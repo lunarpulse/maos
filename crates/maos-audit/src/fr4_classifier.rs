@@ -114,6 +114,8 @@ pub enum PayloadType {
     ContextEnvelope,
     RedistillRequest,
     RedistillOutcome,
+    /// A directed task's reply envelope: exactly one string field, `result`.
+    TaskReply,
 }
 
 /// The intent grammar of one writer site: an exact literal, or a fixed
@@ -377,7 +379,7 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         // fired_at_ns, compliance_claim_ref (Option<[u8;32]> → array|null),
         // side_effect_token_id (TokenId([u8;16]) → array),
         // principal_revocability (bool).
-        site: ("schedule_watchdog.rs", "poll_once", 0),
+        site: ("schedule_watchdog.rs", "admit", 0),
         kind: 7,
         token: TokenColumn::Absent,
         intent: WriterIntent::Prefix("schedule.fire:"),
@@ -549,22 +551,13 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     // the smoke distillate write — a smoke seed, never a production row.
     WriterShapeEntry::call("main.rs", "smoke_orchestrator_fanout_6_2", 0),
     // ── maos-iac — NonCall (kind-1 FR50 dispositions, D-16-3-J (4)) ────────
+    // `emit_task_complete` is the single writer behind the nack and escalate
+    // helpers; its subject is `task.nacked` or `task.escalated`.
     WriterShapeEntry {
-        site: ("adapter.rs", "emit_task_complete_nack", 0),
+        site: ("adapter.rs", "emit_task_complete", 0),
         kind: 1,
         token: TokenColumn::Absent,
-        intent: WriterIntent::Exact("task.nacked"),
-        shape: Some(&[
-            ("task_id", PayloadType::Str),
-            ("originator_spirit_id", PayloadType::Str),
-            ("capability_token", PayloadType::NumArrayOrNull),
-        ]),
-    },
-    WriterShapeEntry {
-        site: ("adapter.rs", "emit_task_complete_escalated", 0),
-        kind: 1,
-        token: TokenColumn::Absent,
-        intent: WriterIntent::Exact("task.escalated"),
+        intent: WriterIntent::Prefix("task."),
         shape: Some(&[
             ("task_id", PayloadType::Str),
             ("originator_spirit_id", PayloadType::Str),
@@ -617,6 +610,37 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
     },
     WriterShapeEntry {
         site: ("transparency_log.rs", "write_erasure_body", 1),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redacted"),
+        shape: Some(&[
+            ("redacted_frame_id", PayloadType::Str),
+            ("original_kind", PayloadType::Num),
+        ]),
+    },
+    // Story 22-6: the same markers, written when a forget scrubs a sealed segment.
+    WriterShapeEntry {
+        site: ("rotation.rs", "scrub_segment", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("distillate.redacted"),
+        shape: Some(&[
+            ("principal_id", PayloadType::Str),
+            ("redacted_distillate_frame_id", PayloadType::Str),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("rotation.rs", "scrub_segment", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("frame.redacted"),
+        shape: Some(&[
+            ("redacted_frame_id", PayloadType::Str),
+            ("original_kind", PayloadType::Num),
+        ]),
+    },
+    WriterShapeEntry {
+        site: ("rotation.rs", "scrub_segment", 0),
         kind: 1,
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("distillate.redacted"),
@@ -684,6 +708,15 @@ pub const WRITER_SHAPES: &[WriterShapeEntry] = &[
         token: TokenColumn::Absent,
         intent: WriterIntent::Exact("context.limit"),
         shape: Some(&[("ContextLimit", PayloadType::ContextEnvelope)]),
+    },
+    // Story 22-8: Mira's native directed-task reply row, written before `completed` as a
+    // component's mailbox reply is (`{"TaskComplete":{"result":"<answer json>"}}`).
+    WriterShapeEntry {
+        site: ("native_task.rs", "run", 0),
+        kind: 1,
+        token: TokenColumn::Absent,
+        intent: WriterIntent::Exact("task.reply"),
+        shape: Some(&[("TaskComplete", PayloadType::TaskReply)]),
     },
     // ── maos-iac — Call (deliberately NOT exempt) ──────────────────────────
     // 17-3c: `deliver_typed` / DRR `flush_batch` now write the caller's
@@ -857,6 +890,12 @@ fn payload_matches(
                     && ["context_used", "context_window_size", "threshold_permille"]
                         .iter()
                         .all(|key| object.get(*key).is_some_and(serde_json::Value::is_u64))
+            }),
+            PayloadType::TaskReply => value.as_object().is_some_and(|object| {
+                object.len() == 1
+                    && object
+                        .get("result")
+                        .is_some_and(serde_json::Value::is_string)
             }),
             PayloadType::SpiritPidEqualsRow => value.as_u64() == Some(row_spirit_pid as u64),
         };

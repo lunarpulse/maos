@@ -10,11 +10,16 @@ pub struct SweepCompletion {
     pub through_rowid: u64,
 }
 pub struct ErasureSweep {
-    subjects: Vec<String>,
-    spirit: Option<String>,
+    pub(super) subjects: Vec<String>,
+    pub(super) spirit: Option<String>,
     through: i64,
     admissions: Admissions,
-    sources: HashSet<String>,
+    pub(super) sources: HashSet<String>,
+    /// Story 22-6: `sources.len()` at the last sealed-segment pass (`None` = never run).
+    pub(super) sealed_scanned: Option<usize>,
+    /// Story 22-6: while a sweep state lives, rotation defers (a frame the sweep has yet to
+    /// scrub must not move into a segment).
+    active: Option<ActiveSweep>,
     pub distillates: Vec<(i64, String)>,
     pub principal_frames: Vec<(i64, String)>,
     pub requests: Vec<RedistillRequest>,
@@ -32,6 +37,8 @@ impl ErasureSweep {
             through: 0,
             admissions: HashMap::new(),
             sources: HashSet::new(),
+            sealed_scanned: None,
+            active: None,
             distillates: Vec::new(),
             principal_frames: Vec::new(),
             requests: Vec::new(),
@@ -50,6 +57,13 @@ impl ErasureSweep {
             || !self.held_principals.is_empty()
             || !self.malformed.is_empty()
             || !self.unattributed.is_empty()
+    }
+}
+/// Counts one live sweep on its adapter; dropping the sweep state releases rotation.
+struct ActiveSweep(std::sync::Arc<std::sync::atomic::AtomicUsize>);
+impl Drop for ActiveSweep {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
     }
 }
 impl TransparencyLogAdapter {
@@ -121,6 +135,14 @@ impl TransparencyLogAdapter {
     }
     /// One finite range; callers dispatch its real requests before certification.
     pub fn sweep_erasure(&self, state: &mut ErasureSweep) -> Result<(), AuditError> {
+        // Story 22-6 (D-22-6-07 A): sealed segments first, so live distillates that cite a
+        // sealed principal frame are found through `sources`.
+        if state.active.is_none() {
+            self.active_erasures
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            state.active = Some(ActiveSweep(std::sync::Arc::clone(&self.active_erasures)));
+        }
+        self.sweep_sealed_segments(state)?;
         let range = (state.through, self.frame_high_water()?);
         state.sources.extend(self.prior_tombstones(range)?);
         let mut frames = Vec::new();
@@ -244,6 +266,8 @@ impl TransparencyLogAdapter {
             })?;
         malformed.sort_unstable();
         state.malformed.extend(malformed);
+        // Sealed distillates that cite a frame this pass scrubbed in the live log.
+        self.sweep_sealed_segments(state)?;
         state.through = range.1;
         Ok(())
     }
@@ -297,7 +321,10 @@ impl TransparencyLogAdapter {
             if intent.starts_with("principal.uninstall.")
                 || matches!(
                     intent.as_str(),
-                    "principal.forget" | "principal.forget.held" | "distillate.redacted"
+                    "principal.forget"
+                        | "principal.forget.held"
+                        | "principal.forget.intent"
+                        | "distillate.redacted"
                 )
             {
                 continue;

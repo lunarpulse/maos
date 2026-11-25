@@ -91,9 +91,8 @@ MAOS separates the **kernel** (invariant, small, ~20 KLOC core) from **Spirits**
 A **MAOS Host** is a single OS process running the kernel. The kernel exposes
 five services plus two internal modules and one stable contract. Spirits run as
 in-process Rust actors (v0.1) or subprocess binaries (the first
-third-party-shippable form); the WASM-component form (ADR-031, ADR-060) ships
-as an opt-in build (`--features wasm-host`, off by default; making it default-on
-is owned by `21-9-wasm-host-default-on`).
+third-party-shippable form). The default host includes the WASM-component form
+(ADR-031, ADR-060) through the `wasm-host` feature.
 
 ```mermaid
 flowchart TB
@@ -168,8 +167,8 @@ gate and forces a major-version bump (ADR-037). Full text in
    the kernel compares via four universal predicates and never introspects Spirit
    cognition.
 8. **Constitutional governance is structural, not procedural.** Invariant changes
-   require the `invariant-lock` gate; per-crate KLOC ceilings enforced by `tokei`
-   (kernel core ≤ 23,000 tokei lines, alarm at 22,000 — ADR-069; currently 20,429).
+   require the `invariant-lock` gate; the kernel core is held to its ADR-069 envelope by `tokei`
+   (kernel core ≤ 24,000 tokei lines, alarm at 23,000; currently 22,143), every other crate measured and printed, not gated.
 
 ## Constitutional invariants (I1–I14)
 
@@ -205,22 +204,20 @@ Three entry points, depending on why you're here (mirrors the
 
 ### ▶️ Run MAOS
 
-Build the kernel host (`maos`) and the operator CLI (`maosctl`):
+Build the host (`maos`), its sibling WASM runner and the operator CLI (`maosctl`):
 
 ```sh
-cargo build -p maos-bin --release      # the `maos` Host executable
-cargo build -p maos-cli --release      # the `maosctl` operator CLI
+cargo build --locked --release -p maos-bin -p maos-wasm-host -p maos-cli
 ```
 
-The default build excludes the WASM engine. To build the opt-in component host
-and runner for development:
+For an explicitly engine-free host, keep networking but disable default features:
 
 ```sh
-cargo build -p maos-bin --release --features wasm-host
+cargo build --locked --release -p maos-bin --no-default-features --features network
 ```
 
-WASM-enabled distribution remains subject to
-[`docs/compliance/export-counsel-precondition.md`](docs/compliance/export-counsel-precondition.md).
+The default build includes Wasmtime. No ECCN determination or counsel review
+is claimed; see [export classification](docs/compliance/eccn-classification.md).
 
 Initialize a Host and start the runtime daemon:
 
@@ -234,6 +231,9 @@ maos shell           # kernel-rendered REPL — talk to a Spirit with `@<spirit>
 maos audit query --spirit <name>   # read a Spirit's Transparency Log trail
                                      #   (calls, halts, operator completions)
 ```
+
+For business-authored, read-only workflows, see the
+[topology authoring and evaluation examples](examples/workflows/README.md).
 
 Operate with `maosctl`:
 
@@ -338,7 +338,7 @@ maos/
 ├── examples/      # worked example Spirits (Rust + TypeScript)
 ├── templates/     # cargo-generate Spirit templates (Rust + TS)
 ├── schemas/       # JSON schemas (manifest, ComplianceClaim, gateway, halt registry)
-├── wit/           # WebAssembly Interface Types (WASM Spirit form, opt-in `wasm-host`)
+├── wit/           # WebAssembly Interface Types (WASM Spirit form)
 ├── docs/          # invariants, ADRs, dev-discipline, the three-door docs site
 ├── xtask/         # build-discipline gates run on every PR
 ├── fuzz/          # fuzz targets
@@ -426,9 +426,9 @@ run on **every PR** — these shipped *before* kernel code, by design:
 
 - **`invariant-lock`** — any change to invariant files, the `lock.toml` mapping,
   or `maos-domain` invariant types requires a machine-checkable diff, a corpus
-  delta, a phase-commitment update, and ≥2 maintainer sign-offs (ADR-037).
-- **KLOC ceilings** — `tokei`-enforced per-crate budgets; kernel core ≤ 23,000 tokei lines,
-  alarm at 22,000 (ADR-069).
+  delta, and a phase-commitment update (ADR-037).
+- **KLOC envelope** — `tokei`-enforced for the kernel core only: ≤ 24,000 tokei lines,
+  alarm at 23,000 (ADR-069); every other crate is measured and printed by `kloc-check`, never gated.
 - **ABI diff** — `cargo public-api` gates the frozen Spirit ABI; only additive
   changes pass without a version bump.
 - **Service-boundary lint** — `check-service-boundary` enforces the
@@ -449,12 +449,12 @@ cargo fmt --all && cargo clippy --workspace --all-targets
 
 ## Project status & roadmap
 
-**Status: `v1.0.0-rc.2` release candidate (workspace version `1.0.0-rc.2`), actively developed.** The kernel substrate, the Spirit
+**Status: `v1.0.0` general availability (workspace version `1.0.0`).** The kernel substrate, the Spirit
 ABI, the adapter ring, and all nine reference Spirits are implemented; the live
 runtime spine (`maos run`) fires real Spirit behavior through production wiring.
-Work is organized as **23 epics** (0, 1a, 1b, 2–21); epics 0 through 19 are done,
-and Epic 20 (the `v1.0.0-rc.2` release candidate and LTS rule) and Epic 21 are in
-progress.
+Work is organized as **23 epics** (0, 1a, 1b, 2–21); epics 0 through 21 are the
+`v1.0.0` scope. What the release does not claim is listed in the
+[release notes](docs/release/v1.0.0.md) and [`RELEASE-HOLDS.md`](RELEASE-HOLDS.md).
 
 | Phase | Milestone | Target |
 |---|---|---|

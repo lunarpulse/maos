@@ -49,6 +49,35 @@ impl Default for WorkingMemoryDigestRefs {
     }
 }
 
+/// One `decision.*` frame: the digests and inbound raw frames the Spirit declared in context and
+/// the refs the frame carries.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Decision {
+    pub declared: Vec<String>,
+    pub refs: Vec<String>,
+}
+
+/// I12 observation: the decision frames sent.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub decisions: Vec<Decision>,
+}
+
+/// I12 predicate: every declared in-context digest and inbound raw frame is in the decision
+/// frame's `working_memory_digest_refs`.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for d in &obs.decisions {
+        let complete = d.declared.iter().all(|r| d.refs.contains(r));
+        ensure(
+            complete,
+            "I12",
+            "decision frame omits a declared in-context digest or raw frame",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

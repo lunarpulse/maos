@@ -2,9 +2,11 @@
 
 //! Story 10.2 AC1 — xtask CI gate: parse `docs/third-party-trial/results/trial-results.toml`
 //! via typed serde deserialization. Integrity failures are fatal at every N.
-//! Validated sampling-only N<12 is preliminary; substantive findings stay RED.
-//! Registry disposition decides whether either blocks, never whether it passed.
-//! At N>=12 all sampling floors block. Wilson 95% CI remains advisory only.
+//! Story 22-7 (D-22-7-10 A): the human-author denominator is removed. There is no sampling floor
+//! (no N = 12, no >= 10 successes, no strata) and no Wilson interval: a cohort of N >= 1 that
+//! passes every per-participant check reads Green and says its N; any per-participant finding
+//! reads Red; N = 0 reads Insufficient. A green gate does not claim an N = 12 human cohort.
+//! Registry disposition decides whether a verdict blocks, never whether it passed.
 
 use serde::Deserialize;
 use std::path::Path;
@@ -23,17 +25,11 @@ pub struct TrialSection {
     pub trial_start: String,
     pub trial_end: String,
     pub methodology_version: String,
-    pub no_prior_contribution: i64,
-    pub no_rust_spirit: i64,
-    pub no_rust: i64,
-    pub non_english: i64,
-    pub offline_only: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Participant {
     pub id: String,
-    pub stratum: Vec<String>,
     pub produced_binary: bool,
     pub binary_loads: bool,
     pub frames_run: i64,
@@ -59,25 +55,6 @@ fn validate_dates(start: &str, end: &str) -> Result<(), String> {
 use crate::gate_common::{
     validate_dates as validate_dates_shared, Observation, OutOfLedgerVerdict,
 };
-
-/// Wilson score interval (95% CI, z = 1.96) for `successes` out of `n`.
-/// At N=12, successes=10 this returns approximately (0.552, 0.953).
-fn wilson_ci(successes: i64, n: i64) -> (f64, f64) {
-    // Defensive: caller must guard n > 0 && successes <= n, but clamp anyway so a
-    // malformed input (e.g. successes > n) can't produce sqrt(negative) = NaN in
-    // the advisory CI written to the step summary.
-    if n <= 0 || successes < 0 || successes > n {
-        return (f64::NAN, f64::NAN);
-    }
-    let n_f = n as f64;
-    let p = successes as f64 / n_f;
-    let z = 1.96_f64;
-    let z2 = z * z;
-    let denom = 1.0 + z2 / n_f;
-    let center = (p + z2 / (2.0 * n_f)) / denom;
-    let margin = z * (p * (1.0 - p) / n_f + z2 / (4.0 * n_f * n_f)).sqrt() / denom;
-    (center - margin, center + margin)
-}
 
 const RESULTS_PATH: &str = "docs/third-party-trial/results/trial-results.toml";
 
@@ -276,11 +253,6 @@ fn check(
     let counts = [
         ("participants_total", t.participants_total),
         ("successes", t.successes),
-        ("no_prior_contribution", t.no_prior_contribution),
-        ("no_rust_spirit", t.no_rust_spirit),
-        ("no_rust", t.no_rust),
-        ("non_english", t.non_english),
-        ("offline_only", t.offline_only),
     ];
     for (name, val) in counts {
         validate_non_negative(name, val)?;
@@ -449,122 +421,23 @@ fn check(
             t.successes, failures.join("; ")
         ));
     }
-    let substantive_findings = !failures.is_empty();
-    if derived_successes < 10 {
-        failures.push(format!(
-            "derived_successes={derived_successes} (< 10 floor)"
-        ));
-    }
-
-    // ── D4: stratification counts derived from participant[].stratum, reconciled ────
-    // Counts derive from detail, just like successes. Strata may overlap, but each
-    // participant must list unique canonical names.
-    let mut derived_strata: std::collections::HashMap<&str, i64> = std::collections::HashMap::new();
-    let canonical_strata = [
-        "no_prior_contribution",
-        "no_rust_spirit",
-        "no_rust",
-        "non_english",
-        "offline_only",
-    ];
-    for p in &results.participant {
-        if p.stratum.is_empty() {
-            return Err(format!(
-                "check-third-party-trial: FAIL — participant {} has empty stratum (must belong to ≥1 canonical stratum)",
-                p.id
-            ));
-        }
-        // Spec Task 1.2: stratum is a list — a participant can belong to multiple strata
-        // (e.g. no_prior_contribution AND non_english). Each stratum label is counted.
-        let mut seen_strata = std::collections::HashSet::new();
-        for s in &p.stratum {
-            if !seen_strata.insert(s.as_str()) {
-                return Err(format!("participant {} has duplicate stratum '{s}'", p.id));
-            }
-            if !canonical_strata.contains(&s.as_str()) {
-                return Err(format!(
-                    "check-third-party-trial: FAIL — participant {} has unknown stratum '{}' (not one of {:?})",
-                    p.id, s, canonical_strata
-                ));
-            }
-            *derived_strata.entry(s.as_str()).or_insert(0) += 1;
-        }
-    }
-    let strat_floors = [
-        ("no_prior_contribution", 4, t.no_prior_contribution),
-        ("no_rust_spirit", 3, t.no_rust_spirit),
-        ("no_rust", 2, t.no_rust),
-        ("non_english", 2, t.non_english),
-        ("offline_only", 1, t.offline_only),
-    ];
-    for (name, floor, reported) in strat_floors {
-        let derived = derived_strata.get(name).copied().unwrap_or(0);
-        // Integrity: derived count must reconcile with the reported [trial] count.
-        if derived != reported {
-            return Err(format!(
-                "check-third-party-trial: FAIL — stratum '{name}': self-reported={reported} does not match participant records (derived={derived})"
-            ));
-        }
-        // AC-1 minimum coverage.
-        if derived < floor {
-            failures.push(format!(
-                "stratum '{name}' derived={derived} (< {floor} floor)"
-            ));
-        }
-    }
-
-    // Advisory only — Wilson 95% CI on the success rate (logged, never asserted; F5→A-prime).
-    let (ci_lower, ci_upper) = if t.participants_total > 0 {
-        wilson_ci(t.successes, t.participants_total)
-    } else {
-        (0.0_f64, 0.0_f64)
-    };
-    if let Ok(summary_path) = std::env::var("GITHUB_STEP_SUMMARY") {
-        let summary = format!(
-            "## ℹ️ Third-Party Trial Gate: Wilson 95% CI\n\
-            successes={} / n={} → [{:.3}, {:.3}]\n",
-            t.successes, t.participants_total, ci_lower, ci_upper
-        );
-        let _ = std::fs::OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&summary_path)
-            .and_then(|mut f| {
-                use std::io::Write;
-                f.write_all(summary.as_bytes())
-            });
-    }
-
-    let preliminary = t.participants_total < 12;
-    if preliminary {
-        failures.push(format!(
-            "participants_total={} (< 12 floor)",
-            t.participants_total
-        ));
-    }
-    let observation = if substantive_findings {
+    // Story 22-7 (D-22-7-10 A): no sampling floor. The human-author denominator (the N = 12 and
+    // >= 10 floors, the strata and the Wilson interval) is removed; what a cohort of any size
+    // must still do is pass every per-participant check above.
+    let n = t.participants_total;
+    let observation = if !failures.is_empty() {
         Observation::Red
-    } else if preliminary {
+    } else if n == 0 {
         Observation::Insufficient
-    } else if failures.is_empty() {
+    } else {
         Observation::Green
-    } else {
-        Observation::Red
     };
-    let strata: Vec<_> = strat_floors
-        .iter()
-        .map(|(name, floor, _)| {
-            serde_json::json!({
-                "name": name,
-                "count": derived_strata.get(name).copied().unwrap_or(0),
-                "floor": floor,
-            })
-        })
-        .collect();
-    let reason = if failures.is_empty() {
-        "all trial sampling floors met".to_owned()
-    } else {
+    let reason = if !failures.is_empty() {
         failures.join("; ")
+    } else if n == 0 {
+        "N=0; no participants recorded".to_owned()
+    } else {
+        format!("N={n}; no sampling floor (human-author denominator removed, 22-7)")
     };
     Ok((
         OutOfLedgerVerdict::judge_registered(
@@ -575,16 +448,13 @@ fn check(
             reason,
         )?,
         serde_json::json!({
-            "trial_status": if preliminary { "preliminary" } else { "complete" },
+            "trial_status": if n == 0 { "empty" } else { "recorded" },
             "participants_total": t.participants_total,
             "successes_reported": t.successes,
             "successes_derived": derived_successes,
-            "strata": strata,
             "trial_start": t.trial_start,
             "trial_end": t.trial_end,
             "methodology_version": t.methodology_version,
-            "wilson_ci_lower": ci_lower,
-            "wilson_ci_upper": ci_upper,
             "provenance_required": require_derivation_provenance,
             "failures": failures,
         }),

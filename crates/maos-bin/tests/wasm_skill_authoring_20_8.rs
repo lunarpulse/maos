@@ -263,6 +263,7 @@ author_self = {granted}
                 hooks: None,
                 providers: None,
                 iac: Some(&iac),
+                quarantine: None,
             },
             &gated,
             obj,
@@ -277,16 +278,13 @@ author_self = {granted}
         let launch = SessionLaunch {
             plan: maos_host::SpiritLaunchPlan {
                 program: runner.to_string_lossy().into_owned(),
-                argv: vec![
-                    "--component".into(),
-                    component.to_string_lossy().into_owned(),
-                    "--fuel".into(),
-                    "100000000".into(),
-                ],
+                argv: vec!["--fuel".into(), "100000000".into()],
                 env: vec![],
                 wire: maos_host::WireShape::ContentLengthCbor,
             },
-            component_artifact: Some(component),
+            component_artifact: Some(
+                maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&component).unwrap(),
+            ),
             turn_budget: Duration::from_secs(30),
             context_window: Default::default(),
             once: true,

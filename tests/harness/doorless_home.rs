@@ -83,3 +83,17 @@ pub fn doorless_xdg_data_home() -> PathBuf {
     std::fs::create_dir_all(&path).expect("scratch XDG_DATA_HOME");
     path
 }
+
+/// A fresh, empty, doorless `HOME` for ONE spawned root. A root that takes the A2A pin store
+/// (Story 21-3) holds an exclusive lock on `<HOME>/.maos/a2a-pins-<local host>.json`, so two
+/// roots of the same host name running at once (tests on threads) must not share the
+/// binary-wide [`doorless_home`].
+pub fn fresh_home() -> PathBuf {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let path = doorless_home().join(format!(
+        "root-{}",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    std::fs::create_dir_all(&path).expect("fresh HOME for one spawned root");
+    path
+}

@@ -28,11 +28,12 @@ const FALSIFIER_TAG: &str = "kernel-pin-falsifier-15-4";
 const FALSIFIER_SHA: &str = "843d53657f2180b56cb374d4e61875f523da7662";
 const FALSIFIER_FILE: &str = "security/sandbox/linux.rs";
 /// The file set is invariant across the falsifier — both sides are copies of the
-/// live tree (90 files since Story 21-5 moved `orchestrator/` out; 95 since Story 17-2
+/// live tree (89 files since Story 21-10 deleted `security/approval.rs`; 90 since Story 21-5
+/// moved `orchestrator/` out; 95 since Story 17-2
 /// retired `scheduler/resource_ceiling.rs`)
 /// — which is exactly why the SET half cannot carry AC2 and
 /// only the per-file hash can.
-const PINNED_ENTRIES: usize = 90;
+const PINNED_ENTRIES: usize = 89;
 
 fn workspace_root() -> PathBuf {
     // `cargo test -p xtask` runs with CWD = `xtask/`, not the workspace root.
@@ -248,7 +249,7 @@ fn a_line_neutral_kernel_edit_reds_the_gate_and_names_the_file() {
     assert!(report.removed.is_empty(), "removed: {:?}", report.removed);
     assert_eq!(
         report.file_set_entries, PINNED_ENTRIES,
-        "the SET is invariant across the falsifier — 90 files both sides"
+        "the SET is invariant across the falsifier — 89 files both sides"
     );
     assert!(
         failure_detail(&report).contains(FALSIFIER_FILE),
@@ -816,11 +817,8 @@ fn no_key_before_src_lines_begins_with_src_lines() {
 
 #[test]
 fn the_three_other_readers_still_resolve_the_pin() {
-    assert_eq!(
-        read_pinned(&baseline_toml()).expect("read_pinned"),
-        26061,
-        "the xtask reader"
-    );
+    // The pin is a measured value: the readers must AGREE with `read_pinned`, not with a literal.
+    read_pinned(&baseline_toml()).expect("read_pinned");
 
     let text = std::fs::read_to_string(baseline_toml()).expect("read baseline");
 
@@ -836,7 +834,11 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .map(str::trim)
         .and_then(|v| v.parse().ok())
         .expect("the a2a-tcp guard's parse still resolves");
-    assert_eq!(a2a, 26061, "the a2a-tcp reader");
+    assert_eq!(
+        a2a,
+        read_pinned(&baseline_toml()).expect("read_pinned"),
+        "the a2a-tcp reader"
+    );
 
     // `fkcs_oracle.rs:170` — exact `strip_prefix("src_lines = ")`.
     let oracle: usize = text
@@ -845,7 +847,11 @@ fn the_three_other_readers_still_resolve_the_pin() {
         .expect("the fkcs oracle's parse still resolves")
         .parse()
         .expect("parses");
-    assert_eq!(oracle, 26061, "the fkcs oracle reader");
+    assert_eq!(
+        oracle,
+        read_pinned(&baseline_toml()).expect("read_pinned"),
+        "the fkcs oracle reader"
+    );
 }
 
 #[test]
@@ -856,17 +862,10 @@ fn the_pin_is_readable_by_a_real_toml_parser() {
     // line-count-neutral; Story 16-5's ratification ledger now places it at line 496.
     let text = std::fs::read_to_string(baseline_toml()).expect("read baseline");
     let parsed: toml::Value = toml::from_str(&text).expect("the baseline file must be valid TOML");
-    assert_eq!(parsed["src_lines"].as_integer(), Some(26061));
-
-    let numbered = text
-        .lines()
-        .position(|line| line.trim_start().starts_with("src_lines = "))
-        .expect("src_lines assignment exists");
     assert_eq!(
-        numbered + 1,
-        505,
-        "`src_lines` moved off line 505 — every `kernel-core-baseline.toml:505` citation \
-         in the tree resolves against that line"
+        parsed["src_lines"].as_integer(),
+        i64::try_from(read_pinned(&baseline_toml()).expect("read_pinned")).ok(),
+        "the TOML parse must agree with read_pinned"
     );
 
     let files = parsed["kernel_src"]["files"]

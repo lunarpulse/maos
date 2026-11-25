@@ -1,0 +1,12 @@
+MAOS Host "{{ include "maos.fullname" . }}" installed (image {{ include "maos.image" . }}).
+
+Check it:
+  kubectl rollout status statefulset/{{ include "maos.fullname" . }} -n {{ .Release.Namespace }}
+  kubectl exec -n {{ .Release.Namespace }} {{ include "maos.fullname" . }}-0 -c maos -- /usr/local/bin/maosctl status
+  kubectl exec -n {{ .Release.Namespace }} {{ include "maos.fullname" . }}-0 -c maos -- /usr/local/bin/maosctl agents
+
+The operator door listens on loopback inside the pod only; this chart renders no Service for it.
+The home is the PersistentVolumeClaim "home-{{ include "maos.fullname" . }}-0" at /var/lib/maos.
+
+NOT SUPPORTED: T3 Workers. They need a rootless container runtime, which a pod does not provide
+by default. This chart mounts no container socket and requests no privilege to work around that.

@@ -41,6 +41,10 @@ pub const ARTIFACTS: &[Artifact] = &[
         package: "maos-spirit-cli",
         binary: "maos-spirit",
     },
+    Artifact {
+        package: "maos-wasm-host",
+        binary: "maos-wasm-runner",
+    },
 ];
 
 /// Written by the manifest path, never a release artifact. Cleared before a

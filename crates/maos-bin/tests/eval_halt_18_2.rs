@@ -99,7 +99,7 @@ fn stderr(out: &Output) -> String {
 }
 
 fn sidecar_path(home: &Path, class: &str, version: &str) -> PathBuf {
-    home.join(".local/share/maos/registry/spirits")
+    home.join("registry/spirits")
         .join(class)
         .join(version)
         .join("benchmark.signed.json")

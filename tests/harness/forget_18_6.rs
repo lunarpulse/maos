@@ -223,6 +223,7 @@ pub fn assert_absent(home: &Path, principal: &str, canary: &str) {
         if ![
             "principal.forget",
             "principal.forget.held",
+            "principal.forget.intent",
             "distillate.redacted",
         ]
         .contains(&intent.as_str())

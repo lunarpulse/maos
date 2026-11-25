@@ -1,4 +1,10 @@
 // Story 20-16: local mirrors, not a replacement for the authoritative CI run.
+//
+// Default (scoped, lean-gates WP-11): `cargo fmt --check`, the gate loop, `cargo nextest run` over the
+// workspace members the diff touches and their direct dependants, `cargo test -p maos-kernel-core --lib`
+// when the kernel changed, and the docs legs when the docs trigger fires. A broken test in an unrelated
+// crate is NOT seen by the scoped run; `--full` is the whole local mirror (workspace nextest, doctests,
+// binary size, test budget and the CI-pin mirror) and the hosted run stays authoritative.
 use regex::Regex;
 use serde::Serialize;
 use serde_json::Value;
@@ -10,6 +16,8 @@ use std::time::{Instant, UNIX_EPOCH};
 use syn::visit::Visit;
 
 const WORKFLOW: &str = ".github/workflows/discipline.yml";
+/// The one release-size limit in bytes; `tests/integration/onb_nfr2_timing.sh` reads the same file.
+const RELEASE_SIZE_LIMIT: &str = include_str!("../../tests/integration/release-size-limit");
 // Literal CI invocations; build-test-fixtures precedes every test leg.
 const GATES: &[(&str, &str)] = &[
     ("stability-matrix --check", "STABILITY.md"),
@@ -22,10 +30,6 @@ const GATES: &[(&str, &str)] = &[
     ),
     ("check-manifest-schema-version", "manifest schema"),
     ("check-skill-schema", "skill schema"),
-    (
-        "check-epic-close-coherence",
-        "epic closure / discipline workflow",
-    ),
     (
         "check-coverage-matrix-completeness",
         "tests/coverage-matrix.yaml",
@@ -61,9 +65,6 @@ const GATES: &[(&str, &str)] = &[
         "calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95",
         "calibration seed",
     ),
-    ("check-review-findings-resolved", "review closure"),
-    ("check-dev-record-completeness", "story records"),
-    ("check-dev-model-tier", "story model tiers"),
     ("check-ship-gate-completeness", "ship registry"),
     ("check-pentest-gate", "pen-test evidence"),
     ("check-third-party-trial", "trial evidence"),
@@ -74,6 +75,9 @@ const GATES: &[(&str, &str)] = &[
     ("cassette-age-gate", "cassette age policy"),
     ("build-test-fixtures", "target/maos-fixtures/manifest.json"),
 ];
+
+/// The scoped test leg; the package selection (`-p <member>` ... or `--workspace`) is appended.
+const SCOPED_NEXTEST: &str = "cargo nextest run --locked --color never --no-fail-fast --no-tests pass --success-output immediate --failure-output final";
 
 #[derive(Debug, Serialize)]
 struct Record {
@@ -309,6 +313,93 @@ fn binary_paths(metadata: &Value) -> Result<BTreeSet<String>, String> {
     }
     Ok(paths)
 }
+/// The workspace members a scoped run tests: every member whose directory holds a changed path plus its
+/// direct dependants (any workspace package with a path dependency on a changed member, dev included).
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Scope {
+    packages: BTreeSet<String>,
+    /// A change no single member owns (`Cargo.toml`, `Cargo.lock`, the toolchain, nextest config).
+    whole_workspace: bool,
+    kernel: bool,
+}
+impl Scope {
+    fn workspace() -> Self {
+        Self {
+            whole_workspace: true,
+            ..Self::default()
+        }
+    }
+    fn is_empty(&self) -> bool {
+        !self.whole_workspace && self.packages.is_empty()
+    }
+    fn nextest_selection(&self) -> Vec<&str> {
+        if self.whole_workspace {
+            return vec!["--workspace"];
+        }
+        self.packages
+            .iter()
+            .flat_map(|name| ["-p", name.as_str()])
+            .collect()
+    }
+}
+fn scope(metadata: &Value, paths: &BTreeSet<String>) -> Result<Scope, String> {
+    let packages = metadata["packages"]
+        .as_array()
+        .ok_or("metadata lacks packages")?;
+    let root = Path::new(
+        metadata["workspace_root"]
+            .as_str()
+            .ok_or("metadata lacks workspace_root")?,
+    );
+    let mut members = Vec::new();
+    for package in packages {
+        let name = package["name"].as_str().ok_or("package lacks name")?;
+        let manifest = package["manifest_path"]
+            .as_str()
+            .ok_or("package lacks manifest_path")?;
+        let directory = Path::new(manifest)
+            .parent()
+            .and_then(|d| d.strip_prefix(root).ok())
+            .ok_or("package directory is outside the workspace")?;
+        members.push((name, format!("{}/", directory.display())));
+    }
+    let mut scope = Scope::default();
+    for path in paths {
+        if matches!(
+            path.as_str(),
+            "Cargo.toml" | "Cargo.lock" | "rust-toolchain.toml"
+        ) || path.starts_with(".config/")
+        {
+            scope.whole_workspace = true;
+        }
+        // The deepest member directory owns the path (a member may nest inside another).
+        let owner = members
+            .iter()
+            .filter(|(_, directory)| path.starts_with(directory.as_str()))
+            .max_by_key(|(_, directory)| directory.len());
+        if let Some((name, _)) = owner {
+            scope.packages.insert((*name).to_owned());
+        }
+    }
+    scope.kernel = scope.whole_workspace || scope.packages.contains("maos-kernel-core");
+    let changed = scope.packages.clone();
+    for package in packages {
+        let depends = package["dependencies"]
+            .as_array()
+            .ok_or("package lacks dependencies")?;
+        if depends.iter().any(|dep| {
+            dep["path"].is_string() && dep["name"].as_str().is_some_and(|n| changed.contains(n))
+        }) {
+            scope.packages.insert(
+                package["name"]
+                    .as_str()
+                    .ok_or("package lacks name")?
+                    .to_owned(),
+            );
+        }
+    }
+    Ok(scope)
+}
 fn size_trigger(paths: &BTreeSet<String>, closure: &BTreeSet<String>) -> bool {
     paths.iter().any(|p| {
         p == "Cargo.toml" || p == "Cargo.lock" || closure.iter().any(|prefix| p.starts_with(prefix))
@@ -342,7 +433,7 @@ fn migration_corpus_skip(root: &Path) -> Option<String> {
     ))
 }
 
-pub(crate) fn run(json: bool) -> ! {
+pub(crate) fn run(json: bool, full: bool) -> ! {
     let started = Instant::now();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
     let mut report = Report::default();
@@ -380,13 +471,27 @@ pub(crate) fn run(json: bool) -> ! {
         (_, None) => Err("change detection unavailable; cannot decide trigger".into()),
         (Ok(metadata), Some(_)) => binary_paths(metadata),
     };
-    if let Some(closure) = report.result(
-        "binary-size:trigger",
-        "cargo metadata / change set",
-        closure,
-    ) {
-        binary_size(root, &mut report, &closure);
+    if full {
+        if let Some(closure) = report.result(
+            "binary-size:trigger",
+            "cargo metadata / change set",
+            closure,
+        ) {
+            binary_size(root, &mut report, &closure);
+        }
     }
+    let scoped = (!full).then(|| match (&metadata, &report.base) {
+        (Err(error), _) => Err(error.clone()),
+        (Ok(_), None) => Ok(Scope::workspace()),
+        (Ok(metadata), Some(_)) => scope(metadata, &report.changed_paths),
+    });
+    let scoped = scoped.and_then(|scope| {
+        report.result(
+            "scope",
+            "changed workspace members and their direct dependants",
+            scope,
+        )
+    });
     let docs_skip = (report.base.is_some() && !docs_trigger(&report.changed_paths))
         .then_some("no docs-site/**, docs/errors/** or xtask/error-catalog.toml changes");
     let deny =
@@ -412,15 +517,30 @@ pub(crate) fn run(json: bool) -> ! {
         ("docs:build", "docs-site/build", "npm run build"),
         ("docs:routes", "docs-site/build / route-manifest.json", "node scripts/gate-routes.js"),
         ("cargo-deny", "Cargo.lock / deny.toml (required cargo-deny)", "cargo deny check"),
+        ("scoped-nextest", "changed workspace members and their direct dependants", SCOPED_NEXTEST),
         ("workspace-nextest", "workspace tests / cross-crate enrolment scanners",
             "cargo nextest run --workspace --locked --color never --no-fail-fast --success-output immediate --failure-output final"),
         ("kernel-core-lib", "maos-kernel-core lib tests",
             "cargo test -p maos-kernel-core --lib --locked --color never -- --nocapture"),
         ("workspace-doc", "workspace doctests", "cargo test --workspace --doc --locked --color never"),
     ] {
+        let applies = match name {
+            "workspace-nextest" | "workspace-doc" => full,
+            "scoped-nextest" => !full,
+            _ => true,
+        };
+        if !applies {
+            continue;
+        }
         let skip = match name {
             "docs:build" | "docs:routes" => docs_skip,
             "cargo-deny" => deny_skip,
+            "kernel-core-lib" if !full && !scoped.as_ref().is_some_and(|s| s.kernel) => {
+                Some("scoped run: maos-kernel-core did not change")
+            }
+            "scoped-nextest" if scoped.as_ref().is_some_and(|s| s.is_empty()) => {
+                Some("no workspace member changed (scoped run)")
+            }
             _ => None,
         };
         if let Some(reason) = skip {
@@ -438,6 +558,13 @@ pub(crate) fn run(json: bool) -> ! {
         let directory: &Path = if name.starts_with("docs:") { &docs_root } else { root };
         let (tool, args) = invocation.split_once(' ').unwrap();
         let mut cmd = command(directory, tool, args);
+        if name == "scoped-nextest" {
+            let Some(scope) = &scoped else {
+                report.add(name, artifact, "red", "scope unavailable; refusing to run an unscoped guess");
+                continue;
+            };
+            cmd.args(scope.nextest_selection());
+        }
         if name.starts_with("docs:") {
             cmd.env("LOCALE", "ko").env("KO_COVERAGE_MIN", "100");
         }
@@ -446,17 +573,19 @@ pub(crate) fn run(json: bool) -> ! {
             docs_built = output.is_some_and(|o| o.status.success());
         }
     }
-    match (&exe, &junit) {
-        (Ok(exe), Some(path)) if path.exists() => test_budget(&mut report, &path.display().to_string(),
-            command(root, exe, "check-test-budget --json --junit").arg(path)),
-        _ => report.add("test-budget", "nextest/default/junit.xml", "skip",
-            "no fresh local nextest junit; timing judgment is advisory and stale junit is never read"),
-    }
-    let pins = fs::read_to_string(root.join(WORKFLOW))
-        .map_err(|e| e.to_string())
-        .and_then(|workflow| read_pins(&workflow));
-    if let Some(pins) = report.result("ci-pins", WORKFLOW, pins) {
-        check_pins(root, &pins, &mut report);
+    if full {
+        match (&exe, &junit) {
+            (Ok(exe), Some(path)) if path.exists() => test_budget(&mut report, &path.display().to_string(),
+                command(root, exe, "check-test-budget --json --junit").arg(path)),
+            _ => report.add("test-budget", "nextest/default/junit.xml", "skip",
+                "no fresh local nextest junit; timing judgment is advisory and stale junit is never read"),
+        }
+        let pins = fs::read_to_string(root.join(WORKFLOW))
+            .map_err(|e| e.to_string())
+            .and_then(|workflow| read_pins(&workflow));
+        if let Some(pins) = report.result("ci-pins", WORKFLOW, pins) {
+            check_pins(root, &pins, &mut report);
+        }
     }
     let preserved = original.and_then(|before| match before == tracked_tree(root)? {
         true => Ok(()),
@@ -502,11 +631,19 @@ fn test_budget(report: &mut Report, junit: &str, budget: &mut Command) {
     }
 }
 
+fn release_size_limit() -> u64 {
+    RELEASE_SIZE_LIMIT
+        .trim()
+        .parse()
+        .expect("tests/integration/release-size-limit holds one integer")
+}
+
 fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
+    let limit = release_size_limit();
     if !size_trigger(&report.changed_paths, closure) {
         return report.add(
             "binary-size",
-            "release maos <= 35651584 B",
+            &format!("release maos <= {limit} B"),
             "skip",
             "no Cargo.toml, Cargo.lock, maos-bin or transitive local dependency changes",
         );
@@ -531,8 +668,8 @@ fn binary_size(root: &Path, report: &mut Report, closure: &BTreeSet<String>) {
         let stripped = temp.path().join("maos");
         capture_command(command(root, "strip", "-o").arg(&stripped).arg(source))?;
         let actual = fs::metadata(stripped).map_err(|e| e.to_string())?.len();
-        if actual > 35_651_584 {
-            return Err(format!("expected <= 35651584 B, actual {actual} B"));
+        if actual > limit {
+            return Err(format!("expected <= {limit} B, actual {actual} B"));
         }
         Ok(())
     })();

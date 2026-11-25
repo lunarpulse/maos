@@ -381,6 +381,7 @@ async fn j_researcher_hermetic_survey_halts_resolves_once_and_resurveys() {
         SpiritManifestBundle {
             lifecycle: LifecycleSection {
                 enabled_hooks: vec!["on_idle".into()],
+                telemetry: None,
             },
             budget: Some(Budget::from_toml_str(&section(&manifest, &["budget"])).unwrap()),
             ..Default::default()
@@ -949,6 +950,7 @@ async fn mcp_response_only_principal_is_purged_without_cached_claim_resurrection
         &AdmissionDeps {
             providers: None,
             iac: None,
+            quarantine: None,
             scheduler: &scheduler,
             security: &security,
             transparency_log: &tl,

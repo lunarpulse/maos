@@ -1,0 +1,13 @@
+# Default Host file baked into the image (Story 22-3), used when the image runs with no arguments.
+# The cast is the in-tree Spirit manifests under /usr/share/maos/spirits.
+# Nash and Observer are compiled-in deterministic classes: no provider key is needed.
+# Override by mounting your own file (compose: packaging/compose/host.toml at /etc/maos/host.toml;
+# chart: .Values.hostToml). The door stays on loopback; `door_bind` must be a loopback address.
+[host]
+# inference_mode unset is the Deterministic mode (ADR-064): no provider is contacted and no key is needed. `live`, `record` and `replay` are explicit (MAOS_INFERENCE_MODE); `replay` needs MAOS_REPLAY_CASSETTE.
+
+[[host.spirits]]
+manifest = "/usr/share/maos/spirits/nash/manifest.toml"
+
+[[host.spirits]]
+manifest = "/usr/share/maos/spirits/observer/manifest.toml"

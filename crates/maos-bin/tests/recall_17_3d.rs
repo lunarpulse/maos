@@ -211,6 +211,7 @@ impl World {
         AdmissionDeps {
             providers: None,
             iac: None,
+            quarantine: None,
             scheduler: &self.scheduler,
             security: &self.security,
             transparency_log: &self.tl,
@@ -389,16 +390,13 @@ fn launch_with_fixture(
     SessionLaunch {
         plan: maos_host::SpiritLaunchPlan {
             program: runner.to_string_lossy().into_owned(),
-            argv: vec![
-                "--component".into(),
-                component.to_string_lossy().into_owned(),
-                "--fuel".into(),
-                "100000000".into(),
-            ],
+            argv: vec!["--fuel".into(), "100000000".into()],
             env: vec![],
             wire: maos_host::WireShape::ContentLengthCbor,
         },
-        component_artifact: Some(component.to_path_buf()),
+        component_artifact: Some(
+            maos_bin::spirit_session::LaunchArtifact::acquire_local_file(component).unwrap(),
+        ),
         turn_budget: Duration::from_secs(30),
         once,
         context_window: Default::default(),
@@ -914,7 +912,9 @@ async fn denied_promotion_counts_without_terminating_wasm_session() {
     let digest = writer.write_distillate(0, request).unwrap().digest_frame_id;
     let mut allowed = AllowedPromotionSet::new();
     allowed.insert(A2AIntent::new("review"));
-    world.iac.register_promotion_set("collector", Some(allowed));
+    world
+        .iac
+        .register_promotion_set_for_pid("collector", 1, Some(allowed));
     let (core, admitted) = admit(&world, &manifest(true)).await;
     let script = format!("promote {}", hex::encode(digest));
     if let Some(report) = t2_result(

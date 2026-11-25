@@ -38,6 +38,57 @@ pub struct DigestRef {
     pub distillation_depth: u32,
 }
 
+/// One digest write: what was requested, what was persisted and why a refusal was refused.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Attempt {
+    pub requested_sources: u32,
+    pub requested_depth: u32,
+    pub persisted: bool,
+    pub persisted_sources: u32,
+    pub persisted_raw_only: bool,
+    pub refusal: Option<String>,
+}
+
+/// I11 observation: the digest writes attempted.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub attempts: Vec<Attempt>,
+}
+
+/// I11 predicate: a persisted digest has a non-empty, flattened (raw-only) `source_log_ref` and a
+/// depth of at least 1; a request without them is refused `EDigestAuditChainMissing`.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for a in &obs.attempts {
+        let chained = a.requested_sources > 0 && a.requested_depth >= 1;
+        if a.persisted {
+            ensure(
+                chained,
+                "I11",
+                "digest persisted without source_log_ref or depth",
+            )?;
+            ensure(
+                a.persisted_sources > 0,
+                "I11",
+                "persisted digest has an empty source_log_ref",
+            )?;
+            ensure(
+                a.persisted_raw_only,
+                "I11",
+                "persisted digest source_log_ref is not flattened",
+            )?;
+        } else if !chained {
+            let refused = a.refusal.as_deref() == Some("EDigestAuditChainMissing");
+            ensure(
+                refused,
+                "I11",
+                "chainless digest not refused EDigestAuditChainMissing",
+            )?;
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

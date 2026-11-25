@@ -60,6 +60,7 @@ fn root_enumeration_child() {
         "stores/proofs",
         "stores/crl",
         "stores/yank-cursor.json",
+        "stores/segments",
     ] {
         assert!(
             roots
@@ -69,6 +70,14 @@ fn root_enumeration_child() {
             "missing MAOS-owned resolver output {relative}: {roots:#?}"
         );
     }
+    // Story 22-6: the sealed-segment directory beside the relocated log is a MAOS-written
+    // directory root. PROVEN RED: with it removed from `maos_roots` this assertion fails.
+    assert_root(
+        &roots,
+        &home.parent().unwrap().join("stores/segments"),
+        RootKind::Directory,
+        WrittenBy::Maos,
+    );
     assert_root(
         &roots,
         &config.join("audit-signing.key"),
@@ -654,6 +663,122 @@ fn purge_keep_log_discloses_and_preserves_a_queryable_checkpointed_log() {
     }
 }
 
+/// Story 22-6 (AC6, ADR-067 amendment): seal one segment into the log `initialize_and_boot`
+/// created, so `purge` has a segment directory to remove or to retain with the log.
+fn seal_one_segment(audit: &Path) -> usize {
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_iac::adapter::transparency_log::{FrameKind, RotationOutcome, TransparencyLogAdapter};
+    let tl = TransparencyLogAdapter::open(audit, 0x22_06).expect("open the booted log");
+    tl.install_segment_sealer(std::sync::Arc::new(
+        maos_cli::audit_rotation::DaemonSealer::new([0x55; 32], None, None),
+    ))
+    .expect("one sealer");
+    for n in 0..6 {
+        tl.insert_frame_event(
+            FrameKind::TaskAssign,
+            7,
+            None,
+            &format!("purge.segment.{n}"),
+            b"sealed row",
+            FrameOrigin::HumanAuthored,
+        );
+    }
+    match tl.rotate_through(i64::MAX, i64::MAX).expect("rotate") {
+        RotationOutcome::Sealed(segment) => segment.row_count as usize,
+        other => panic!("expected a sealed segment, got {other:?}"),
+    }
+}
+
+#[test]
+fn purge_removes_sealed_segments_and_keep_log_retains_them() {
+    // --keep-log: the segments stay with the log "as a unit", and the dry run and the receipt
+    // disclose their count and bytes.
+    let temp = tempfile::tempdir().expect("create segment keep-log fixture");
+    let root = temp.path();
+    initialize_and_boot(root);
+    let audit = root.join("maos-home/audit/transparency.sqlite");
+    let sealed = seal_one_segment(&audit);
+    let segments = root.join("maos-home/audit/segments");
+    let rows = maos_audit::query(&audit, maos_audit::AuditFilter::default())
+        .expect("the merged read sees sealed rows")
+        .len();
+    assert!(rows > sealed, "live rows remain beside the {sealed} sealed");
+
+    let dry_run = maos_command(root)
+        .args(["purge", "--keep-log"])
+        .output()
+        .expect("keep-log dry run");
+    assert!(dry_run.status.success());
+    let stdout = String::from_utf8_lossy(&dry_run.stdout);
+    assert!(stdout.contains("audit_segments=1 "), "{stdout}");
+    assert!(stdout.contains(&format!("audit_rows={rows}")), "{stdout}");
+    assert!(!stdout.contains("audit_segment_bytes=0"), "{stdout}");
+
+    let receipt = root.join("keep-log-segments-receipt.json");
+    let purge = maos_command(root)
+        .args(["purge", "--keep-log", "--yes", "--receipt"])
+        .arg(&receipt)
+        .output()
+        .expect("keep-log purge");
+    assert!(
+        purge_completed(&purge),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&purge.stdout),
+        String::from_utf8_lossy(&purge.stderr)
+    );
+    assert!(audit.exists() && segments.join("0000000001.sqlite").is_file());
+    assert!(segments.join("0000000001.manifest.json").is_file());
+    assert_eq!(
+        maos_audit::query(&audit, maos_audit::AuditFilter::default())
+            .unwrap()
+            .len(),
+        rows,
+        "the retained log still reads across its segment"
+    );
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&receipt).unwrap()).expect("receipt");
+    let roots = record["roots"].as_array().expect("receipt roots");
+    assert!(
+        roots.iter().any(|entry| entry["disposition"] == "kept"
+            && entry["path"]
+                .as_str()
+                .is_some_and(|path| path.contains("segments=1, bytes="))),
+        "the receipt discloses the retained segment count and bytes: {roots:?}"
+    );
+
+    // A plain purge removes the segment directory with the rest of the MAOS home.
+    let temp = tempfile::tempdir().expect("create segment purge fixture");
+    let root = temp.path();
+    initialize_and_boot(root);
+    let audit = root.join("maos-home/audit/transparency.sqlite");
+    seal_one_segment(&audit);
+    let segments = root.join("maos-home/audit/segments");
+    assert!(segments.is_dir());
+    let dry_run = maos_command(root)
+        .args(["purge"])
+        .output()
+        .expect("dry run");
+    assert!(
+        String::from_utf8_lossy(&dry_run.stdout).contains("would remove: audit segments"),
+        "{}",
+        String::from_utf8_lossy(&dry_run.stdout)
+    );
+    assert!(segments.is_dir(), "a dry run removes nothing");
+    let purge = maos_command(root)
+        .args(["purge", "--yes", "--receipt"])
+        .arg(root.join("purge-receipt.json"))
+        .output()
+        .expect("plain purge");
+    assert!(
+        purge_completed(&purge),
+        "stdout={} stderr={}",
+        String::from_utf8_lossy(&purge.stdout),
+        String::from_utf8_lossy(&purge.stderr)
+    );
+    assert!(!segments.exists(), "purge removes the sealed segments");
+    assert!(!audit.exists());
+}
+
 #[test]
 fn purge_keep_log_retains_distinct_tenant_audit_and_host_memory_databases() {
     let temp = tempfile::tempdir().expect("create tenant keep-log fixture");
@@ -1235,21 +1360,33 @@ fn purge_refuses_live_store_without_changing_filesystem_identity() {
         .expect("run init");
     assert!(init.status.success());
 
+    // Keep the capture outside the filesystem identity sample.
+    let shell_stdout = tempfile::NamedTempFile::new().expect("capture shell readiness");
     let mut live_root = maos_command(root)
         .args(["shell", "--plain"])
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stdout(shell_stdout.reopen().expect("open shell stdout"))
         .stderr(Stdio::piped())
         .spawn()
         .expect("start live MAOS root");
-    let audit = root.join("maos-home/audit/transparency.sqlite");
-    let journal = root.join("maos-home/journal/lifecycle.ndjson");
+    // Store files appear before boot has finished publishing the control lease.
+    // The REPL banner is emitted after both, so startup writes cannot race the snapshot.
     let deadline = Instant::now() + Duration::from_secs(10);
-    while !audit.exists() || !journal.exists() {
-        assert!(
-            Instant::now() < deadline,
-            "live root did not finish materializing its locked stores"
-        );
+    loop {
+        let stdout = std::fs::read(shell_stdout.path()).expect("read shell stdout");
+        if String::from_utf8_lossy(&stdout).contains("maos shell — type @hello-spirit") {
+            break;
+        }
+        if live_root.try_wait().expect("check shell status").is_some() || Instant::now() >= deadline
+        {
+            let _ = live_root.kill();
+            let output = live_root.wait_with_output().expect("reap unready shell");
+            panic!(
+                "live root did not reach the REPL: status={} stderr={}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
         std::thread::sleep(Duration::from_millis(20));
     }
 
@@ -1536,24 +1673,39 @@ fn snapshot_restore_undoes_lock_acquisition_on_dry_run_and_contention_paths() {
         "the dry run must materialize and then remove the missing store root"
     );
 
+    // Wait for the REPL banner, not for store files: the FIRST boot's stores
+    // already exist, and the live shell opens the Transparency Log in WAL mode
+    // AFTER it re-materializes the proofs dir (the -wal sidecar appears, then
+    // -shm). A snapshot taken on the proofs dir alone can land between those
+    // two creations and then differ from the post-refusal tree by the -shm
+    // alone. The banner is printed only after every boot write, so no startup
+    // write can race the snapshot (same readiness gate as
+    // `purge_refuses_live_store_without_changing_filesystem_identity`). The
+    // stdout goes to a file so the capture stays outside the identity sample.
+    let shell_stdout = tempfile::NamedTempFile::new().expect("capture shell readiness");
     let mut live_root = maos_command(root)
         .args(["shell", "--plain"])
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stdout(shell_stdout.reopen().expect("open shell stdout"))
         .stderr(Stdio::piped())
         .spawn()
         .expect("start live MAOS root");
-    let audit = root.join("maos-home/audit/transparency.sqlite");
-    let journal = root.join("maos-home/journal/lifecycle.ndjson");
-    // The FIRST boot's stores already exist, so waiting on audit/journal
-    // alone races the live shell's own lock acquisition; also wait for the
-    // proofs dir it re-materializes before deleting it again.
     let deadline = Instant::now() + Duration::from_secs(10);
-    while !audit.exists() || !journal.exists() || !proofs.exists() {
-        assert!(
-            Instant::now() < deadline,
-            "live root did not finish materializing its locked stores"
-        );
+    loop {
+        let stdout = std::fs::read(shell_stdout.path()).expect("read shell stdout");
+        if String::from_utf8_lossy(&stdout).contains("maos shell — type @hello-spirit") {
+            break;
+        }
+        if live_root.try_wait().expect("check shell status").is_some() || Instant::now() >= deadline
+        {
+            let _ = live_root.kill();
+            let output = live_root.wait_with_output().expect("reap unready shell");
+            panic!(
+                "live root did not reach the REPL: status={} stderr={}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
         std::thread::sleep(Duration::from_millis(20));
     }
     std::fs::remove_dir_all(&proofs).expect("delete the proofs root again");

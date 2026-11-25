@@ -278,10 +278,21 @@ pub fn cursor_file_path() -> std::io::Result<std::path::PathBuf> {
         }
         return Ok(path.into());
     }
-    let home = std::env::var_os("HOME")
-        .filter(|home| !home.is_empty())
-        .ok_or_else(|| std::io::Error::other("HOME or explicit yank cursor path is required"))?;
-    Ok(std::path::PathBuf::from(home).join(".local/share/maos/registry/yank_cursor.json"))
+    if !maos_domain::data_root::anchored() {
+        return Err(std::io::Error::other(
+            "HOME, a data home or an explicit yank cursor path is required",
+        ));
+    }
+    // 22-1 AC6: a cursor under any ranked data root stays readable in place; a new one
+    // sits beside the registry store.
+    Ok(
+        maos_domain::data_root::locations("registry/yank_cursor.json")
+            .into_iter()
+            .find(|path| path.exists())
+            .unwrap_or_else(|| {
+                maos_domain::data_root::resolve("registry").join("yank_cursor.json")
+            }),
+    )
 }
 pub fn save_cursor(registry_uri: &str, last_seen_ns: u64) -> std::io::Result<()> {
     use std::io::Write;

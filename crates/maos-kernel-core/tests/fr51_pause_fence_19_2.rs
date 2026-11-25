@@ -176,6 +176,7 @@ fn manifest() -> SpiritManifestBundle {
                 "on_resume".into(),
                 "on_unload".into(),
             ],
+            telemetry: None,
         },
         ..Default::default()
     }

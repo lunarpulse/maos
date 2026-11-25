@@ -12,7 +12,7 @@ name = "maos"
 path = "src/main.rs"
 
 [features]
-default = ["network"]
+default = ["network", "online-adapters", "wasm-host"]  # Story 21-9 (operator ruling `wasm` = on, 2026-11-12) — the WASM host is in the default build. Engine-free is explicit only: `--no-default-features`. Story 23-0 — `online-adapters` is in the default build too.
 network = [
     "dep:maos-registry",
     "maos-registry/tls",
@@ -28,9 +28,13 @@ network = [
     "dep:maos-a2a",
     "dep:maos-sso",
     "dep:maos-siem",
+    "dep:maos-topology",
+    "dep:maos-persistence",
 ]
+# Story 23-0 (D-23-6-02 A, D-23-6-01 A iii) — the one umbrella for every online adapter. It enables `network`; `network` must NOT enable it, so `--no-default-features --features network,wasm-host` builds the profile without online adapters. It gates no code until 23-1.
+online-adapters = ["network"]
 air-gap = []  # Compile-out all networking: reqwest, hyper client, tokio::net, DNS resolvers
-wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a — OFF by default. Gates the vendored `wasmtime` engine + maos-wasm-host/maos-wasm-runner. OFF-by-default is the export-control precondition (5D002.c.1) — see docs/compliance/export-counsel-precondition.md.
+wasm-host = ["dep:maos-wasm-host"]  # Story 11.1a / 21-9 — ON by default. Gates the vendored `wasmtime` engine + maos-wasm-host (the `maos-wasm-runner` bin lives in maos-wasm-host, released as its own artifact). 5D002.c.1 stays unclassified; no counsel review or ECCN determination is claimed — see docs/compliance/export-counsel-precondition.md. Engine-free build: `--no-default-features` (drops `network` too; add `--features network` as needed).
 spirit_test = ["network", "maos-kernel-core/spirit_test", "maos-spirit-sdk/spirit_test"]
 fixture_replay = ["network", "maos-mcp/fixture_replay", "maos-acp/fixture_replay", "maos-providers/fixture_replay", "maos-registry/fixture_replay", "maos-bench/fixture_replay"]
 smoke_schedule = ["tokio/test-util"]
@@ -54,6 +58,7 @@ maos-frame-codec = { path = "../maos-frame-codec" }
 maos-manifest = { path = "../maos-manifest" }
 maos-kernel-core = { path = "../maos-kernel-core" }
 maos-orchestrator-buffer = { path = "../maos-orchestrator-buffer" }
+maos-topology = { path = "../maos-topology", optional = true }
 maos-control = { path = "../maos-control" }
 maos-loom-lite = { path = "../maos-loom-lite" }
 maos-pdp = { path = "../maos-pdp" }   # Story 11.4a — enterprise PDP (Cedar) adapter; composed at the root, optional via MAOS_PDP_POLICY
@@ -77,6 +82,7 @@ maos-iac = { path = "../maos-iac" }              # Story 12.1 — daemon-owned T
 maos-a2a-core = { path = "../maos-a2a-core" }  # Story 8.6 — protocol substrate (config/pin types for the daemon binding)
 maos-a2a-tcp = { path = "../maos-a2a-tcp", optional = true }    # Story 8.6 — live cross-Host TCP/mTLS transport + smoke-a2a-tcp-8-6
 maos-cohort = { path = "../maos-cohort", optional = true }      # Story 12.1 — signed cohort manifest state + distribution
+maos-persistence = { path = "../maos-persistence", optional = true }  # Story 21-3 — durable TOFU pin file (`FilePinStore`), opened only by the cohort-a2a-daemon root
 rcgen = { version = "0.13", optional = true }  # Story 8.6 — runtime self-signed cert gen for the smoke-a2a-tcp-8-6 demo
 maos-compliance = { path = "../maos-compliance" }   # Story 7.3 — v0.9-binding evaluator (smoke-compliance-7-3)
 maos-spirit-cli = { path = "../maos-spirit-cli", default-features = false }   # Story 7.3 — REAL producer round-trip in the smoke arm

@@ -26,7 +26,7 @@ if [ "$kind" = fuzz ]; then
   fi
   for record in "${records[@]}"; do
     jq -se 'length == 1 and (.[0] | type == "object" and
-      (.target | IN("manifest_parser", "frame_deser", "fuzz_exec_deps_parse_elf")) and
+      (.target | IN("manifest_parser", "frame_deser", "fuzz_exec_deps_parse_elf", "cap_token_verify", "i8_consent_intent", "i11_digest_chain")) and
       (.cpu_seconds | type == "number" and . >= 0 and floor == .) and
       (.corpus_size | type == "number" and . >= 0 and floor == .) and
       (.timestamp | fromdateiso8601 | type == "number"))' "$record" >/dev/null

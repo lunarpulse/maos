@@ -42,6 +42,36 @@ use maos_control::{
     UpgradePolicyRequest, COMMAND_QUEUED, COMMAND_STARTED,
 };
 
+/// Story 22-5 (D-22-5-03 A) — the form each admitted pid runs as: a non-durable map written by
+/// the admission path, read by `GET /v1/agents`. A pid no site recorded reads `unknown`.
+static SPIRIT_FORMS: Mutex<BTreeMap<u32, &'static str>> = Mutex::new(BTreeMap::new());
+
+/// Record `pid`'s form (`in-process`, `wasm`, `native` or `worker`).
+pub fn record_form(pid: u32, form: &'static str) {
+    SPIRIT_FORMS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .insert(pid, form);
+}
+
+/// The form a manifest's `[class].forms` list admits as.
+pub fn form_label(forms: &[String]) -> &'static str {
+    match forms {
+        [only] if only == "wasm-component" => "wasm",
+        [only] if only == "subprocess" => "native",
+        _ => "in-process",
+    }
+}
+
+fn form_of(pid: u32) -> &'static str {
+    SPIRIT_FORMS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .get(&pid)
+        .copied()
+        .unwrap_or("unknown")
+}
+
 /// Explicit package evidence resolved before a manifest becomes a temp snapshot.
 #[derive(Clone, Copy, Default)]
 pub struct UpgradeVetting<'a> {
@@ -160,7 +190,7 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal>;
 
     /// Withdraw any I13 recipient policy after a successful unload.
-    fn forget_promotion_set(&self, _spirit_id: &str) {}
+    fn forget_promotion_set(&self, _spirit_id: &str, _pid: u32) {}
 
     /// Recovery uses precisely the same structural gate and constructor as load.
     #[cfg(feature = "network")]
@@ -183,13 +213,16 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     /// Story 20-9 (D-12 A) — the spawned admission path a cold swap re-admits a component
     /// through (`prepare_spawned` → `load_admit_start` → the spawned session), at a new pid.
     /// `origin` is the directory the manifest's relative `artifact` resolves against: the
-    /// door passes a private snapshot of the manifest bytes. `maosctl load` of a component
-    /// stays refused: only a cold swap reaches this.
+    /// door passes a private snapshot of the manifest bytes. `held` is the component the door
+    /// acquired in its preflight ([`Self::acquire_spawned_artifact`]); the launch uses exactly
+    /// that file and never reopens a pathname. `maosctl load` of a component stays refused:
+    /// only a cold swap reaches this.
     #[cfg(feature = "network")]
     async fn load_spawned(
         &self,
         _manifest: &Path,
         _origin: &Path,
+        _held: HeldLaunch,
     ) -> Result<crate::admission::Admitted, crate::admission::AdmissionRefusal> {
         Err(
             crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
@@ -198,8 +231,65 @@ pub trait BinPrivateOps: Send + Sync + 'static {
         )
     }
 
-    /// A spawned predecessor's retained manifest passes the same structural gates, and its
-    /// artifact is still where it was admitted from, so this root's runner can launch it.
+    /// Acquire, once and before any unload, the component `manifest` declares under `origin`.
+    /// `source` is the original path the manifest was read from (never its private snapshot):
+    /// a signed package there is verified and its component handed off open; an unsigned
+    /// source falls to a plain local acquire. `pin` is the digest the bytes must have. The door
+    /// carries the result through the matching [`Self::load_spawned`]; dropping it closes the
+    /// file.
+    #[cfg(feature = "network")]
+    fn acquire_spawned_artifact(
+        &self,
+        _manifest: &Path,
+        _text: &str,
+        _origin: &Path,
+        _source: Option<&Path>,
+        _pin: Option<[u8; 32]>,
+    ) -> Result<HeldLaunch, crate::admission::AdmissionRefusal> {
+        Err(
+            crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                surface: "operator door",
+            },
+        )
+    }
+
+    /// SHA-256 of the component bytes the live spawned session of `spirit_id` was launched
+    /// with: what a restore must reacquire.
+    #[cfg(feature = "network")]
+    fn spawned_artifact_sha256(&self, _spirit_id: &str) -> Option<[u8; 32]> {
+        None
+    }
+
+    /// The publisher key verified when the live spawned session of `spirit_id` was launched
+    /// from a signed package (`SwapContext.verified_publisher`); `None` for a local source.
+    /// A restore carries it so the predecessor re-admits under its publisher-bound storage
+    /// identity, never the bare id namespace.
+    #[cfg(feature = "network")]
+    fn spawned_publisher(&self, _spirit_id: &str) -> Option<[u8; 32]> {
+        None
+    }
+
+    /// Reacquire a spawned predecessor for restore: exactly the bytes whose digest is `pin`
+    /// (mandatory), opened locally under `origin`, carrying the previously verified
+    /// `publisher` unchanged. Never discovers provenance from the staged filename.
+    #[cfg(feature = "network")]
+    fn acquire_spawned_restore(
+        &self,
+        _manifest: &Path,
+        _text: &str,
+        _origin: &Path,
+        _pin: [u8; 32],
+        _publisher: Option<[u8; 32]>,
+    ) -> Result<HeldLaunch, crate::admission::AdmissionRefusal> {
+        Err(
+            crate::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
+                surface: "operator door",
+            },
+        )
+    }
+
+    /// A spawned predecessor's retained manifest passes the same structural gates, so this
+    /// root's runner can launch it.
     #[cfg(feature = "network")]
     fn prepare_spawned_restore(
         &self,
@@ -242,6 +332,13 @@ pub trait BinPrivateOps: Send + Sync + 'static {
     /// Plans are hot-swap/migrator hops, so a cold swap refuses on `true`.
     #[cfg(feature = "network")]
     fn migration_plan_pending(&self, spirit_id: &str) -> bool;
+
+    /// A cold-swap successor `text` that would drop or widen the promotion set registered for
+    /// `spirit_id`: a swap may only keep or narrow authority.
+    #[cfg(feature = "network")]
+    fn widens_promotion(&self, _spirit_id: &str, _text: &str) -> bool {
+        false
+    }
 
     /// Story 19-2 (D-19-2-08 A) — the principal bound at boot for a serving
     /// Butler (`MAOS_BUTLER_PRINCIPAL` or the scene header). `None` ⇒ a pick
@@ -456,7 +553,14 @@ pub struct SuccessorManifestSlot {
     /// Story 20-9 — where a staged component's relative `artifact` resolves (the door stages
     /// manifest bytes in a private file; the artifact stays in the operator's directory).
     origin: Arc<Mutex<Option<PathBuf>>>,
+    /// The component the exact hop staged here was verified against, held open: one-shot,
+    /// consumed by the successor factory, dropped (closed) by the next `stage`/`take`.
+    artifact: Arc<Mutex<Option<HeldLaunch>>>,
 }
+
+/// A held, one-shot component file in transit (a `spirit_session::LaunchArtifact`), typed
+/// opaquely so the door compiles without the WASM host.
+pub type HeldLaunch = Box<dyn std::any::Any + Send>;
 
 const POISONED: &str =
     "successor manifest slot: poisoned — a prior panic left upgrade staging inconsistent";
@@ -465,17 +569,27 @@ impl SuccessorManifestSlot {
     pub fn stage(&self, path: PathBuf) {
         *self.path.lock().expect(POISONED) = Some(path);
         *self.origin.lock().expect(POISONED) = None;
+        *self.artifact.lock().expect(POISONED) = None;
     }
 
-    /// Stage `path` whose relative `artifact` resolves against `origin`.
-    pub fn stage_at(&self, path: PathBuf, origin: PathBuf) {
+    /// Stage `path` whose relative `artifact` resolves against `origin`; `held` is the
+    /// component acquired for exactly this hop (none for an in-process successor).
+    pub fn stage_at(&self, path: PathBuf, origin: PathBuf, held: Option<HeldLaunch>) {
         *self.path.lock().expect(POISONED) = Some(path);
         *self.origin.lock().expect(POISONED) = Some(origin);
+        *self.artifact.lock().expect(POISONED) = held;
     }
 
     pub fn take(&self) -> Option<PathBuf> {
         self.origin.lock().expect(POISONED).take();
+        self.artifact.lock().expect(POISONED).take();
         self.path.lock().expect(POISONED).take()
+    }
+
+    /// The staged hop's held component, once: a second call (or a later hop that staged none)
+    /// finds nothing, so a launch can never reuse a file that was not verified for it.
+    pub fn take_artifact(&self) -> Option<HeldLaunch> {
+        self.artifact.lock().expect(POISONED).take()
     }
 
     /// Read WITHOUT clearing: the factory may be consulted per hop while the
@@ -550,6 +664,46 @@ struct DoorInner {
     /// Story 19-7 — the set-once re-pin control. Empty (every route 404) in
     /// every root but `cohort-a2a-daemon`, which installs its live pin store.
     repin: Arc<crate::repin_door::RepinControl>,
+    /// FR13 — the durable quarantine holds; set once by the composition root (absent in tests
+    /// that do not exercise them).
+    quarantine: Mutex<Option<Arc<crate::quarantine::QuarantineGate>>>,
+    /// Story 22-2 (D-22-2-02 A) — the live Transparency Log file the writability probe opens
+    /// its own connection to. Set once by the composition root; unset reads as not writable.
+    audit_store_path: std::sync::OnceLock<std::path::PathBuf>,
+    /// Story 22-4 — the Host's directed tasks; set once by the composition root.
+    directed_tasks: Mutex<Option<Arc<crate::directed_task::DirectedTasks>>>,
+}
+
+/// Longest the writability probe waits for the audit store's write lock. Well under the
+/// door's 10 s route budget, so a held lock reads as "not writable" rather than a timeout.
+const AUDIT_PROBE_BUSY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Story 22-2 (D-22-2-02 A) — can the store at `path` take a write lock right now? Opens a
+/// fresh connection (never the adapter's, whose mutex the writer holds), runs
+/// `BEGIN IMMEDIATE`, a same-value `user_version` write and `ROLLBACK`; it writes no row.
+fn audit_store_accepts_write_lock(path: &std::path::Path) -> bool {
+    let Ok(connection) =
+        rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
+    else {
+        return false;
+    };
+    // `BEGIN IMMEDIATE` alone succeeds on a WAL store whose main file is read-only (a read-only
+    // remount, a revoked write permission): SQLite opened it read-only and defers the refusal
+    // to the first page write. So the transaction rewrites `user_version` to its current value,
+    // which dirties the header page, then rolls back: no row, no change.
+    if connection.busy_timeout(AUDIT_PROBE_BUSY_TIMEOUT).is_err() {
+        return false;
+    }
+    let Ok(version) =
+        connection.pragma_query_value(None, "user_version", |row| row.get::<_, i64>(0))
+    else {
+        return false;
+    };
+    connection
+        .execute_batch(&format!(
+            "BEGIN IMMEDIATE; PRAGMA user_version = {version}; ROLLBACK;"
+        ))
+        .is_ok()
 }
 
 /// `maosctl`-visible director identity on every approval-log row (FR42 keeps
@@ -618,11 +772,34 @@ impl OperatorDoor {
             worker_revoke_stop: Mutex::new(None),
             forget_pump: Mutex::default(),
             repin: Arc::new(crate::repin_door::RepinControl::new()),
+            quarantine: Mutex::default(),
+            audit_store_path: std::sync::OnceLock::new(),
+            directed_tasks: Mutex::default(),
         }))
+    }
+
+    /// Story 22-2 — name the live audit store for the `/v1/daemon` writability probe.
+    pub fn set_audit_store_path(&self, path: std::path::PathBuf) {
+        let _ = self.0.audit_store_path.set(path);
+    }
+
+    /// Story 22-4 — install the Host's directed-task registry (the `ask` verb and
+    /// `GET /v1/tasks/{id}`). Uninstalled, every ask is a typed `spirit_not_directable`.
+    pub fn set_directed_tasks(&self, tasks: Arc<crate::directed_task::DirectedTasks>) {
+        *self
+            .0
+            .directed_tasks
+            .lock()
+            .unwrap_or_else(|error| error.into_inner()) = Some(tasks);
     }
 
     pub fn set_forget_pump(&self, pump: &Arc<crate::hook_pump::HookPump>) {
         *self.0.forget_pump.lock().unwrap_or_else(|e| e.into_inner()) = Some(Arc::downgrade(pump));
+    }
+
+    /// FR13 — install the daemon's quarantine gate (the release verb and the swap refusal).
+    pub fn set_quarantine(&self, gate: Arc<crate::quarantine::QuarantineGate>) {
+        *self.0.quarantine.lock().unwrap_or_else(|e| e.into_inner()) = Some(gate);
     }
 
     /// The per-Spirit serialization lock (D-16-1-R). Exposed so the in-process
@@ -744,6 +921,18 @@ impl DoorInner {
         }
     }
 
+    fn conflict(code: &str, detail: impl Into<String>) -> OperatorOutcome {
+        OperatorOutcome::Conflict {
+            code: code.into(),
+            detail: detail.into(),
+        }
+    }
+
+    #[cfg(feature = "network")]
+    fn unrestorable(detail: impl Into<String>) -> OperatorOutcome {
+        Self::conflict("cold_swap_unrestorable", detail)
+    }
+
     fn spirit_not_loaded(spirit_id: &str) -> OperatorOutcome {
         Self::not_found(
             "spirit_not_loaded",
@@ -798,6 +987,9 @@ impl DoorInner {
                 )
                 .await
             }
+            OperatorCommand::QuarantineRelease { spirit_id } => {
+                self.quarantine_release_command(&spirit_id).await
+            }
             OperatorCommand::Posture { spirit_id, posture } => {
                 self.posture_command(&spirit_id, &posture).await
             }
@@ -851,6 +1043,14 @@ impl DoorInner {
                 pick,
                 work_mode,
             } => self.option_pick_command(&spirit_id, pick, &work_mode).await,
+            OperatorCommand::Ask {
+                spirit_id,
+                text,
+                idempotency_key,
+            } => {
+                self.ask_command(&spirit_id, &text, idempotency_key.as_deref())
+                    .await
+            }
             OperatorCommand::RevokeToken { token_id } => self.revoke_token_command(&token_id).await,
             OperatorCommand::ImportRevocations { crl } => {
                 self.import_revocations_command(&crl).await
@@ -861,6 +1061,9 @@ impl DoorInner {
             OperatorCommand::ReleaseLegalHold { principal } => {
                 self.release_legal_hold_command(&principal).await
             }
+            OperatorCommand::AuditRotate => tokio::task::block_in_place(|| {
+                crate::audit_rotation::rotate_now(&self.transparency_log)
+            }),
             OperatorCommand::AdmitGovernanceSchema { schema } => {
                 self.admit_governance_schema_command(schema).await
             }
@@ -1015,7 +1218,13 @@ impl DoorInner {
             };
         }
         if verb == "unload" {
-            self.private_ops.forget_promotion_set(spirit_id);
+            self.private_ops.forget_promotion_set(spirit_id, pid);
+        }
+        if verb == "unload" {
+            // Story 22-4 (AC4) — an unloaded Spirit's queued tasks end `failed/spirit_unloaded`.
+            if let Some(tasks) = installed(&self.directed_tasks) {
+                tasks.spirit_unloaded(spirit_id);
+            }
         }
 
         if let Err(error) = self
@@ -1052,6 +1261,8 @@ impl DoorInner {
         if matches!(verb, "pause" | "resume") {
             // AC7.4 — the capability fence, read back rather than assumed.
             body["fenced"] = self.capability.is_paused(pid).into();
+            body["quarantined"] = self.capability.is_quarantined(pid).into();
+            body["director_paused"] = self.capability.is_director_paused(pid).into();
         }
         if let Some(frozen) = frozen {
             body["frozen"] = frozen.into();
@@ -1302,9 +1513,22 @@ impl DoorInner {
                 ),
             };
         }
-        let Some(_pid) = self.scheduler.resolve_pid(spirit_id) else {
+        let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
         };
+        // D-LRQC-08 A: a quarantined Spirit is not swapped (hot, cold or migrator) until the
+        // operator releases it; a swap never lifts the hold.
+        let held =
+            installed(&self.quarantine).is_some_and(|gate| !gate.holds_for(spirit_id).is_empty());
+        if held || self.capability.is_quarantined(pid) {
+            return OperatorOutcome::Conflict {
+                code: "quarantined_swap_refused".into(),
+                detail: format!(
+                    "spirit '{spirit_id}' is quarantined; run `maosctl quarantine-release \
+                     {spirit_id}` before upgrading it"
+                ),
+            };
+        }
         // Forward-only comparison uses SemVer, including prerelease ordering.
         let target_semver = match semver::Version::parse(&target_version) {
             Ok(version) => version,
@@ -1435,8 +1659,13 @@ impl DoorInner {
                     .cold_swap(
                         spirit_id,
                         &snapshot.0,
-                        target_path.parent().unwrap_or(Path::new(".")),
+                        &target_path,
                         &target_version,
+                        package.as_ref().map(|package| {
+                            <[u8; 32]>::from(<sha2::Sha256 as sha2::Digest>::digest(
+                                &package.artifact_bytes,
+                            ))
+                        }),
                     )
                     .await
             }
@@ -1487,11 +1716,13 @@ impl DoorInner {
         &self,
         spirit_id: &str,
         target: &Path,
-        target_origin: &Path,
+        target_source: &Path,
         successor_version: &str,
+        artifact_pin: Option<[u8; 32]>,
     ) -> OperatorOutcome {
         use maos_domain::invariants::i10::LifecycleEvent;
 
+        let target_origin = target_source.parent().unwrap_or(Path::new("."));
         let started_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
@@ -1564,11 +1795,26 @@ impl DoorInner {
                 ),
             };
         }
-        let restore_origin = if spawned {
-            self.private_ops.spawned_origin(spirit_id)
-        } else {
-            None
-        };
+        if self.private_ops.widens_promotion(spirit_id, &target_text) {
+            return Self::conflict(
+                "swap_promotion_widened",
+                format!(
+                    "the successor's intent_promotion_set is absent or wider than the one \
+                     '{spirit_id}' holds; refused before unload"
+                ),
+            );
+        }
+        // Story 21-7: a swap keeps or narrows consent; it never widens it or drops it.
+        if let Some(change) = crate::admission::widened_consent(&predecessor_manifest, &target_text)
+        {
+            return OperatorOutcome::Conflict {
+                code: "swap_consent_widened".into(),
+                detail: format!("the successor {change} of '{spirit_id}'; refused before unload"),
+            };
+        }
+        let restore_origin = spawned
+            .then(|| self.private_ops.spawned_origin(spirit_id))
+            .flatten();
         let restorable = match (spawned, restore_origin.as_deref()) {
             (true, Some(origin)) => self.private_ops.prepare_spawned_restore(
                 &restore_manifest.0,
@@ -1592,9 +1838,48 @@ impl DoorInner {
             }
         });
         if let Err(detail) = restorable {
-            return OperatorOutcome::Conflict {
-                code: "cold_swap_unrestorable".into(),
-                detail,
+            return Self::unrestorable(detail);
+        }
+        // Spawned: take custody of both components now, before the unload. The predecessor is
+        // reacquired against the digest of the bytes it actually launched with, so a restore
+        // is that exact source even if its pathname is replaced or removed meanwhile; the
+        // target is held from here through its launch, not reopened after the unload.
+        let (mut restore_held, mut target_held) = (None, None);
+        if let Some(origin) = restore_origin.as_deref() {
+            // The predecessor is restored only from the exact bytes it launched with.
+            let Some(restore_pin) = self.private_ops.spawned_artifact_sha256(spirit_id) else {
+                return Self::unrestorable("the live component session records no launch digest");
+            };
+            restore_held = match self.private_ops.acquire_spawned_restore(
+                &restore_manifest.0,
+                &predecessor_manifest,
+                origin,
+                restore_pin,
+                self.private_ops.spawned_publisher(spirit_id),
+            ) {
+                Ok(held) => Some(held),
+                Err(error) => return Self::unrestorable(format!("{}: {error}", error.code())),
+            };
+            // The target is acquired from its own original source: a signed package there is
+            // verified and its component handed off held, never a verify-then-reopen.
+            target_held = match self.private_ops.acquire_spawned_artifact(
+                target,
+                &target_text,
+                target_origin,
+                Some(target_source),
+                artifact_pin,
+            ) {
+                Ok(held) => Some(held),
+                Err(error) => {
+                    let code = match error.code() {
+                        code @ "wasm_transport_unsupported" => code,
+                        _ => "cold_swap_target_artifact_refused",
+                    };
+                    return Self::conflict(
+                        code,
+                        format!("{}: {error}; refused before unload", error.code()),
+                    );
+                }
             };
         }
         // A spawned predecessor's session ends with its unload; the root stays up across the
@@ -1610,39 +1895,49 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
-        self.private_ops.forget_promotion_set(spirit_id);
+        self.private_ops.forget_promotion_set(spirit_id, pid);
         let target_origin = spawned.then_some(target_origin);
-        let (outcome, journal, result) =
-            match self.admit_and_start(spirit_id, target, target_origin).await {
-                Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
-                Err(refused) => match self
-                    .admit_and_start(spirit_id, &restore_manifest.0, restore_origin.as_deref())
-                    .await
-                {
-                    Ok(restored) => (
-                        "reverted",
-                        None,
-                        Err(OperatorOutcome::Conflict {
-                            code: "cold_swap_reverted".into(),
-                            detail: format!(
-                                "successor refused: {refused}; predecessor {predecessor_version} \
+        let (outcome, journal, result) = match self
+            .admit_and_start(
+                spirit_id,
+                target,
+                target_origin.map(|o| (o, target_held.take())),
+            )
+            .await
+        {
+            Ok(new_pid) => ("completed", Some(LifecycleEvent::Upgrade), Ok(new_pid)),
+            Err(refused) => match self
+                .admit_and_start(
+                    spirit_id,
+                    &restore_manifest.0,
+                    restore_origin.as_deref().map(|o| (o, restore_held.take())),
+                )
+                .await
+            {
+                Ok(restored) => (
+                    "reverted",
+                    None,
+                    Err(OperatorOutcome::Conflict {
+                        code: "cold_swap_reverted".into(),
+                        detail: format!(
+                            "successor refused: {refused}; predecessor {predecessor_version} \
                              restored at pid {restored}"
-                            ),
-                        }),
-                    ),
-                    Err(restore) => (
-                        "failed",
-                        Some(LifecycleEvent::Unload),
-                        Err(OperatorOutcome::Failed {
-                            code: "cold_swap_failed".into(),
-                            detail: format!(
-                                "successor refused: {refused}; restore refused: {restore}; spirit \
+                        ),
+                    }),
+                ),
+                Err(restore) => (
+                    "failed",
+                    Some(LifecycleEvent::Unload),
+                    Err(OperatorOutcome::Failed {
+                        code: "cold_swap_failed".into(),
+                        detail: format!(
+                            "successor refused: {refused}; restore refused: {restore}; spirit \
                              '{spirit_id}' is not loaded"
-                            ),
-                        }),
-                    ),
-                },
-            };
+                        ),
+                    }),
+                ),
+            },
+        };
         // The row the kernel orchestrator writes for hot swap, same shape.
         let payload = serde_json::json!({
             "spirit_id": spirit_id,
@@ -1696,19 +1991,27 @@ impl DoorInner {
         &self,
         spirit_id: &str,
         manifest: &Path,
-        component_origin: Option<&Path>,
+        component: Option<(&Path, Option<HeldLaunch>)>,
     ) -> Result<u32, String> {
         // Story 20-9 (D-12 A) — a component is admitted, and started, through the spawned
-        // admission path (its session is the Spirit's start), relative to its own directory.
-        let admitted = match component_origin {
-            Some(origin) => self.private_ops.load_spawned(manifest, origin).await,
+        // admission path (its session is the Spirit's start), relative to its own directory,
+        // from the file the preflight acquired.
+        let component_origin = component.as_ref().map(|(origin, _)| *origin);
+        let admitted = match component {
+            Some((origin, Some(held))) => {
+                self.private_ops.load_spawned(manifest, origin, held).await
+            }
+            Some((_, None)) => {
+                return Err("held_component_missing: no acquired component for this launch".into())
+            }
             None => self.private_ops.load_spirit(manifest, None).await,
         }
         .map_err(|refusal| format!("{}: {refusal}", refusal.code()))?;
         if admitted.spirit_id != spirit_id {
             let unwound = self.scheduler.unload(admitted.pid).await;
             if unwound.is_ok() {
-                self.private_ops.forget_promotion_set(&admitted.spirit_id);
+                self.private_ops
+                    .forget_promotion_set(&admitted.spirit_id, admitted.pid);
             }
             return Err(format!(
                 "target_manifest_mismatch: admitted {}; unwind: {unwound:?}",
@@ -1722,7 +2025,8 @@ impl DoorInner {
         if let Err(error) = self.scheduler.start(admitted.pid).await {
             let unwound = self.scheduler.unload(admitted.pid).await;
             if unwound.is_ok() {
-                self.private_ops.forget_promotion_set(&admitted.spirit_id);
+                self.private_ops
+                    .forget_promotion_set(&admitted.spirit_id, admitted.pid);
             }
             return Err(match unwound {
                 Ok(_) => format!("start_failed: {error}"),
@@ -1864,7 +2168,7 @@ impl DoorInner {
                 detail: error.to_string(),
             };
         }
-        self.private_ops.forget_promotion_set(spirit_id);
+        self.private_ops.forget_promotion_set(spirit_id, pid);
         let halts_after = self
             .halt_registry
             .halt_metadata_for_spirit(pid, 0)
@@ -2319,8 +2623,8 @@ impl DoorInner {
         reason: Option<&str>,
     ) -> Result<Option<serde_json::Value>, String> {
         use maos_kernel_core::iac::transparency_log::{FrameFilter, FrameKind};
-        let Some(row) = self
-            .transparency_log
+        let log = &self.transparency_log;
+        let Some(row) = log
             .query_frames(FrameFilter {
                 correlation_id: Some(Self::forget_replay_key(principal, reason)),
                 descending: true,
@@ -2344,11 +2648,7 @@ impl DoorInner {
             .map_err(|error| format!("invalid completed forget snapshot: {error}"))?;
         if row.origin != maos_domain::invariants::i3::FrameOrigin::Kernel
             || row.kind != FrameKind::TelemetryEvent
-            || row
-                .intent
-                .strip_prefix("operator.forget.")
-                .and_then(|intent| intent.strip_suffix(":completed"))
-                != Some(saved.operation_id.as_str())
+            || row.intent != format!("operator.forget.{}:completed", saved.operation_id)
             || saved.outcome != "completed"
             || report["operation_id"] != saved.operation_id
             || report["principal_id"] != principal
@@ -2358,21 +2658,17 @@ impl DoorInner {
         {
             return Err("durable forget report is not a completed kernel receipt".into());
         }
-        let marker = &report["frame_sweep_completion"];
         let mut marker_id = [0_u8; 16];
-        hex::decode_to_slice(
-            marker["frame_id"]
-                .as_str()
-                .ok_or("completed forget has no frame marker")?,
-            &mut marker_id,
-        )
-        .map_err(|error| format!("invalid completed forget marker: {error}"))?;
-        let through = marker["through_rowid"]
+        let frame = report["frame_sweep_completion"]["frame_id"]
+            .as_str()
+            .ok_or("completed forget has no frame marker")?;
+        hex::decode_to_slice(frame, &mut marker_id)
+            .map_err(|error| format!("invalid completed forget marker: {error}"))?;
+        let through = report["frame_sweep_completion"]["through_rowid"]
             .as_u64()
             .and_then(|rowid| i64::try_from(rowid).ok())
             .ok_or("completed forget has no valid high-water")?;
-        let certified = self
-            .transparency_log
+        let certified = log
             .query_frame_by_id(marker_id)
             .map_err(|error| error.to_string())?
             .ok_or("completed forget marker is missing")?;
@@ -2388,15 +2684,18 @@ impl DoorInner {
         {
             return Err("durable forget report does not match its certified marker".into());
         }
-        if self
-            .transparency_log
+        // A later open intent (a forget interrupted after this report) must be recovered.
+        if log
             .is_under_legal_hold(principal)
             .map_err(|error| error.to_string())?
+            || !log
+                .outstanding_forget_intents(Some(principal))
+                .map_err(|error| error.to_string())?
+                .is_empty()
         {
             return Ok(None);
         }
-        let tail = self
-            .transparency_log
+        let tail = log
             .query_frames(FrameFilter {
                 cursor_insertion_id: Some(through),
                 order_by_insertion: true,
@@ -2412,7 +2711,10 @@ impl DoorInner {
                         || frame.intent.starts_with("principal.uninstall.")
                         || matches!(
                             frame.intent.as_str(),
-                            "principal.forget" | "principal.forget.held" | "distillate.redacted"
+                            "principal.forget"
+                                | "principal.forget.held"
+                                | "principal.forget.intent"
+                                | "distillate.redacted"
                         ));
                 !retained
                     && (frame.kind == FrameKind::Distillate
@@ -2439,21 +2741,17 @@ impl DoorInner {
                 detail: "principal must not be empty".into(),
             };
         }
+        let fail = |detail: String| OperatorOutcome::Failed {
+            code: "forget_failed".into(),
+            detail,
+        };
         match tokio::task::block_in_place(|| self.completed_forget(principal, reason)) {
             Ok(Some(report)) => return OperatorOutcome::Completed(report),
             Ok(None) => {}
-            Err(detail) => {
-                return OperatorOutcome::Failed {
-                    code: "forget_failed".into(),
-                    detail,
-                };
-            }
+            Err(detail) => return fail(detail),
         }
         match tokio::task::block_in_place(|| self.memory.forget_with_reason(principal, reason)) {
-            Err(error) => OperatorOutcome::Failed {
-                code: "forget_failed".into(),
-                detail: error.to_string(),
-            },
+            Err(error) => fail(error.to_string()),
             Ok(outcome @ maos_domain::memory::ForgetOutcome::Erased { .. }) => {
                 let pump = self
                     .forget_pump
@@ -2479,9 +2777,9 @@ impl DoorInner {
                 body["terminal_code"] = serde_json::json!(if complete { 0 } else { 5 });
                 OperatorOutcome::Completed(body)
             }
+            // P29-cli: a legal-hold suspension is NOT a success — the
+            // preserved terminal code 3 rides in the body.
             Ok(outcome @ maos_domain::memory::ForgetOutcome::Suspended { .. }) => {
-                // P29-cli: a legal-hold suspension is NOT a success — the
-                // preserved terminal code 3 rides in the body.
                 OperatorOutcome::Completed(serde_json::json!({
                     "principal_id": principal,
                     "outcome": "held",
@@ -2578,6 +2876,124 @@ impl DoorInner {
         }))
     }
 
+    /// Story 22-4 (D-22-4-05 A) — `POST /v1/spirits/{id}/ask`: accept one task for a running,
+    /// directable Spirit into its bounded queue and return its id. Every refusal is typed and
+    /// mints nothing; the answer is read later through `GET /v1/tasks/{id}`.
+    async fn ask_command(
+        &self,
+        spirit_id: &str,
+        text: &str,
+        idempotency_key: Option<&str>,
+    ) -> OperatorOutcome {
+        let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
+            return Self::spirit_not_loaded(spirit_id);
+        };
+        if text.trim().is_empty() {
+            return OperatorOutcome::Invalid {
+                code: "invalid_task".into(),
+                detail: "task text must not be empty".into(),
+            };
+        }
+        let Some(tasks) = installed(&self.directed_tasks) else {
+            return Self::not_directable(spirit_id, "this daemon serves no directed tasks");
+        };
+        use maos_kernel_core::scheduler::control_block::ScbLifecycleState as Scb;
+        if self.capability.is_quarantined(pid) {
+            return Self::conflict(
+                "spirit_not_running",
+                format!("spirit '{spirit_id}' is Quarantined; release it before directing a task"),
+            );
+        }
+        match self.scb_state(spirit_id) {
+            Some(Scb::Running) => {}
+            other => {
+                return Self::conflict(
+                    "spirit_not_running",
+                    match other {
+                        Some(state) => {
+                            format!("spirit '{spirit_id}' is {state:?}, not Running")
+                        }
+                        None => format!("spirit '{spirit_id}' has no control block"),
+                    },
+                )
+            }
+        }
+        if !tasks.is_directable(spirit_id) {
+            // `spawned_artifact_sha256` exists only in `network` builds (the spawned component
+            // session is a network-build form); a default build has no such session.
+            #[cfg(feature = "network")]
+            let single_session = self
+                .private_ops
+                .spawned_artifact_sha256(spirit_id)
+                .is_some();
+            #[cfg(not(feature = "network"))]
+            let single_session = false;
+            let form = if single_session {
+                "a single-session component (`maos run`), not an installed cast member"
+            } else if spirit_id.starts_with("worker-") {
+                "a cli_wrapper Worker"
+            } else {
+                "a native class"
+            };
+            return Self::not_directable(spirit_id, form);
+        }
+        let accepted = {
+            let (tasks, spirit_id, text, key) = (
+                Arc::clone(&tasks),
+                spirit_id.to_owned(),
+                text.to_owned(),
+                idempotency_key.map(str::to_owned),
+            );
+            // The accept row and the key lookup read and write the Transparency Log.
+            match tokio::task::spawn_blocking(move || {
+                tasks.accept(&spirit_id, &text, key.as_deref())
+            })
+            .await
+            {
+                Ok(accepted) => accepted,
+                Err(error) => {
+                    return OperatorOutcome::Failed {
+                        code: "task_accept_failed".into(),
+                        detail: error.to_string(),
+                    }
+                }
+            }
+        };
+        match accepted {
+            Ok(accepted) => OperatorOutcome::Completed(serde_json::json!({
+                "task_id": accepted.task_id,
+                "spirit_id": spirit_id,
+                "state": accepted.state.as_str(),
+                "replayed": accepted.replayed,
+            })),
+            Err(crate::directed_task::AcceptError::NotDirectable) => {
+                Self::not_directable(spirit_id, "no task pump serves it")
+            }
+            Err(crate::directed_task::AcceptError::QueueFull { scope, limit }) => Self::conflict(
+                "task_queue_full",
+                format!("the {scope} task queue holds {limit} queued tasks; retry later"),
+            ),
+            Err(crate::directed_task::AcceptError::ShuttingDown) => Self::conflict(
+                "host_stopping",
+                "the Host is stopping and accepts no new task; retry on its successor",
+            ),
+            Err(crate::directed_task::AcceptError::Log(error)) => OperatorOutcome::Failed {
+                code: "task_log_failed".into(),
+                detail: format!("{error}; nothing was queued"),
+            },
+        }
+    }
+
+    fn not_directable(spirit_id: &str, form: &str) -> OperatorOutcome {
+        Self::conflict(
+            "spirit_not_directable",
+            format!(
+                "spirit '{spirit_id}' is {form}, which takes no directed task: a task goes to an \
+                 installed component of the cast or to mira"
+            ),
+        )
+    }
+
     // ── shared helpers ───────────────────────────────────────────────────
 
     fn scb_state(
@@ -2588,6 +3004,83 @@ impl DoorInner {
         let scbs = self.scheduler.scbs();
         let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
         guard.get(&pid).map(|scb| scb.current_state())
+    }
+
+    /// FR13 (D-LRQC-03 A) — door-only release: refused while an applied CRL still matches the
+    /// identity; journals the approval row, then clears the fences and the durable holds. A
+    /// director pause is not lifted.
+    async fn quarantine_release_command(&self, spirit_id: &str) -> OperatorOutcome {
+        let Some(gate) = installed(&self.quarantine) else {
+            return OperatorOutcome::Failed {
+                code: "quarantine_unavailable".into(),
+                detail: "this daemon has no quarantine store".into(),
+            };
+        };
+        let pid = self.scheduler.resolve_pid(spirit_id);
+        let holds = gate.holds_for(spirit_id);
+        let fenced = pid.is_some_and(|pid| self.capability.is_quarantined(pid));
+        if holds.is_empty() && !fenced {
+            let detail = format!("spirit '{spirit_id}' is not quarantined");
+            return match pid {
+                Some(_) => OperatorOutcome::Conflict {
+                    code: "spirit_not_quarantined".into(),
+                    detail,
+                },
+                None => Self::not_found("spirit_not_quarantined", detail),
+            };
+        }
+        // A hold names its class identity; a loaded Worker's instance id (`worker-2`) is not its
+        // declared class name, so the loaded SCB's own `(class.name, class.version)` is checked.
+        let mut identities: Vec<(String, String)> = holds
+            .into_iter()
+            .map(|hold| (hold.spirit_id, hold.version))
+            .collect();
+        let loaded = pid.and_then(|pid| {
+            let scbs = self.scheduler.scbs();
+            let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
+            let scb = guard.get(&pid)?;
+            let class = scb.runtime_snapshot().manifest.class.clone();
+            class.map(|class| (class.name, class.version))
+        });
+        identities.extend(loaded);
+        let crls: Vec<String> = identities
+            .iter()
+            .flat_map(|(name, version)| self.revocation_applier.matching_crls(name, version))
+            .map(|id| hex::encode(id.0))
+            .collect();
+        if !crls.is_empty() {
+            return OperatorOutcome::Conflict {
+                code: "quarantine_crl_applies".into(),
+                detail: format!(
+                    "applied CRL(s) {} still match '{spirit_id}'; forget them before releasing",
+                    crls.join(",")
+                ),
+            };
+        }
+        if let Err(outcome) = self.approval_row(
+            spirit_id,
+            "quarantine-release",
+            "release",
+            format!("director released the FR13 quarantine of '{spirit_id}'"),
+        ) {
+            return outcome;
+        }
+        let removed = match gate.release(spirit_id, pid) {
+            Ok(removed) => removed,
+            Err(error) => {
+                return OperatorOutcome::Failed {
+                    code: "quarantine_release_failed".into(),
+                    detail: error.to_string(),
+                }
+            }
+        };
+        OperatorOutcome::Completed(serde_json::json!({
+            "spirit_id": spirit_id,
+            "released": true,
+            "holds_removed": removed,
+            "quarantined": pid.is_some_and(|pid| self.capability.is_quarantined(pid)),
+            "director_paused": pid.is_some_and(|pid| self.capability.is_director_paused(pid)),
+        }))
     }
 
     /// The loaded `[class]` version from the SCB's runtime snapshot — the
@@ -2691,6 +3184,11 @@ impl DoorInner {
             OperatorCommand::ForgetMemory { principal, reason } => {
                 Some(Self::forget_replay_key(principal, reason.as_deref()))
             }
+            OperatorCommand::Ask {
+                spirit_id,
+                idempotency_key: Some(key),
+                ..
+            } => Some(crate::directed_task::ask_replay_key(spirit_id, key)),
             _ => None,
         };
         let mut outcome = self.dispatch(command, pread).await;
@@ -2716,6 +3214,13 @@ impl DoorInner {
             | OperatorOutcome::Invalid { code, .. }
             | OperatorOutcome::Failed { code, .. } => code.clone(),
         };
+        let ask_receipt = match (&outcome, verb) {
+            (OperatorOutcome::Completed(report), "ask") => Some((
+                report["task_id"].as_str().map(str::to_owned),
+                report["replayed"] == true,
+            )),
+            _ => None,
+        };
         let mut completed_report = None;
         let mut replayed_operation_id = None;
         let correlation = match (replay_key, &mut outcome) {
@@ -2734,6 +3239,15 @@ impl DoorInner {
                     Some(key)
                 }
             }
+            // Story 22-4 (D-22-4-07 A) — a first accept writes the key as the row's
+            // correlation; a replay writes none, so the key keeps naming the first task.
+            (Some(key), OperatorOutcome::Completed(_))
+                if ask_receipt
+                    .as_ref()
+                    .is_some_and(|(task_id, replayed)| task_id.is_some() && !replayed) =>
+            {
+                Some(key)
+            }
             _ => None,
         };
         let intent = format!("operator.{verb}.{operation_id}:{outcome_label}");
@@ -2747,6 +3261,11 @@ impl DoorInner {
             completed_report: Option<&'a [u8]>,
             #[serde(skip_serializing_if = "Option::is_none")]
             replayed_operation_id: Option<&'a str>,
+            /// Story 22-4 — the task an `ask` accepted (or, replayed, the earlier one).
+            #[serde(skip_serializing_if = "Option::is_none")]
+            task_id: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            replayed: Option<bool>,
         }
         // Stream the byte slice; do not allocate a JSON Value for every byte.
         let bytes = match serde_json::to_vec(&CompletionReceipt {
@@ -2756,6 +3275,8 @@ impl DoorInner {
             outcome: &outcome_label,
             completed_report: completed_report.as_deref(),
             replayed_operation_id,
+            task_id: ask_receipt.as_ref().and_then(|(id, _)| id.as_deref()),
+            replayed: ask_receipt.as_ref().map(|(_, replayed)| *replayed),
         }) {
             Ok(bytes) => bytes,
             Err(error) => panic!("MAOS I2 operator completion serialization failed: {error}"),
@@ -2871,6 +3392,12 @@ impl OperatorCommandPort for OperatorDoor {
             lifecycle_states,
             audit_degraded: audit_health.degraded,
             audit_drop_count: audit_health.total_drops,
+            audit_store_writable: !audit_health.degraded
+                && self
+                    .0
+                    .audit_store_path
+                    .get()
+                    .is_some_and(|path| audit_store_accepts_write_lock(path)),
         }
     }
 
@@ -2899,6 +3426,106 @@ impl OperatorCommandPort for OperatorDoor {
 
     fn pending_repins(&self) -> Option<Vec<maos_control::RepinRequestRow>> {
         self.0.repin.pending()
+    }
+
+    fn peer_pins(&self) -> Option<maos_control::PeerPinStatus> {
+        self.0.repin.peer_pins()
+    }
+
+    fn task_status(&self, task_id: &str) -> Option<maos_control::TaskStatusRow> {
+        installed(&self.0.directed_tasks)?
+            .get(task_id)
+            .map(|record| record.to_row())
+    }
+
+    /// Story 22-5 (AC1) — rows from ONE `scbs()` pass, each ledger cloned under its own lock;
+    /// both guards are gone before the journal is read.
+    fn agents(&self) -> Option<Vec<serde_json::Value>> {
+        let mut rows: Vec<serde_json::Value> = {
+            let scbs = self.0.scheduler.scbs();
+            let guard = scbs.read().unwrap_or_else(|error| error.into_inner());
+            guard
+                .values()
+                .map(|scb| {
+                    let ledger = scb
+                        .task_assignments_in_flight
+                        .lock()
+                        .unwrap_or_else(|error| error.into_inner())
+                        .clone();
+                    serde_json::json!({
+                        "id": scb.spirit_id,
+                        "pid": scb.pid,
+                        "state": format!("{:?}", scb.current_state()),
+                        "form": form_of(scb.pid),
+                        "originator": ledger.first().map(|t| &t.originator_spirit_id),
+                        "task": ledger.first().map(|t| &t.task_id),
+                        "more_tasks": ledger.len().saturating_sub(1),
+                        "age_secs": null,
+                        "spend": null,
+                    })
+                })
+                .collect()
+        };
+        rows.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
+        let pids: Vec<u32> = rows
+            .iter()
+            .filter_map(|r| r["pid"].as_u64())
+            .map(|p| p as u32)
+            .collect();
+        let vitals = self
+            .0
+            .audit_store_path
+            .get()
+            .map(|path| maos_audit::session::agent_vitals(path, self.0.boot_nonce, &pids));
+        if let Some(Ok(vitals)) = vitals {
+            let now_ns = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_nanos() as u64);
+            for (row, vital) in rows.iter_mut().zip(vitals) {
+                row["age_secs"] = vital
+                    .first_row_ns
+                    .map(|ns| now_ns.saturating_sub(ns) / 1_000_000_000)
+                    .into();
+                row["spend"] = serde_json::json!({"in": vital.tokens_in, "out": vital.tokens_out});
+            }
+        }
+        Some(rows)
+    }
+
+    /// Story 22-5 (AC2) — header-only rows of the Spirit's current boot, read through a
+    /// fresh read-only connection; never the Transparency Log adapter, never a write.
+    fn session(
+        &self,
+        spirit_id: &str,
+        query: &maos_control::SessionQuery,
+    ) -> Option<Result<serde_json::Value, String>> {
+        let pid = self.0.scheduler.resolve_pid(spirit_id)?;
+        let boot = self.0.scheduler.scbs().read().ok()?.get(&pid)?.boot_nonce;
+        let Some(path) = self.0.audit_store_path.get() else {
+            return Some(Err("the daemon names no audit store".into()));
+        };
+        let cursor = maos_audit::session::SessionCursor {
+            after_rowid: query.after_rowid,
+            after_decision: query.after_decision,
+        };
+        let classify = &maos_cli::subcommands::classify_halt_record;
+        let rows = maos_audit::session::session_rows(
+            path,
+            boot,
+            pid,
+            spirit_id,
+            cursor,
+            query.limit,
+            classify,
+        );
+        Some(rows.map_err(|error| error.to_string()).map(|rows| {
+            serde_json::json!({
+                "spirit_id": spirit_id,
+                "pid": pid,
+                "boot_nonce": boot.to_string(),
+                "rows": rows,
+            })
+        }))
     }
 
     fn applied_revocations(&self) -> Vec<maos_control::RevocationRow> {
@@ -2936,6 +3563,7 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         OperatorCommand::Pause { .. } => "pause",
         OperatorCommand::Resume { .. } => "resume",
         OperatorCommand::Unload { .. } => "unload",
+        OperatorCommand::QuarantineRelease { .. } => "quarantine-release",
         OperatorCommand::Posture { .. } => "posture",
         OperatorCommand::Upgrade { .. } => "upgrade",
         OperatorCommand::HotSwapPrecheck { .. } => "hot-swap-precheck",
@@ -2946,10 +3574,13 @@ fn command_verb(command: &OperatorCommand) -> &'static str {
         // `operator.spirit-pick.<op>:<outcome>`.
         OperatorCommand::OrchestratorRecall { .. } => "orchestrator-recall",
         OperatorCommand::OptionPick { .. } => "spirit-pick",
+        // Story 22-4 — `operator.ask.<operation_id>:<outcome>`; the receipt names the task.
+        OperatorCommand::Ask { .. } => "ask",
         OperatorCommand::RevokeToken { .. } => "revoke-token",
         OperatorCommand::ImportRevocations { .. } => "revocations-import",
         OperatorCommand::ForgetMemory { .. } => "forget",
         OperatorCommand::ReleaseLegalHold { .. } => "legal-hold-release",
+        OperatorCommand::AuditRotate => "audit-rotate",
         OperatorCommand::AdmitGovernanceSchema { .. } => "governance-admit",
         OperatorCommand::SkillDecision { .. } => "skill-decision",
         // Story 19-7 — the completion row reads

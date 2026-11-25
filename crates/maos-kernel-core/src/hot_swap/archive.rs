@@ -3,6 +3,12 @@
 //! Spirit archive persistence — saves predecessor manifest + final-state
 //! CBOR snapshot to `~/.local/share/maos/spirit-archives/<spirit_id>/<version>/`.
 //!
+//! Each record is written crash-atomically: a uniquely named create-new
+//! (no-follow on unix) temporary in the same directory is fsynced, renamed over
+//! the destination, and the directory fsynced. The temporary is owned by an RAII
+//! guard that removes it on every failure path; the previous destination inode is
+//! never written in place.
+//!
 //! Used by the migrator path to detect whether a predecessor archive exists
 //! (triggering `EMigratorMissing` if no migrator is declared).
 
@@ -41,14 +47,73 @@ pub struct SpiritArchive {
     base_dir: PathBuf,
 }
 
-/// Crash-atomic write: a temp file in the same directory, fsynced, renamed over
-/// `path`, then the directory fsynced, so a death never leaves a partial record.
+/// Removes the owned temporary on every return path until the rename disarms it.
+struct TempGuard {
+    path: PathBuf,
+    armed: bool,
+}
+
+impl Drop for TempGuard {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
+
+/// Create a uniquely named temporary beside `path`: create-new (`O_EXCL`) and,
+/// on unix, no-follow, so no writer ever opens a file another writer (or a
+/// planted link) already owns.
+fn create_unique_temp(path: &Path) -> io::Result<(fs::File, TempGuard)> {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let mut attempts = 0;
+    loop {
+        let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        let tmp = path.with_file_name(format!(
+            ".{name}.{}.{nanos:x}.{seq}.tmp",
+            std::process::id()
+        ));
+        let mut opts = fs::OpenOptions::new();
+        opts.write(true).create_new(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::OpenOptionsExt;
+            opts.custom_flags(rustix::fs::OFlags::NOFOLLOW.bits() as i32);
+        }
+        match opts.open(&tmp) {
+            Ok(file) => {
+                return Ok((
+                    file,
+                    TempGuard {
+                        path: tmp,
+                        armed: true,
+                    },
+                ));
+            }
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists && attempts < 16 => attempts += 1,
+            Err(e) => return Err(e),
+        }
+    }
+}
+
+/// Crash-atomic write: a uniquely named, create-new temp file in the same
+/// directory, fsynced, renamed over `path`, then the directory fsynced, so a
+/// death never leaves a partial record and concurrent writers never share a temp.
 fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let tmp = path.with_extension("tmp");
-    let mut file = fs::File::create(&tmp)?;
+    let (mut file, mut guard) = create_unique_temp(path)?;
     file.write_all(bytes)?;
     file.sync_all()?;
-    fs::rename(&tmp, path)?;
+    drop(file);
+    fs::rename(&guard.path, path)?;
+    guard.armed = false;
     match path.parent() {
         Some(dir) => fs::File::open(dir)?.sync_all(),
         None => Ok(()),

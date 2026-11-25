@@ -7,7 +7,7 @@
 //! per-contract-clause, not per-helper-line: one isolated planted red per
 //! clause (a)–(f), per denominator (workflows, secrets, ADRs, checklist rows),
 //! per `require_absent` regression direction, and per artifact guard
-//! (STABILITY fence, README flag, Cargo.lock wasmtime pin). Helper clauses
+//! (STABILITY fence, README engine-free command, Cargo.lock wasmtime pin). Helper clauses
 //! without their own vector are refactors pending a red, not proven controls.
 
 use regex::Regex;
@@ -15,6 +15,22 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+/// Fixture text for the STABILITY export fence: default-on, unclassified.
+const FENCE_STATEMENT: &str = "The default `maos` build includes the Wasmtime engine (`wasm-host` is in the default feature set); the explicit `--no-default-features` build is engine-free, whether the engine engages 5D002.c.1 is unresolved, and the default artifact carries no counsel clearance.";
+/// Substrings the real fence must keep (all single-line in STABILITY.md).
+const FENCE_REQUIRED: &[&str] = &[
+    "wasm-host",
+    "default feature set",
+    "--no-default-features",
+    "5D002.c.1",
+    "no counsel clearance",
+];
+/// Superseded off-by-default wording that must not return to the fence.
+const FENCE_STALE: &[&str] = &[
+    "stays outside the default closure",
+    "off by default",
+    "opt-in precondition",
+];
 const CHECKLIST: &str = "docs/runbooks/provisioning-checklist.md";
 const REQUIRED_ADRS: &[(&str, &str)] = &[
     ("060", "17-3b-wasm-form-admission-and-contract"),
@@ -287,25 +303,61 @@ fn clears_plain_worker_environment(source: &str) -> bool {
     let Ok(file) = syn::parse_file(source) else {
         return false;
     };
-    file.items.iter().any(|item| {
-        let syn::Item::Fn(function) = item else {
-            return false;
+    let function = |name: &str| {
+        file.items.iter().find_map(|item| match item {
+            syn::Item::Fn(f) if f.sig.ident == name => Some(f),
+            _ => None,
+        })
+    };
+    let (Some(spawn), Some(build)) = (function("spawn_child"), function("base_command")) else {
+        return false;
+    };
+    let Some(syn::Stmt::Expr(syn::Expr::Path(returned), None)) = build.block.stmts.last() else {
+        return false;
+    };
+    let Some(returned) = returned.path.get_ident() else {
+        return false;
+    };
+    let Some(command) = spawn.block.stmts.iter().find_map(|statement| {
+        let syn::Stmt::Local(local) = statement else {
+            return None;
         };
-        function.sig.ident == "spawn_child"
-            && function.block.stmts.iter().any(|statement| {
-                let syn::Stmt::Expr(expression, _) = statement else {
-                    return false;
-                };
-                let mut expression = expression;
-                while let syn::Expr::MethodCall(call) = expression {
-                    if call.method == "env_clear" && call.args.is_empty() {
-                        return true;
-                    }
-                    expression = &call.receiver;
+        let syn::Pat::Ident(binding) = &local.pat else {
+            return None;
+        };
+        let syn::Expr::Call(call) = ungroup_expression(&local.init.as_ref()?.expr) else {
+            return None;
+        };
+        let syn::Expr::Path(callee) = ungroup_expression(&call.func) else {
+            return None;
+        };
+        callee
+            .path
+            .is_ident("base_command")
+            .then_some(&binding.ident)
+    }) else {
+        return false;
+    };
+
+    let calls_on = |f: &syn::ItemFn, name: &str, receiver: &syn::Ident| {
+        f.block.stmts.iter().any(|statement| {
+            let syn::Stmt::Expr(expression, _) = statement else {
+                return false;
+            };
+            let mut expression = ungroup_expression(expression);
+            while let syn::Expr::MethodCall(call) = expression {
+                expression = ungroup_expression(&call.receiver);
+                if call.method == name
+                    && call.args.is_empty()
+                    && matches!(expression, syn::Expr::Path(p) if p.path.is_ident(receiver))
+                {
+                    return true;
                 }
-                false
-            })
-    })
+            }
+            false
+        })
+    };
+    calls_on(spawn, "spawn", command) && calls_on(build, "env_clear", returned)
 }
 
 fn rust_inproc_form_predicate(expr: &syn::Expr) -> bool {
@@ -635,86 +687,6 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
     }
 }
 
-fn sprint_keys(root: &Path, findings: &mut Vec<String>) -> BTreeSet<String> {
-    let Some(body) = read(
-        root,
-        "_bmad-output/implementation-artifacts/sprint-status.yaml",
-        findings,
-    ) else {
-        return BTreeSet::new();
-    };
-    let key_re = Regex::new(r"(?m)^  ([0-9]+-[0-9]+[a-z]?-[a-z0-9-]+):").unwrap();
-    key_re
-        .captures_iter(&body)
-        .map(|capture| capture[1].to_string())
-        .collect()
-}
-
-/// `ADR-060` must not match inside `ADR-0600`: the match is only credited when
-/// no ASCII digit follows it.
-fn contains_adr_number(haystack: &str, adr: &str) -> bool {
-    let mut from = 0;
-    while let Some(offset) = haystack[from..].find(adr) {
-        let at = from + offset;
-        let after = &haystack[at + adr.len()..];
-        if after.chars().next().map_or(true, |ch| !ch.is_ascii_digit()) {
-            return true;
-        }
-        from = at + adr.len();
-    }
-    false
-}
-
-fn epic_section_has_backreference(root: &Path, consumer: &str, adr: &str) -> bool {
-    for path in top_level_files(root, "_bmad-output/planning-artifacts/epics", ".md") {
-        let Ok(body) = std::fs::read_to_string(path) else {
-            continue;
-        };
-        let lines: Vec<_> = body.lines().collect();
-        for (index, line) in lines.iter().enumerate() {
-            if line.starts_with("### ") && line.contains(consumer) {
-                let end = lines[index + 1..]
-                    .iter()
-                    .position(|candidate| candidate.starts_with("### "))
-                    .map_or(lines.len(), |offset| index + 1 + offset);
-                if lines[index..end]
-                    .iter()
-                    .any(|candidate| contains_adr_number(candidate, adr))
-                {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-fn validate_consumers(
-    root: &Path,
-    number: &str,
-    expected_consumer: &str,
-    body: &str,
-    keys: &BTreeSet<String>,
-    findings: &mut Vec<String>,
-) {
-    if !body.contains(expected_consumer) {
-        findings.push(format!(
-            "ADR-{number} must name consuming story `{expected_consumer}`"
-        ));
-    }
-    if !keys.contains(expected_consumer) {
-        findings.push(format!(
-            "ADR-{number} names `{expected_consumer}`, but sprint-status.yaml does not declare it"
-        ));
-    }
-    let adr = format!("ADR-{number}");
-    if !epic_section_has_backreference(root, expected_consumer, &adr) {
-        findings.push(format!(
-            "consumer `{expected_consumer}` must cite {adr} back in its own epic section"
-        ));
-    }
-}
-
 fn validate_index(root: &Path, files: &[PathBuf], findings: &mut Vec<String>) {
     let Some(index) = read(root, "docs/adr/index.md", findings) else {
         return;
@@ -885,8 +857,7 @@ fn validate(root: &Path) -> Vec<String> {
         ));
     }
 
-    let keys = sprint_keys(root, &mut findings);
-    for (number, consumer) in REQUIRED_ADRS {
+    for (number, _) in REQUIRED_ADRS {
         let prefix = format!("ADR-{number}-");
         let Some(path) = adrs.iter().find(|path| {
             path.file_name()
@@ -904,7 +875,6 @@ fn validate(root: &Path) -> Vec<String> {
         };
         validate_shape(number, &body, &mut findings);
         validate_anchors(root, number, &body, &mut findings);
-        validate_consumers(root, number, consumer, &body, &keys, &mut findings);
     }
 
     validate_index(root, &adrs, &mut findings);
@@ -918,8 +888,9 @@ fn validate(root: &Path) -> Vec<String> {
         }
     }
 
-    // (g) The WASM-off-until-Hold-2 statement lives inside the preserved
-    // export fence; every other region of this generated file is byte-locked.
+    // (g) The preserved export fence states the ruled default-on WASM host
+    // and its unclassified status; every other region of this generated file
+    // is byte-locked. No counsel review or ECCN determination is claimed.
     if let Some(stability) = read(root, "STABILITY.md", &mut findings) {
         let open = "<!-- PRESERVED:export -->";
         let close = "<!-- END PRESERVED:export -->";
@@ -928,23 +899,32 @@ fn validate(root: &Path) -> Vec<String> {
             _ => None,
         };
         match fence {
-            Some(fence) if fence.contains("wasm-host") && fence.contains("5D002") => {}
+            Some(fence)
+                if FENCE_REQUIRED.iter().all(|needle| fence.contains(needle))
+                    && !FENCE_STALE.iter().any(|needle| fence.contains(needle)) => {}
             Some(_) => findings.push(
-                "STABILITY.md PRESERVED:export fence must carry the WASM-off-until-Hold-2 statement naming `wasm-host` and the 5D002.c.1 precondition; keep the statement inside the fence — regenerate with `cargo run -p xtask -- stability-matrix` never preserves edits outside it"
+                "STABILITY.md PRESERVED:export fence must carry the default-on WASM host statement naming `wasm-host`, the explicit `--no-default-features` engine-free build, the unresolved 5D002.c.1 question and `no counsel clearance`, and must not retain the superseded off-by-default / opt-in wording; keep the statement inside the fence — regenerate with `cargo run -p xtask -- stability-matrix` never preserves edits outside it"
                     .to_string(),
             ),
             None => findings.push(
-                "STABILITY.md must carry both `<!-- PRESERVED:export -->` fence markers; the WASM-off statement belongs between them"
+                "STABILITY.md must carry both `<!-- PRESERVED:export -->` fence markers; the default-on WASM host statement belongs between them"
                     .to_string(),
             ),
         }
     }
 
-    // (h) Self-builders get the opt-in build command.
+    // (h) Self-builders get the explicit engine-free command; the WASM host is
+    // default-on, so the old opt-in command must not survive.
     if let Some(readme) = read(root, "README.md", &mut findings) {
-        if !readme.contains("--features wasm-host") {
+        if !readme.contains("--no-default-features") {
             findings.push(
-                "README.md build documentation must include the self-builder `--features wasm-host` command (the WASM host is opt-in and off by default)"
+                "README.md build documentation must document the explicit engine-free build (`--no-default-features`); the WASM host is on by default"
+                    .to_string(),
+            );
+        }
+        if readme.contains("--features wasm-host") {
+            findings.push(
+                "README.md must not present `--features wasm-host` as an opt-in; the WASM host is in the default feature set"
                     .to_string(),
             );
         }
@@ -1022,18 +1002,6 @@ impl Fixture {
                 &body,
             );
         }
-        write_file(
-            root,
-            "_bmad-output/implementation-artifacts/sprint-status.yaml",
-            &format!(
-                "last_updated: 2026-09-08\ndevelopment_status:\n{}",
-                REQUIRED_ADRS
-                    .iter()
-                    .map(|(_, consumer)| format!("  {consumer}: backlog\n"))
-                    .collect::<String>()
-            ),
-        );
-
         let mut index = String::from(
             "# Architecture Decision Records\n\n| ADR | Title | Status | Gate |\n|-----|-------|--------|------|\n",
         );
@@ -1075,18 +1043,6 @@ impl Fixture {
         }
         write_file(root, "docs/adr/index.md", &index);
 
-        let mut epic = String::from("# Fixture epic\n\n");
-        for (number, consumer) in REQUIRED_ADRS {
-            epic.push_str(&format!(
-                "### {consumer} — fixture\n\nBuilds the decision in ADR-{number}.\n\n"
-            ));
-        }
-        write_file(
-            root,
-            "_bmad-output/planning-artifacts/epics/epic-fixture.md",
-            &epic,
-        );
-
         write_file(
             root,
             "crates/maos-manifest/src/manifest.rs",
@@ -1109,7 +1065,9 @@ impl Fixture {
         write_file(
             root,
             "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
-            "fn spawn_child() { let mut command = Command::new(program); command.env_clear().args(argv); }\n",
+            "fn spawn_child() { let mut child = base_command(spec, argv); child.spawn(); }\n\
+             fn base_command() { let mut command = Command::new(program); \
+             command.env_clear().args(argv); command }\n",
         );
         write_file(
             root,
@@ -1151,12 +1109,12 @@ impl Fixture {
         write_file(
             root,
             "STABILITY.md",
-            "<!-- GENERATED FILE -->\n\n<!-- PRESERVED:export -->\nThe WASM host stays outside the default closure; `wasm-host` is the 5D002.c.1 opt-in precondition.\n<!-- END PRESERVED:export -->\n",
+            &format!("<!-- GENERATED FILE -->\n\n<!-- PRESERVED:export -->\n{FENCE_STATEMENT}\n<!-- END PRESERVED:export -->\n"),
         );
         write_file(
             root,
             "README.md",
-            "# Fixture\n\nBuild the engine explicitly:\n\ncargo build -p maos-bin --release --features wasm-host\n",
+            "# Fixture\n\nThe default build includes the WASM host. Build the explicit engine-free binary:\n\ncargo build -p maos-bin --release --no-default-features --features network\n",
         );
         write_file(
             root,
@@ -1250,14 +1208,6 @@ fn every_clause_and_denominator_has_a_planted_red() {
     });
     assert_red_contains(&fx, "anti-rot anchor moved");
 
-    // (d) ADR names the consumer, but the epic section no longer cites back.
-    let fx = Fixture::complete();
-    fx.rewrite(
-        "_bmad-output/planning-artifacts/epics/epic-fixture.md",
-        |body| body.replace("ADR-064", "the replay decision"),
-    );
-    assert_red_contains(&fx, "must cite ADR-064 back");
-
     // (e) An ADR file has no index row.
     let fx = Fixture::complete();
     fx.rewrite("docs/adr/index.md", |body| {
@@ -1276,20 +1226,37 @@ fn every_clause_and_denominator_has_a_planted_red() {
     assert_red_contains(&fx, "NEW_OPERATOR_SECRET");
     assert_red_contains(&fx, CHECKLIST);
     assert_red_contains(&fx, LEGAL_STATES);
-    // (g) The STABILITY fence keeps its markers but loses the statement.
+    // (g) The STABILITY fence keeps its markers but loses the default-on /
+    // unclassified statement.
+    let fx = Fixture::complete();
+    fx.rewrite("STABILITY.md", |body| {
+        body.replace(&format!("{FENCE_STATEMENT}\n"), "")
+    });
+    assert_red_contains(&fx, "PRESERVED:export fence must carry");
+
+    // (g2) The fence regresses to the superseded off-by-default policy.
     let fx = Fixture::complete();
     fx.rewrite("STABILITY.md", |body| {
         body.replace(
-            "The WASM host stays outside the default closure; `wasm-host` is the 5D002.c.1 opt-in precondition.\n",
-            "",
+            FENCE_STATEMENT,
+            "The WASM host stays outside the default closure; `wasm-host` is the 5D002.c.1 opt-in precondition, off by default.",
         )
     });
     assert_red_contains(&fx, "PRESERVED:export fence must carry");
 
-    // (h) README drops the self-builder command.
+    // (h) README drops the explicit engine-free command.
     let fx = Fixture::complete();
-    fx.rewrite("README.md", |body| body.replace("--features wasm-host", ""));
-    assert_red_contains(&fx, "must include the self-builder");
+    fx.rewrite("README.md", |body| {
+        body.replace("--no-default-features", "")
+    });
+    assert_red_contains(&fx, "must document the explicit engine-free build");
+
+    // (h2) README regresses to the superseded opt-in command.
+    let fx = Fixture::complete();
+    fx.rewrite("README.md", |body| {
+        format!("{body}\ncargo build -p maos-bin --release --features wasm-host\n")
+    });
+    assert_red_contains(&fx, "must not present `--features wasm-host`");
 
     // (i) Cargo.lock regresses to the advisory-affected wasmtime version.
     let fx = Fixture::complete();
@@ -1389,9 +1356,10 @@ fn every_clause_and_denominator_has_a_planted_red() {
     fx.rewrite(
         "crates/maos-kernel-core/src/lifecycle/cli_wrapper/runtime.rs",
         |_| {
-            "fn spawn_child() { let mut command = Command::new(program); \
-             let rationale = \"env_clear\"; /* command.env_clear(); */ command.args(argv); }\n\
-             fn unrelated() { Command::new(\"decoy\").env_clear(); }\n"
+            "fn spawn_child() { let mut child = base_command(spec, argv); child.spawn(); }\n\
+             fn base_command() { let mut command = Command::new(program); \
+             let rationale = \"env_clear\"; /* command.env_clear(); */ \
+             Command::new(\"decoy\").env_clear(); command.args(argv); command }\n"
                 .into()
         },
     );

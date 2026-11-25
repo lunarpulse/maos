@@ -148,7 +148,10 @@ impl PrincipalNamespaceIndex {
         }
         conn.execute("UPDATE principal_index SET written=1, writer_spirit_pid=?1, timestamp_ns=?2 WHERE principal_id=?3 AND writer_owner=?4 AND schema=?5 AND key=?6",
             params![writer_spirit_pid, timestamp_ns as i64, principal_id, writer_owner, schema, key])
-            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+            // The intent row is already durable and discoverable, and the spill and
+            // its quota charge have committed: a failed refresh of the pid and
+            // timestamp must not turn this committed write into an error.
+            .ok();
         Ok(())
     }
 

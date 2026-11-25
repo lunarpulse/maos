@@ -16,6 +16,7 @@ members = [
     "crates/maos-domain",
     "crates/maos-egress",
     "crates/maos-orchestrator-buffer",
+    "crates/maos-topology",
     "crates/maos-capability",
     "crates/maos-iac",
     "crates/maos-journey-test",
@@ -65,7 +66,7 @@ default-members = []
 exclude = ["templates", "templates/spirit-ts"]
 
 [workspace.package]
-version = "1.0.0-rc.2"
+version = "1.0.0"
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/lunarpulse/maos"
@@ -93,6 +94,63 @@ opt-level = 3
 opt-level = 3
 
 [profile.dev.package.sha2]
+opt-level = 3
+
+# Story 22-7 (E55): the Wasmtime/Cranelift COMPILER, compiled optimised in dev/test. `maos-wasm-runner`
+# compiles the component on every start (the `cache` feature is excluded, see maos-wasm-host/Cargo.toml).
+# The shipped componentized-JS domain Spirit (examples/incident-triage-ts, 12.6 MB) took 179 s to compile on
+# one core with these crates at opt-level 0 and 13.9 s with them optimised (measured 2026-11-24, taskset -c 0),
+# which made `maosctl ask` on that Spirit run out its `--wait` on the hosted 2-vCPU runner. Scope is the
+# compile path only, dev/test only (`test` inherits `dev`); release is untouched and no behaviour changes.
+[profile.dev.package.wasmtime]
+opt-level = 3
+
+[profile.dev.package.wasmtime-environ]
+opt-level = 3
+
+[profile.dev.package.wasmtime-internal-cranelift]
+opt-level = 3
+
+[profile.dev.package.wasmtime-internal-core]
+opt-level = 3
+
+[profile.dev.package.cranelift-codegen]
+opt-level = 3
+
+[profile.dev.package.cranelift-frontend]
+opt-level = 3
+
+[profile.dev.package.cranelift-entity]
+opt-level = 3
+
+[profile.dev.package.cranelift-bforest]
+opt-level = 3
+
+[profile.dev.package.cranelift-bitset]
+opt-level = 3
+
+[profile.dev.package.cranelift-control]
+opt-level = 3
+
+[profile.dev.package.cranelift-native]
+opt-level = 3
+
+[profile.dev.package.regalloc2]
+opt-level = 3
+
+[profile.dev.package.wasmparser]
+opt-level = 3
+
+[profile.dev.package.gimli]
+opt-level = 3
+
+[profile.dev.package.object]
+opt-level = 3
+
+[profile.dev.package.hashbrown]
+opt-level = 3
+
+[profile.dev.package.bumpalo]
 opt-level = 3
 
 # Story 20-12 AC7 — test binaries were 22–100 MB of full DWARF and every

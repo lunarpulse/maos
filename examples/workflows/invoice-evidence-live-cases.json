@@ -1,0 +1,20 @@
+[
+  {
+    "id": "direct-assigned",
+    "input": {"excerpt": "Vendor: Example Gears. The buyer issued purchase order PO-731 for this invoice."},
+    "expect": {"outcome": "ready_for_approval", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "documented"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": true, "quote": "The buyer issued purchase order PO-731 for this invoice."}}]
+  },
+  {
+    "id": "direct-missing",
+    "input": {"excerpt": "Due date: 14 May. Procurement confirms that no purchase order was issued for this invoice."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "Procurement confirms that no purchase order was issued for this invoice."}}]
+  },
+  {
+    "id": "abbreviation-unassigned",
+    "input": {"excerpt": "PO field: N/A (not issued). Vendor sales order: SO-626."},
+    "expect": {"outcome": "hold_for_procurement", "path": ["extract", "review"], "step_outcomes": ["finding_ready", "missing_order"]},
+    "step_artifacts": [{"step": "extract", "fields": {"purchase_order_present": false, "quote": "PO field: N/A (not issued)."}}]
+  }
+]

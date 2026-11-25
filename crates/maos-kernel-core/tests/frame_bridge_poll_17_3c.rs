@@ -160,3 +160,174 @@ fn overlong_stderr_never_journals_a_token_split_across_records() {
         }
     }
 }
+
+#[test]
+fn frame_writer_roundtrips_through_local_consumer() {
+    let mut bridge = bridge("exec cat", CliWrapperStdioShape::JsonRpcOverStdio);
+    let mut writer = bridge.take_frame_writer().expect("take child stdin");
+    assert_eq!(
+        writer
+            .write_frame_until(
+                &vec![0; maos_frame_codec::MAX_FRAME_BYTES + 1],
+                Instant::now() + Duration::from_secs(10),
+            )
+            .unwrap_err()
+            .kind(),
+        std::io::ErrorKind::InvalidData
+    );
+    writer.write_frame(b"first").expect("blocking write");
+    writer
+        .write_frame_until(b"second", Instant::now() + Duration::from_secs(10))
+        .expect("bounded write to the same pipe");
+    drop(writer);
+
+    let (seen, closed) = poll_until_closed(&mut bridge, Duration::from_secs(10));
+    assert!(closed, "closing the writer must deliver EOF");
+    assert_eq!(
+        seen,
+        vec![
+            (SubStream::Stdout, b"first".to_vec()),
+            (SubStream::Stdout, b"second".to_vec()),
+        ],
+        "the real child must roundtrip both canonical frames in order"
+    );
+}
+
+#[test]
+fn frame_writer_expired_deadline_times_out_and_emits_no_frame() {
+    use std::io::ErrorKind::{BrokenPipe, TimedOut};
+
+    let mut bridge = bridge("exec cat", CliWrapperStdioShape::JsonRpcOverStdio);
+    let mut writer = bridge.take_frame_writer().expect("take child stdin");
+    assert_eq!(
+        writer
+            .write_frame_until(b"never", Instant::now())
+            .unwrap_err()
+            .kind(),
+        TimedOut
+    );
+    assert_eq!(
+        writer
+            .write_frame_until(b"later", Instant::now() + Duration::from_secs(10))
+            .unwrap_err()
+            .kind(),
+        BrokenPipe
+    );
+    assert_eq!(writer.write_frame(b"later").unwrap_err().kind(), BrokenPipe);
+    drop(writer);
+
+    let (seen, closed) = poll_until_closed(&mut bridge, Duration::from_secs(10));
+    assert!(closed, "closing the timed-out writer must deliver EOF");
+    assert!(
+        seen.is_empty(),
+        "the real child received a post-deadline frame: {seen:?}"
+    );
+}
+
+#[test]
+fn frame_writer_full_pipe_times_out_and_refuses_new_frames() {
+    use std::io::ErrorKind::{BrokenPipe, TimedOut};
+
+    // An ordinary child keeps its pipe open without reading it. No test sleeps
+    // to induce backpressure: the frame itself is larger than the Linux pipe.
+    let mut bridge = bridge("exec sleep 600", CliWrapperStdioShape::JsonRpcOverStdio);
+    let mut writer = bridge.take_frame_writer().expect("take child stdin");
+    let (done, result) = std::sync::mpsc::sync_channel(1);
+    let attempt = std::thread::spawn(move || {
+        let body = vec![b'x'; 8 * 1024 * 1024];
+        let first = writer.write_frame_until(&body, Instant::now() + Duration::from_millis(100));
+        let second = writer.write_frame_until(b"next", Instant::now() + Duration::from_secs(10));
+        done.send((first, second))
+    });
+    // An independent failure bound, not a timing oracle for the 100 ms poll.
+    // On timeout, unwinding drops the bridge, killing and reaping the child
+    // even if a broken blocking writer still owns stdin.
+    let (first, second) = result
+        .recv_timeout(Duration::from_secs(10))
+        .expect("backpressured writer did not return under the independent bound");
+    assert_eq!(first.unwrap_err().kind(), TimedOut);
+    assert_eq!(second.unwrap_err().kind(), BrokenPipe);
+    attempt
+        .join()
+        .expect("writer unwound")
+        .expect("result sent");
+}
+
+/// The pipe-backpressure witness of the pre-warm stage wall (Story 21-9 AC8e): a child that never
+/// reads its stdin cannot hold the host's writer past the wall. The blocked writer is released by
+/// the wall itself (typed `TimedOut`, the same kind the pre-warm maps to its deadline refusal),
+/// its thread finishes and is joined, and dropping the bridge reaps the child and leaves no fd
+/// to the child's stdin pipe in this process.
+#[test]
+fn backpressured_writer_is_released_at_the_wall_and_the_child_is_reaped() {
+    use std::io::ErrorKind::TimedOut;
+
+    /// The inode token of the pipe behind `/proc/<pid>/fd/0` (`pipe:[N]`).
+    fn child_stdin_pipe(pid: u32) -> String {
+        let target = std::fs::read_link(format!("/proc/{pid}/fd/0")).expect("child stdin link");
+        let target = target.to_string_lossy().into_owned();
+        assert!(
+            target.starts_with("pipe:["),
+            "child stdin is not a pipe: {target}"
+        );
+        target
+    }
+    /// How many of this process's fds point at `pipe`.
+    fn own_fds_on(pipe: &str) -> usize {
+        std::fs::read_dir("/proc/self/fd")
+            .expect("own fd table")
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                std::fs::read_link(entry.path())
+                    .is_ok_and(|target| target.to_string_lossy() == pipe)
+            })
+            .count()
+    }
+
+    const WALL: Duration = Duration::from_millis(200);
+    // A hard bound for a loaded machine, not a timing oracle for `WALL`.
+    const HARD: Duration = Duration::from_secs(20);
+
+    let mut bridge = bridge("exec sleep 600", CliWrapperStdioShape::JsonRpcOverStdio);
+    let pid = bridge.child_pid();
+    let mut writer = bridge.take_frame_writer().expect("take child stdin");
+    let pipe = child_stdin_pipe(pid);
+    assert_eq!(own_fds_on(&pipe), 1, "the writer holds the one write end");
+
+    let (done, result) = std::sync::mpsc::sync_channel(1);
+    let started = Instant::now();
+    let thread = std::thread::spawn(move || {
+        // Larger than any Linux pipe buffer: the write must block on backpressure.
+        let body = vec![b'x'; 8 * 1024 * 1024];
+        let outcome = writer.write_frame_until(&body, started + WALL);
+        let _ = done.send((outcome, Instant::now()));
+        // `writer`, and with it the stdin fd, is dropped as this thread ends.
+    });
+    let (outcome, returned_at) = result
+        .recv_timeout(HARD)
+        .expect("the wall did not release the blocked writer");
+    assert_eq!(outcome.unwrap_err().kind(), TimedOut);
+    assert!(
+        returned_at.duration_since(started) >= WALL,
+        "released before the wall: {:?}",
+        returned_at.duration_since(started)
+    );
+    // The writer thread is finished, not parked: an observable join, not a sleep.
+    thread.join().expect("the writer thread unwound");
+    assert_eq!(
+        own_fds_on(&pipe),
+        0,
+        "a stdin write end outlived its writer"
+    );
+
+    assert!(
+        std::path::Path::new(&format!("/proc/{pid}")).exists(),
+        "the child must still be live until its owner tears it down"
+    );
+    drop(bridge);
+    assert!(
+        !std::path::Path::new(&format!("/proc/{pid}")).exists(),
+        "child {pid} was not killed and reaped (no zombie either)"
+    );
+    assert_eq!(own_fds_on(&pipe), 0, "a stdin pipe fd leaked past teardown");
+}

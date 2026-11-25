@@ -1,0 +1,17 @@
+AC3b plant: crates/maos-bin/src/audit_rotation.rs floor_for returns i64::MAX (registered tail/stamper floors dropped from the cut). Command: cargo nextest run ... -E 'escape_tail_surfaces | progress_stamper_misses | insertion_ids_keep'. Result: escape_tail_surfaces_a_kill_sealed_by_a_rotation_exactly_once FAILS ('the floor kept the unscanned kill row in the live log'); progress_stamper_misses_no_row_across_rotation FAILS too; insertion_ids_keep_growing... passes (independent of floors). Plant reverted.
+
+        FAIL [   0.615s] (1/3) maos-bin::audit_rotation_22_6 progress_stamper_misses_no_row_across_rotation
+  stderr 
+    thread 'progress_stamper_misses_no_row_across_rotation' (3588269) panicked at crates/maos-bin/tests/audit_rotation_22_6.rs:671:5:
+    assertion `left == right` failed: the stamper publishes its committed cursor
+      left: 9223372036854775807
+     right: 6
+        FAIL [   1.113s] (2/3) maos-bin::audit_rotation_22_6 escape_tail_surfaces_a_kill_sealed_by_a_rotation_exactly_once
+  stderr 
+    thread 'escape_tail_surfaces_a_kill_sealed_by_a_rotation_exactly_once' (3588268) panicked at crates/maos-bin/tests/audit_rotation_22_6.rs:592:5:
+    the floor kept the unscanned kill row in the live log
+        PASS [   1.222s] (3/3) maos-bin::audit_rotation_22_6 insertion_ids_keep_growing_after_a_rotation_that_seals_all_but_the_newest_row
+     Summary [   1.222s] 3 tests run: 1 passed, 2 failed, 12 skipped
+        FAIL [   0.615s] (1/3) maos-bin::audit_rotation_22_6 progress_stamper_misses_no_row_across_rotation
+        FAIL [   1.113s] (2/3) maos-bin::audit_rotation_22_6 escape_tail_surfaces_a_kill_sealed_by_a_rotation_exactly_once
+rc=100

@@ -116,7 +116,9 @@ Dependencies point inward (adapter ring → kernel services → domain core), wi
 
 **Workspace member count (post Story 17-1):** Story 17-1 adds ONE leaf crate `crates/maos-egress/`, moving the count from 57 to **58 workspace members**. The daemon feature owns the reverse proxy and scoped credential; the default-features-off build supplies only the std-only in-container transport. Neither kernel nor domain depends on the proxy. This membership change does not yet establish Worker containment; the T3 route is a later task in the same story. History: 46 (Story 10.4a, maos-loom-lite) → 48 (Story 11.1a, maos-host + maos-wasm-host) → 49 (Story 11.4a, maos-pdp) → 50 (Story 11.4b, maos-escape-detector) → 51/52 (Story 11.4c, maos-siem + maos-sso) → 53 (Story 11.5, maos-fkcs) → 54 (Story 12.1, maos-cohort) → 55 (Story 12.4b, digest) → 56 (Story 17-6, maos-exec-deps) → 57 (Story 17-3c, maos-frame-codec) → 58 (Story 17-1, maos-egress).
 
-**Workspace member count (post Story 21-5):**<!-- workspace-count-authoritative --> Story 21-5 adds ONE leaf crate `crates/maos-orchestrator-buffer/`, moving the count from 58 to **59 workspace members**.
+**Workspace member count (post Story 21-5):** Story 21-5 adds one leaf crate `crates/maos-orchestrator-buffer/`, moving the count from 58 to **59 workspace members**.
+
+**Workspace member count (DSA pilot):**<!-- workspace-count-authoritative --> The DSA pilot adds `crates/maos-topology/`, a workflow compiler and runtime contract library outside the kernel and domain dependency closures, moving the count from 59 to **60 workspace members**.
 
 **A2A transport layering (post Story 8.6).** The A2A surface is now three crates with the dependency arrows drawn explicitly:
 

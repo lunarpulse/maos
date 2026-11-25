@@ -98,6 +98,9 @@ async fn boot(declared: Option<&[&str]>) -> Rig {
         .load("keeper", bundle, CountingSpirit(Arc::clone(&counts)), 0x208)
         .await
         .expect("load the predecessor");
+    harness.policy.mutate(|policy| {
+        policy.manifest_scopes.insert(pid, Default::default());
+    });
     harness.scheduler.start(pid).await.expect("start it");
     Rig {
         harness,

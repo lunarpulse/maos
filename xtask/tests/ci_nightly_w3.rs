@@ -8,9 +8,10 @@ use std::path::PathBuf;
 
 use serde_yaml::Value;
 
-/// Slow or sensitive jobs that protect a release claim: NO `continue-on-error`, so a red night reds the
-/// run. They return to `aggregate.needs` after 10 consecutive green nightly runs and before GA.
-const SLOW_SENSITIVE: [&str; 2] = ["nfr-rel-11-halt-receipt-999pct", "expensive-tests"];
+/// Slow or sensitive jobs that protect a release claim. They ran nightly (W3) and RETURNED to `discipline.yml`,
+/// `aggregate.needs`, `release-ready.needs` and `xtask/release-ready-required.toml` for GA, as ordinary jobs
+/// with NO `continue-on-error`. They are no longer nightly jobs.
+const RETURNED: [&str; 2] = ["nfr-rel-11-halt-receipt-999pct", "expensive-tests"];
 
 /// Advisory / measurement jobs: they carried `continue-on-error` in `discipline.yml` and keep it.
 const ADVISORY: [&str; 6] = [
@@ -38,8 +39,18 @@ fn workflow(name: &str) -> Value {
         .unwrap_or_else(|e| panic!("parse {name}: {e}"))
 }
 
+/// Jobs moved off the merge and release path by lean-gates WP-06 (advisory, `continue-on-error`). They carry
+/// no `deferred-work.md` row: the tracker rows that recorded earlier moves are not part of this move.
+const LEAN_GATES_ADVISORY: [&str; 5] = [
+    "windows-check",
+    "check-perf-counts",
+    "check-perf-runner-policy",
+    "check-cert-rotation-trigger",
+    "check-model-currency",
+];
+
 fn moved() -> impl Iterator<Item = &'static str> {
-    SLOW_SENSITIVE.into_iter().chain(ADVISORY)
+    ADVISORY.into_iter().chain(LEAN_GATES_ADVISORY)
 }
 
 fn needs(job: &Value) -> Vec<String> {
@@ -99,9 +110,15 @@ fn ci_nightly_is_scheduled_pinned_read_only_and_takes_no_expression_in_a_script(
     for (name, job) in jobs {
         let name = name.as_str().expect("job name");
         assert!(moved().any(|m| m == name), "unexpected job {name}");
+        // `windows-check` is the one job that needs Windows; it keeps the runner it had in `discipline.yml`.
+        let image = if name == "windows-check" {
+            "windows-latest"
+        } else {
+            "ubuntu-24.04"
+        };
         assert_eq!(
             job["runs-on"].as_str(),
-            Some("ubuntu-24.04"),
+            Some(image),
             "{name}: pinned runner image"
         );
         assert!(
@@ -140,6 +157,12 @@ fn moved_jobs_run_nightly_and_are_on_no_merge_or_ship_gate_path() {
         .iter()
         .filter_map(|row| row["name"].as_str())
         .collect();
+    for name in RETURNED {
+        assert!(
+            nightly["jobs"][name].is_null(),
+            "{name} returned to discipline.yml; it must not also be a nightly job"
+        );
+    }
     let discipline_jobs = discipline["jobs"].as_mapping().expect("jobs");
     for name in moved() {
         assert!(nightly["jobs"][name].is_mapping(), "{name} runs nightly");
@@ -192,16 +215,44 @@ fn every_nightly_job_records_its_result_as_summary_line_and_artifact() {
             "{name}: a red job is recorded too"
         );
         assert_eq!(record["with"]["job"].as_str(), Some(name));
-        assert!(
-            record["with"]["status"]
-                .as_str()
-                .is_some_and(|status| status.contains("job.status")),
-            "{name}: the recorded status derives from job.status"
+        // Every job records `job.status` verbatim, except `determinism-tests`: its advisory step is
+        // `continue-on-error`, so the job is green even when the tests failed. It records the surfaced
+        // step result when there is one (a test failure beats job success), else `job.status`.
+        let expected = if name == "determinism-tests" {
+            "${{ steps.surface.outputs.result || job.status }}"
+        } else {
+            "${{ job.status }}"
+        };
+        assert_eq!(
+            record["with"]["status"].as_str(),
+            Some(expected),
+            "{name}: recorded status expression"
         );
     }
     let action: Value =
         serde_yaml::from_str(&read(".github/actions/record-nightly-result/action.yml"))
             .expect("parse record-nightly-result");
+    let mut descriptive = vec![
+        ("name", action["name"].as_str().expect("action name")),
+        (
+            "description",
+            action["description"].as_str().expect("action description"),
+        ),
+    ];
+    for input in ["job", "status"] {
+        descriptive.push((
+            input,
+            action["inputs"][input]["description"]
+                .as_str()
+                .unwrap_or_else(|| panic!("input {input} description")),
+        ));
+    }
+    for (field, text) in descriptive {
+        assert!(
+            !text.contains("${{"),
+            "action metadata {field} must stay literal: expression examples are evaluated by the runner"
+        );
+    }
     let steps = action["runs"]["steps"].as_sequence().expect("steps");
     let write = steps[0]["run"].as_str().expect("write step");
     assert!(write.contains("$GITHUB_STEP_SUMMARY"), "job summary line");
@@ -217,11 +268,41 @@ fn every_nightly_job_records_its_result_as_summary_line_and_artifact() {
         upload["with"]["name"].as_str(),
         Some("nightly-result-${{ inputs.job }}")
     );
-    // Where the old job uploaded an artifact, the nightly job still does.
-    let expect_upload = [
-        ("expensive-tests", "expensive-tests-junit"),
-        ("clippy-advisory", "clippy-advisory-diagnostics"),
+    // The Unix smoke below supplies the values resolved by these bindings.
+    let env = steps[0]["env"].as_mapping().expect("write step env");
+    let wiring = [
+        ("NIGHTLY_JOB", "${{ inputs.job }}"),
+        ("NIGHTLY_STATUS", "${{ inputs.status }}"),
+        ("NIGHTLY_SHA", "${{ github.sha }}"),
+        (
+            "NIGHTLY_RUN_URL",
+            "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+        ),
     ];
+    for (key, expected) in wiring {
+        assert_eq!(
+            env.get(key).and_then(|value| value.as_str()),
+            Some(expected),
+            "the write step's env {key} wiring"
+        );
+    }
+    assert_eq!(
+        upload["with"]["path"].as_str(),
+        Some("${{ runner.temp }}/nightly-result/${{ inputs.job }}.txt"),
+        "the upload path is the recorder's actual output file"
+    );
+    assert_eq!(
+        upload["with"]["retention-days"].as_u64(),
+        Some(90),
+        "result artifacts are retained 90 days"
+    );
+    assert_eq!(
+        upload["with"]["if-no-files-found"].as_str(),
+        Some("error"),
+        "a missing result file must fail the upload, not pass silently"
+    );
+    // Where the old job uploaded an artifact, the nightly job still does.
+    let expect_upload = [("clippy-advisory", "clippy-advisory-diagnostics")];
     for (job, artifact) in expect_upload {
         assert!(
             nightly["jobs"][job]["steps"]
@@ -235,13 +316,24 @@ fn every_nightly_job_records_its_result_as_summary_line_and_artifact() {
 }
 
 #[test]
-fn slow_sensitive_jobs_can_red_the_run_and_advisory_jobs_keep_their_labelled_continue_on_error() {
+fn returned_jobs_are_ordinary_release_path_jobs_and_advisory_jobs_keep_their_labelled_continue_on_error(
+) {
     let nightly = workflow("ci-nightly.yml");
-    for name in SLOW_SENSITIVE {
-        let job = &nightly["jobs"][name];
+    let discipline = workflow("discipline.yml");
+    let required: toml::Value =
+        toml::from_str(&read("xtask/release-ready-required.toml")).expect("release-ready roster");
+    let required_jobs: Vec<&str> = required["jobs"]
+        .as_array()
+        .expect("roster jobs")
+        .iter()
+        .filter_map(toml::Value::as_str)
+        .collect();
+    for name in RETURNED {
+        let job = &discipline["jobs"][name];
+        assert!(job.is_mapping(), "{name} is a discipline job again");
         assert!(
             job["continue-on-error"].is_null(),
-            "{name}: a red night is the signal; it carries no continue-on-error"
+            "{name}: a red job is the signal; it carries no continue-on-error"
         );
         for step in job["steps"].as_sequence().expect("steps") {
             assert!(
@@ -249,8 +341,22 @@ fn slow_sensitive_jobs_can_red_the_run_and_advisory_jobs_keep_their_labelled_con
                 "{name}: no step-level continue-on-error"
             );
         }
+        for gate in ["aggregate", "release-ready"] {
+            assert!(
+                needs(&discipline["jobs"][gate]).iter().any(|n| n == name),
+                "{name} must be in {gate}.needs"
+            );
+        }
+        assert!(
+            required_jobs.contains(&name),
+            "{name} must be pinned in release-ready-required.toml"
+        );
+        assert!(
+            nightly["jobs"][name].is_null(),
+            "{name} is no longer a nightly job"
+        );
     }
-    for name in ADVISORY {
+    for name in ADVISORY.into_iter().chain(LEAN_GATES_ADVISORY) {
         let job = &nightly["jobs"][name];
         let masked = job["continue-on-error"].as_bool() == Some(true)
             || job["steps"]
@@ -260,17 +366,6 @@ fn slow_sensitive_jobs_can_red_the_run_and_advisory_jobs_keep_their_labelled_con
                 .any(|step| step["continue-on-error"].as_bool() == Some(true));
         assert!(masked, "{name}: advisory jobs keep their continue-on-error");
     }
-    // The recorded line of `determinism-tests` reads the step outcome, because its test step masks itself.
-    let record = nightly["jobs"]["determinism-tests"]["steps"]
-        .as_sequence()
-        .expect("steps")
-        .last()
-        .expect("record step")
-        .clone();
-    assert_eq!(
-        record["with"]["status"].as_str(),
-        Some("${{ steps.surface.outputs.result || job.status }}")
-    );
 }
 
 #[test]
@@ -311,7 +406,7 @@ fn timing_bound_binaries_are_in_the_serial_test_group_with_no_budget_change() {
 #[test]
 fn deferred_work_records_every_move_with_owner_and_return_rule() {
     let deferred = read("_bmad-output/implementation-artifacts/deferred-work.md");
-    for name in moved() {
+    for name in ADVISORY {
         let row = deferred
             .lines()
             .find(|line| {
@@ -326,18 +421,79 @@ fn deferred_work_records_every_move_with_owner_and_return_rule() {
         );
         assert!(row.contains("Status: open"), "{name}: the row is open");
     }
-    for name in SLOW_SENSITIVE {
+    for name in RETURNED {
         let row = deferred
             .lines()
             .find(|line| {
                 line.starts_with("- **")
                     && line.contains(&format!("`{name}`"))
-                    && line.contains("ci-nightly.yml")
+                    && line.contains("returned from `ci-nightly.yml`")
             })
-            .expect("row");
+            .unwrap_or_else(|| {
+                panic!("deferred-work.md has no row recording the return of `{name}`")
+            });
+        assert!(row.contains("Status: closed"), "{name}: the row is closed");
         assert!(
-            row.contains("10 consecutive") && row.contains("before GA"),
-            "{name}: the row states the 10-consecutive-green rule and the before-GA requirement"
+            row.contains("repromotion.yml"),
+            "{name}: the row names the repromotion dispatch as its evidence"
+        );
+    }
+}
+
+/// Runs the real write step under bash (unix only) for the three statuses the recorder is given: the
+/// line carries exactly the allowed fields and the artifact file holds the same line.
+#[cfg(unix)]
+#[test]
+fn record_nightly_result_write_step_emits_one_line_to_summary_and_artifact_file() {
+    let action: Value =
+        serde_yaml::from_str(&read(".github/actions/record-nightly-result/action.yml"))
+            .expect("parse record-nightly-result");
+    let write = action["runs"]["steps"][0]["run"]
+        .as_str()
+        .expect("write step");
+    for status in ["success", "failure", "cancelled"] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let summary = dir.path().join("summary");
+        let out = std::process::Command::new("bash")
+            .arg("-c")
+            .arg(write)
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .env("LC_ALL", "C")
+            .env("NIGHTLY_JOB", "determinism-tests")
+            .env("NIGHTLY_STATUS", status)
+            .env("NIGHTLY_SHA", "abc123")
+            .env("NIGHTLY_RUN_URL", "https://example.test/runs/1")
+            .env("GITHUB_STEP_SUMMARY", &summary)
+            .env("RUNNER_TEMP", dir.path())
+            .output()
+            .expect("run write step");
+        assert!(out.status.success(), "write step failed for {status}");
+        let line = fs::read_to_string(dir.path().join("nightly-result/determinism-tests.txt"))
+            .expect("result file");
+        let fields: Vec<&str> = line.trim_end().split(' ').collect();
+        assert_eq!(fields.len(), 6, "line fields for {status}: {line}");
+        assert_eq!(fields[0], "nightly-result");
+        assert_eq!(fields[1], "job=determinism-tests");
+        assert_eq!(fields[2], format!("status={status}"));
+        assert_eq!(fields[3], "sha=abc123");
+        let at = fields[4]
+            .strip_prefix("at=")
+            .unwrap_or_else(|| panic!("timestamp field: {line}"));
+        assert!(at.ends_with('Z'), "UTC suffix Z: {at}");
+        let parsed = chrono::DateTime::parse_from_rfc3339(at)
+            .unwrap_or_else(|e| panic!("RFC3339 timestamp {at}: {e}"));
+        assert_eq!(parsed.offset().local_minus_utc(), 0, "UTC offset: {at}");
+        assert_eq!(fields[5], "run=https://example.test/runs/1");
+        assert_eq!(
+            fs::read_to_string(&summary).expect("summary"),
+            line,
+            "summary line equals the artifact line"
+        );
+        assert_eq!(
+            String::from_utf8_lossy(&out.stdout),
+            line,
+            "stdout echoes the same line"
         );
     }
 }

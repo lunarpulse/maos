@@ -86,9 +86,11 @@ fn manifest_self_check_is_well_formed() {
             "output_shape must require '{f}'"
         );
     }
+    // Story 22-8 (D-22-8-04 A) — Nash declares exactly one capability: `provider.complete`,
+    // the completion that phrases `proposed_fix`.
     assert_eq!(
-        report.capabilities_required_count, 0,
-        "Nash declares no [capabilities.required] (Decision I)"
+        report.capabilities_required_count, 1,
+        "Nash declares [capabilities.required] provider.complete (Story 22-8)"
     );
     assert!(
         report.warnings.is_empty(),
@@ -105,13 +107,18 @@ fn manifest_sections_parse_with_authoritative_validators() {
     let _ = PostureSection::from_toml_str(&section(MANIFEST, "posture")).expect("[posture] valid");
     let _ = SandboxConfig::from_toml_str(&section(MANIFEST, "sandbox")).expect("[sandbox] valid");
 
-    // Decision I / Decision C — these sections are deliberately ABSENT: Nash does
-    // no inference (no capabilities) and never halts (no epistemic_policy).
+    // Decision C — Nash never halts (no epistemic_policy). Story 22-8 — its only capability is
+    // the Inference Port that phrases `proposed_fix`: no MCP driver.
     let v = value(MANIFEST);
-    assert!(
-        v.get("capabilities").is_none(),
-        "Nash declares no [capabilities] (Decision I)"
+    let required = &v["capabilities"]["required"];
+    assert_eq!(
+        required["provider"]["complete"],
+        toml::Value::Array(vec![toml::Value::String(
+            "anthropic.claude-haiku-5-5".into()
+        )]),
+        "Nash pins the Butler model for its phrasing seam"
     );
+    assert!(required.get("mcp").is_none(), "Nash uses no MCP driver");
     assert!(
         v.get("epistemic_policy").is_none(),
         "Nash declares no [epistemic_policy] — it architects, it does not halt (Decision C)"

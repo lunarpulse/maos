@@ -1,0 +1,226 @@
+name: repromotion
+
+# WP-15 (lean-gates plan, operator decision 8, 2026-11-23). Ten green iterations of the two
+# jobs that left `discipline.yml` in the CI release-ready program W3
+# (`nfr-rel-11-halt-receipt-999pct`, `expensive-tests`), run in ONE dispatch instead of ten nights.
+#
+# COUNTING RULE: ten green iterations of one dispatch at one SHA, attempt 1 only. One red
+# iteration voids the dispatch. No re-run: a re-run is attempt 2 and the `summary` job refuses
+# it. A red dispatch is read, fixed, and a NEW dispatch is started. No retry-to-green.
+#
+# Both jobs below are copies of the `ci-nightly.yml` jobs of the same names (bodies unchanged
+# except `strategy.matrix.iteration` and the per-iteration junit artifact name; the nightly
+# result recorder is dropped because `summary` records the run). The membership PR that moves
+# them into `release-ready.needs` follows only after this dispatch is green.
+#
+# Honest limit: ten same-hour samples see less runner variance than ten nights. The count and
+# the no-retry rule are unchanged.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_PUBLIC_API_VERSION: "0.51.0"
+  MAOS_SECRETS_BACKEND: env
+  # Harm-reduction against transient crates.io network errors (same value as discipline.yml);
+  # not a retry of a failed job.
+  CARGO_NET_RETRY: "10"
+
+jobs:
+  # Story 5.3 — NFR-Rel-11 halt-receipt production rate ≥99.9%.
+  # Left `aggregate.needs` in W3: the 5 s root-shutdown bound of the 16-3 suite is wall-clock
+  # sensitive on shared hosted runners (recurring hosted failure at root_shutdown_unload_16_3.rs).
+  # Back on the release path after 10 consecutive green nightly runs; MUST be back before GA.
+  nfr-rel-11-halt-receipt-999pct:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        iteration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run halt receipt production rate test
+        run: cargo test -p maos-kernel-core --test halt_receipt_production_rate --release
+      # Story 17-1 — the root-shutdown Workers run under real T3.
+      - uses: ./.github/actions/provision-t3-test-substrate
+      # Story 16-3 (AC4) — NFR-Rel-11's PLANNED half, at every `maos run` root.
+      # The kernel test above drives `terminate_spirit` directly; this second
+      # step drives the real roots, where the receipt was actually missing.
+      #
+      # All three binaries are built with the SAME `--release` profile as the
+      # test run: `maosctl` is resolved as the `maos` binary's SIBLING and the
+      # fixture as a sibling/parent of the running exe, so a debug-profile
+      # build of either is invisible to a release test.
+      - name: Build release binaries for the root-shutdown suite
+        run: |
+          cargo build --release -p maos-bin --bin maos
+          cargo build --release -p maos-cli --bin maosctl
+          cargo build --release -p worker --bin worker-cli-fixture
+      # `--test-threads=1` is REQUIRED: these vectors spawn real roots with
+      # scratch doors and scan `/proc`, and assume sequential execution.
+      #
+      # ── PROFILE SPLIT (Epic-16 retrospective, 2026-09-21) ──────────────────
+      # The suite is run in TWO profiles because two correct decisions collide
+      # on the `cohort::*` vectors, and they were RED from the day Story 16-3
+      # created this file:
+      #
+      #   * `crates/maos-bin/src/main.rs:1948` gates the `MAOS_TEST_BOOT_NONCE`
+      #     override on `cfg!(debug_assertions)`. That is deliberate and stays:
+      #     a shipped release binary that accepts an env-supplied boot nonce has
+      #     no NFR-Rel-6 restart detection at all.
+      #   * The cohort vectors pre-pair `boot_nonce` in each host's
+      #     `[tcp] peer_pins` row (`root_shutdown_unload_16_3.rs:1670`), because
+      #     `PinnedFingerprint.boot_nonce` is a REQUIRED field with no serde
+      #     default (`maos-a2a-tcp/src/config.rs:31-36`) and
+      #     `TofuPinStore::verify_pinned_sync` returns `NotPinned` rather than
+      #     TOFU-pinning on first contact (`maos-a2a-core/src/tofu.rs:457-466`).
+      #     So the config IS the pre-pairing mechanism; there is no way for the
+      #     harness to omit the nonce.
+      #
+      # Under `--release` both hosts therefore mint RANDOM nonces from
+      # `getrandom` (`main.rs:1956-1959`), neither matches the pinned
+      # `NONCE_A`/`NONCE_B`, the receiver fires `CODE_SPIRIT_RESTART_DETECTED`
+      # (`maos-a2a-core/src/router.rs:1372-1380`) and the sender reports
+      # `CrossHostPinMismatch`. Measured: 9 of 11 vectors pass in release; the
+      # 3 `cohort::*` vectors pass 3/3 in debug.
+      #
+      # REJECTED at the 2026-09-21 round-table (unanimous): a `test-boot-nonce`
+      # cargo feature — all four fault-inject precedents guard
+      # `not(debug_assertions)` with `compile_error!`, so it would need
+      # `--release` AND the feature, inverting the house rule on a security
+      # path; loosening the `cfg!`; and `#[ignore]`, which is E16-A2 in disguise.
+      # The designed `re-pin` recovery is NOT driven here: since Story 19-7 its
+      # production caller is the `cohort-a2a-daemon` door
+      # (`maosctl a2a repin approve`), and its two-process vector lives in
+      # `crates/maos-bin/tests/f4_pairing.rs` (`workspace-test-suite`).
+      #
+      # The profile split keeps each run INTERNALLY consistent, which is what
+      # the note above actually requires: `maosctl` and the fixture are resolved
+      # as siblings of the running `maos`, so a release test needs release
+      # siblings and a debug test needs debug siblings. Both hold below.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Run root shutdown unload suite (release — 10 vectors)
+        run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort
+      # The debug siblings, for the debug half. Same sibling-consistency rule.
+      - name: Build debug binaries for the cohort vectors
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
+      - name: Run root shutdown unload cohort vectors (debug — boot-nonce override live)
+        run: cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort
+      # Coverage guard: the split MUST NOT silently drop a vector. 10 + 5 = 15.
+      # 20-3a added harness ownership; 20-1b adds the AST teardown guard,
+      # no-Worker local-timer drain and declared-capability negative control.
+      # A renamed module makes `--skip cohort` match nothing, the release run
+      # then executes all 15 and fails LOUD on the live-Worker cohort vectors.
+      - name: Assert the two halves still sum to the whole suite
+        run: |
+          set -euo pipefail
+          # Keep the cargo output in the log: a failure here was undiagnosable when it was swallowed by sed (run 43155033280 job 130972879907).
+          cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | tee /tmp/split-rel.log
+          cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | tee /tmp/split-dbg.log
+          rel=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-rel.log | tail -1)
+          dbg=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-dbg.log | tail -1)
+          echo "release=${rel} debug=${dbg} total=$(( rel + dbg ))"
+          if [ "$(( rel + dbg ))" -ne 15 ]; then
+            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 15"
+            exit 1
+          fi
+
+  # Story 20-12 AC2 — the ONE job that runs the registered expensive tests:
+  # exactly the `xtask/test-budgets.toml [[expensive]]` rows whose `job` is
+  # `expensive-tests`, restricted to their `#[ignore = "expensive: …"]` tests
+  # (filter derived by `check-test-cost --expensive-filter`, so the job cannot
+  # drift from the register). Rows naming a dedicated job (the 16-3 corpora,
+  # the 11.3 meshes) run there, where their substrate is provisioned.
+  # One image: none of these tests has the image as its subject. No fixture
+  # build (D-18-0-09): no registered `job = "expensive-tests"` row needs one; a
+  # fixture-needing test without a build fails closed naming `build-test-fixtures`.
+  # CI release-ready program W3: left `aggregate.needs` (the plan puts it nightly until its
+  # timing bounds are deterministic) and lives here; `check-test-cost` resolves the register's
+  # `job` names in `discipline.yml` and in this file. Back on the release path after 10
+  # consecutive green nightly runs; MUST be back before GA.
+  expensive-tests:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        iteration: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: expensive-tests-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Install nightly toolchain and cargo-public-api (abi_diff_integration)
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
+      - name: Run the registered expensive tests
+        run: |
+          set -euo pipefail
+          filter="$(cargo run -q -p xtask -- check-test-cost --expensive-filter)"
+          echo "expensive filter: $filter"
+          cargo nextest run --workspace --locked --profile expensive --run-ignored ignored-only -E "$filter"
+      - name: Upload the expensive-tests junit
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: expensive-tests-junit-${{ matrix.iteration }}
+          path: target/nextest/expensive/junit.xml
+          if-no-files-found: error
+
+  # 20 of 20 green, attempt 1 only, one SHA. Reads the per-iteration job conclusions of THIS
+  # run attempt from the API (a matrix `needs` result is only the aggregate).
+  summary:
+    needs: [nfr-rel-11-halt-receipt-999pct, expensive-tests]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Counting rule self-test (19 of 20 red, 20 of 20 green, attempt 2 red)
+        run: python3 scripts/repromotion-summary.py --self-test
+      - name: Require 20 of 20 green, attempt 1, one SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          jobs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            --jq '[.jobs[] | {name, conclusion, head_sha}]')"
+          jq -n --argjson jobs "$jobs" --arg run_id "$GITHUB_RUN_ID" --arg sha "$GITHUB_SHA" \
+            --argjson attempt "$GITHUB_RUN_ATTEMPT" \
+            '{run_id: $run_id, sha: $sha, attempt: $attempt, jobs: $jobs}' > repromotion-input.json
+          mkdir -p repromotion-out
+          cp repromotion-input.json repromotion-out/jobs.json
+          python3 scripts/repromotion-summary.py repromotion-input.json --record repromotion-out/result.txt | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload run id, SHA and attempt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: repromotion-result-${{ github.run_id }}
+          path: repromotion-out/
+          if-no-files-found: warn
+          retention-days: 90

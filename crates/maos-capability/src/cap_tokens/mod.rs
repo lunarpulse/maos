@@ -223,8 +223,22 @@ impl CapTokensShardRing {
         &self,
         token: &CapabilityToken,
         current_posture_hash: [u8; 32],
-        _current_sandbox: SandboxTier,
+        current_sandbox: SandboxTier,
     ) -> Result<(), CapError> {
+        self.verify_scoped(token, current_posture_hash, current_sandbox)
+            .map(drop)
+    }
+
+    /// [`Self::verify`], returning the authenticated stored [`Scope`] on success.
+    /// Same single shard read and the same check order; the scope is moved out
+    /// of the snapshot that read already produced, so callers needing the
+    /// held scope (e.g. a policy re-entitlement check) pay no second lookup.
+    pub fn verify_scoped(
+        &self,
+        token: &CapabilityToken,
+        current_posture_hash: [u8; 32],
+        _current_sandbox: SandboxTier,
+    ) -> Result<Scope, CapError> {
         let shard_idx = shard::hash_token_id(&token.token_id);
         let shard = &self.shards[shard_idx];
 
@@ -257,7 +271,7 @@ impl CapTokensShardRing {
             return Err(CapError::PostureMismatch);
         }
 
-        Ok(())
+        Ok(state.scope)
     }
 
     /// Look up the scope for a given token ID without verifying validity.

@@ -29,7 +29,7 @@ pub struct RevocationApplier {
     spirits: Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>,
     capability: Arc<crate::capability::CapabilityRegistryAdapter>,
     scheduler: Arc<SpiritSchedulerAdapter>,
-    _iac: Arc<crate::iac::IacBusAdapter>,
+    iac: Arc<crate::iac::IacBusAdapter>,
     halt_registry: Arc<HaltRegistry>,
     tl: Arc<TransparencyLogAdapter>,
     journal: Arc<JournalAdapter>,
@@ -58,7 +58,7 @@ impl RevocationApplier {
             spirits,
             capability,
             scheduler,
-            _iac: iac,
+            iac,
             halt_registry,
             tl,
             journal,
@@ -101,24 +101,23 @@ impl RevocationApplier {
                 };
                 let class_name = class.name.clone();
                 let version = class.version.clone();
-                let entry = crl
-                    .entries
-                    .iter()
-                    .find(|entry| entry.spirit_class == class_name)
-                    .cloned();
-                let Some(entry) = entry else {
+                let mut hit = None;
+                for candidate in crl.entries.iter().filter(|e| e.spirit_class == class_name) {
+                    let range = &candidate.version_range;
+                    let contained =
+                        crate::revocation::version_match::semver_range_contains(&version, range)
+                            .map_err(|error| RevocationError::MalformedVersionRange {
+                                range: range.clone(),
+                                reason: error.to_string(),
+                            })?;
+                    if contained {
+                        hit = Some(candidate.clone());
+                        break;
+                    }
+                }
+                let Some(entry) = hit else {
                     continue;
                 };
-                if !crate::revocation::version_match::semver_range_contains(
-                    &version,
-                    &entry.version_range,
-                )
-                .map_err(|error| RevocationError::MalformedVersionRange {
-                    range: entry.version_range.clone(),
-                    reason: error.to_string(),
-                })? {
-                    continue;
-                }
                 matched_count += 1;
                 revoked_count += 1;
                 let tokens_revoked = self.capability.revoke_all_for_pid(scb.pid);
@@ -175,6 +174,7 @@ impl RevocationApplier {
                     // for forensic inspection and is never terminated by this arm.
                     RevocationAction::Quarantine => {
                         self.capability.set_quarantined(scb.pid, true);
+                        self.iac.set_sender_fenced(scb.pid, true);
                         let marker_bytes = serde_json::to_vec(&serde_json::json!({
                             "spirit_id": scb.spirit_id, "spirit_pid": scb.pid, "quarantined": true,
                         }))
@@ -294,5 +294,10 @@ impl RevocationApplier {
     /// List committed or in-flight CRL IDs (for `maosctl revocations list`).
     pub fn list_applied(&self) -> Vec<CrlId> {
         self.rules.list()
+    }
+
+    /// The applied CRLs matching class `name` at `version` (the FR13 release gate).
+    pub fn matching_crls(&self, name: &str, version: &str) -> Vec<CrlId> {
+        self.rules.matching(name, version)
     }
 }

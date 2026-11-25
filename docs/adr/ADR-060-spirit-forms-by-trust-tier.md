@@ -182,6 +182,11 @@ default build and as `wasm_launch_not_built` in a `wasm-host` build until
 > refuses unsupported in-process surfaces (operator door, topology, hot-swap
 > successor) as `spawned_surface_unsupported`.
 
+> **Implementation update (Story 21-9):** The Wasmtime engine and the sibling
+> runner are now in the default build. The explicit engine-free build retains
+> `wasm_engine_off`. Linux T2 launch and supported lifecycle swaps do not add
+> an in-process component load or topology path, or expand the supported sandbox tiers.
+
 ## Amendment — §D-C transport (ratified 2026-09-26)
 
 Ratified by the operator (Lunarpulse) on 2026-09-26, on Story 17-3a's measured

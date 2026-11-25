@@ -40,12 +40,16 @@ impl maos_spirit_abi::lifecycle::Spirit for CorpusSpirit {
 pub struct UpgradeHarness {
     pub scheduler: Arc<SpiritSchedulerAdapter>,
     pub orchestrator: Arc<UpgradeOrchestrator>,
+    pub hot_swap: Arc<HotSwapCoordinator>,
     pub journal: Arc<JournalAdapter>,
     pub transparency_log: Arc<TransparencyLogAdapter>,
     /// Story 19-5 (AC4.2) — the registry the scheduler and hot swap share,
     /// and its policy table, so a witness can mint at a pid and read back.
     pub capability: Arc<CapabilityRegistryAdapter>,
     pub policy: Arc<PolicyTable>,
+    /// The halt registry and IAC bus the scheduler and hot swap share (I6/I14 ledger proofs).
+    pub halt_registry: Arc<maos_kernel_core::halt::HaltRegistry>,
+    pub iac: Arc<IacBusAdapter>,
     _tmp: tempfile::TempDir,
 }
 
@@ -108,16 +112,16 @@ impl UpgradeHarness {
             scheduler.scbs(),
             Arc::clone(&journal),
             Arc::clone(&transparency_log),
-            halt_registry,
+            Arc::clone(&halt_registry),
             Arc::clone(&capability),
-            iac,
+            Arc::clone(&iac),
             dispatcher,
             Arc::clone(&telemetry),
             tmp.path().join("archives"),
         ));
         let orchestrator = Arc::new(UpgradeOrchestrator::new(
             Arc::clone(&scheduler),
-            hot_swap,
+            Arc::clone(&hot_swap),
             Arc::clone(&transparency_log),
             Arc::clone(&journal),
             telemetry,
@@ -126,10 +130,13 @@ impl UpgradeHarness {
         Self {
             scheduler,
             orchestrator,
+            hot_swap,
             journal,
             transparency_log,
             capability,
             policy,
+            halt_registry,
+            iac,
             _tmp: tmp,
         }
     }

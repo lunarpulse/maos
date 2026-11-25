@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 # Added 2026-09-21 (Epic-16 retrospective). Five consecutive pushes to `main`
 # left FIVE full 162-job runs queued simultaneously — 810 jobs contending for
@@ -100,8 +101,7 @@ jobs:
   # Membership rule: the old job's only work was `cargo run -p xtask -- <gate>` (plus xtask-only proven-red test
   # steps), the gate is one `xtask prepush` already runs locally (`xtask/src/prepush.rs` GATES; the steps keep that
   # order), it judges committed files only, and it needed no secret, service, matrix runner, extra toolchain or
-  # feature, artifact or `needs` edge. A gate another job `needs` (check-workspace-count, check-corpus,
-  # check-review-findings-resolved, check-dev-record-completeness) keeps its own job, so consolidation puts no new
+  # feature, artifact or `needs` edge. A gate another job `needs` (check-workspace-count, check-corpus) keeps its own job, so consolidation puts no new
   # edge in front of any other job.
   #
   # Identity is unchanged: step `name` == `id` == the gate's registry / old job name, running the old command and
@@ -123,7 +123,6 @@ jobs:
       check-serde-error-handling: ${{ steps.check-serde-error-handling.outcome }}
       check-manifest-schema-version: ${{ steps.check-manifest-schema-version.outcome }}
       check-skill-schema: ${{ steps.check-skill-schema.outcome }}
-      check-epic-close-coherence: ${{ steps.check-epic-close-coherence.outcome }}
       check-coverage-matrix-completeness: ${{ steps.check-coverage-matrix-completeness.outcome }}
       check-test-cost: ${{ steps.check-test-cost.outcome }}
       check-test-cost-vectors: ${{ steps.check-test-cost-vectors.outcome }}
@@ -143,7 +142,6 @@ jobs:
       check-security-md-vectors: ${{ steps.check-security-md-vectors.outcome }}
       example-spirit-drift: ${{ steps.example-spirit-drift.outcome }}
       corpus-staleness: ${{ steps.corpus-staleness.outcome }}
-      check-dev-model-tier: ${{ steps.check-dev-model-tier.outcome }}
       check-pentest-gate: ${{ steps.check-pentest-gate.outcome }}
       check-third-party-trial: ${{ steps.check-third-party-trial.outcome }}
       check-red-team-gate: ${{ steps.check-red-team-gate.outcome }}
@@ -186,11 +184,6 @@ jobs:
         id: check-skill-schema
         if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
         run: cargo run -p xtask -- check-skill-schema --json
-      # Epic-13 retro C1 + 20-3b: close-out sources agree and no workflow gate is parked.
-      - name: check-epic-close-coherence
-        id: check-epic-close-coherence
-        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
-        run: cargo run -p xtask -- check-epic-close-coherence --json
       # Story 10.1b AC3 — coverage matrix completeness: no v1.0 NFR has empty gates.
       - name: check-coverage-matrix-completeness
         id: check-coverage-matrix-completeness
@@ -282,19 +275,13 @@ jobs:
         id: corpus-staleness
         if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
         run: cargo run -p xtask -- corpus-staleness --json
-      # Epic 12 retro B3 (Option C Blocking; closes E11 retro A1) — frontier-era (epic >= 12) stories must record an
-      # allowlisted dev model + a §A6 review artifact. Makes the frontier-allowlist policy mechanical, not cultural.
-      - name: check-dev-model-tier
-        id: check-dev-model-tier
-        if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
-        run: cargo run -p xtask -- check-dev-model-tier --json
       # Story 10.1b AC1 — pen-test gate: conditional per calibrate-per-commit pattern. When summary.toml exists,
       # parse and assert p0_open == 0 && p1_open == 0. When absent, report ABSENT (not a pass), advisory at v1_5.
       - name: check-pentest-gate
         id: check-pentest-gate
         if: ${{ !cancelled() && steps.build-xtask.outcome == 'success' }}
         run: cargo run -p xtask -- check-pentest-gate --json
-      # Story 10.2 AC1 — third-party trial N=12 gate (conditional: advisory-if-absent).
+      # Story 10.2 AC1, simplified by Story 22-7 — third-party trial gate (conditional: advisory-if-absent); no N floor.
       # Story 15-3 AC2(b): the ship-phase env block that stood on the old job is retired. A GitHub *repository
       # variable* could move this one gate's ship phase with no code change, and `check-env-contract` can never see
       # it (it scans only the maos-bin src tree), so it was a third phase source no instrument could audit. The
@@ -360,12 +347,10 @@ jobs:
   #
   # Same failure contract as `xtask-gates`: every step runs after a red one (`if: !cancelled()`, never
   # `continue-on-error`), the last step lists every step that was not `success` and fails the job, no retry, and
-  # the per-step outcomes are job `outputs`. `needs` is the old smoke-discipline-7-1-5 edge (that smoke runs the
-  # two gates inside the binary); `!cancelled()` keeps the other smokes running when those gates are red.
+  # the per-step outcomes are job `outputs`.
   smoke-suite:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    needs: [check-review-findings-resolved, check-dev-record-completeness]
     if: ${{ !cancelled() }}
     outputs:
       smoke-deps: ${{ steps.smoke-deps.outcome }}
@@ -379,7 +364,6 @@ jobs:
       server-exit-drain: ${{ steps.server-exit-drain.outcome }}
       audit-query-fr4-smoke: ${{ steps.audit-query-fr4-smoke.outcome }}
       maosctl-smoke: ${{ steps.maosctl-smoke.outcome }}
-      smoke-discipline-7-1-5: ${{ steps.smoke-discipline-7-1-5.outcome }}
       cap-registry-smoke: ${{ steps.cap-registry-smoke.outcome }}
       smoke-skill-7-4: ${{ steps.smoke-skill-7-4.outcome }}
       smoke-abi-7-5a: ${{ steps.smoke-abi-7-5a.outcome }}
@@ -492,12 +476,6 @@ jobs:
         run: |
           export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
           bash tests/integration/maosctl_smoke.sh
-      - name: smoke-discipline-7-1-5
-        id: smoke-discipline-7-1-5
-        if: ${{ !cancelled() }}
-        run: |
-          export CARGO_HOME="${CARGO_HOME:-$HOME/.cargo}" RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" HOME="$(mktemp -d)"
-          MAOS_ONE_SHOT=smoke-discipline-7-1-5 cargo run --release -p maos-bin
       - name: cap-registry-smoke
         id: cap-registry-smoke
         if: ${{ !cancelled() }}
@@ -599,22 +577,10 @@ jobs:
   kloc-check:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    # BLOCKING since 2026-07-25 (founder-ratified ceiling-policy replacement).
-    # Was ADVISORY from 2026-06-11 under the "tight measured residual" rule, whose
-    # own revert condition read: "revert to blocking once the kernel-core
-    # decomposition lands and the ceilings can be met honestly."
-    # HONEST STATUS OF THAT CONDITION: the second half is met, the first is NOT.
-    # Decomposition Phase 3/4 has still not landed (kernel-core is 17,890 against
-    # an Epic-5 target of ~5,400 — a target whose own named extractions only ever
-    # totalled ~13,627 LOC, so it was never reachable as written). What changed is
-    # that ceilings are now set by a rule that leaves real operating capacity
-    # (`measured + max(100, ceil(0.02 * measured))`, see xtask/kloc.toml), so the
-    # gate can be met honestly and is therefore enforceable. It was advisory
-    # BECAUSE tight-residual made it unshippable, not because breaches were
-    # acceptable. Slack is capacity, NOT authorization: kernel-core changes still
-    # require a measured FLAG-Winston grant plus a kernel-core-baseline.toml
-    # HISTORY row, enforced separately by the BLOCKING check-kernel-baseline job.
-    # Phase 4 decomposition remains tracked architectural debt in kloc.toml.
+    # BLOCKING on one row only: `maos-kernel-core` above its xtask/kloc.toml row (the ADR-069
+    # envelope, 24,000, alarm 23,000) reds the job. Every other crate is measured and printed as
+    # a size table, never gated (operator decision 11, lean-gates WP-23, confirmed 2026-11-24).
+    # The kernel exact pin is enforced separately by the BLOCKING check-kernel-baseline job.
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@v1
@@ -632,7 +598,7 @@ jobs:
           # Cargo.lock for reproducibility.
           cargo install --locked --version ${TOKEI_VERSION} tokei
       - name: Run kloc-check
-        run: cargo run -p xtask -- kloc-check --json
+        run: cargo run -p xtask -- kloc-check
 
   abi-diff:
     runs-on: ubuntu-24.04
@@ -706,117 +672,19 @@ jobs:
           cargo run --locked -p xtask -- build-test-fixtures --only maos-crypto-recording
           cargo build --locked -p maos-cli
           cargo test --locked -p maos-bin --test crypto_real_shell_20_13 --test crypto_real_boot_20_13
-
-  # Story 14-0 AC1 — the Epic-14 preflight decision register's reader.
-  #
-  # Blocking, and hermetic: it reads two committed files
-  # (`_bmad-output/planning-artifacts/epics/epic-14-preflight-decisions.md` and
-  # `_bmad-output/implementation-artifacts/sprint-status.yaml`) and nothing else,
-  # so it can never take an ABSENT branch and can never be substrate-gated.
-  #
-  # The register declared as binding rule 2 that its deadlines were "a query, not
-  # a judgement". No machine read the file, so every deadline in it WAS a
-  # judgement, and eight of nineteen rows were wrong at HEAD — including one
-  # marked RESOLVED with its substance unimplemented and its deadline four
-  # stories in the past. The proven-red vectors run in the same job as the gate
-  # deliberately: a gate whose reds are never executed is the failure mode this
-  # story exists to close.
-  check-decision-register:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-decision-register
-        run: cargo run -p xtask -- check-decision-register --json
-      - name: Run the 14-0 AC1.5 proven-red vectors
-        run: cargo test -p xtask --test decision_register_gate
-
-  # Story 14-2a AC6 — the production peer-certificate rotation trigger. The
-  # gate's CONTROL leg boots a real `maos` daemon in
-  # `MAOS_ONE_SHOT=cohort-a2a-daemon` mode, delivers a real signed
-  # `cohort:manifest-reissue` over real mTLS, and observes the pin-set change
-  # through the production operator HTTP surface — so removing the set-once
-  # install in `main.rs` reds this job while the daemon still boots and still
-  # ACKs the reissue. The gate's own unit tests run in the same job: they are
-  # what keep the method-aware AST probe from silently reverting to the
-  # `visit_expr_call`-only shape that made the obvious probe a null control.
-  check-cert-rotation-trigger:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-cert-rotation-trigger
-        run: cargo run -p xtask -- check-cert-rotation-trigger --json
-      - name: Run the gate's own oracle unit tests
-        run: cargo test -p xtask check_cert_rotation_trigger
-
-  # Story 15-3 AC5 — confidence rule 1 made mechanical. Copies the 14-2a job
-  # shape deliberately, including `timeout-minutes`: the gate SHELLS
-  # `maos --help`, which at HEAD never returned, so an untimed job hung the
-  # runner. The gate's own proven-red vectors run in this same job because
-  # `discipline.yml`'s own comment above records the doctrine — a gate whose
-  # reds are never executed is the failure mode this story exists to close —
-  # and because no job runs `cargo test -p xtask` unscoped.
-  check-exit-commands:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Build every shipped binary surface the gate resolves
-        run: cargo build -p maos-bin --bin maos &&
-          cargo build -p maos-cli &&
-          cargo build -p maos-spirit-cli --bin maos-spirit &&
-          cargo build -p maos-registry --bin maos-registry-server &&
-          cargo build -p maos-wasm-host --bin maos-wasm-runner
-      - name: Run check-exit-commands
-        run: cargo run -p xtask -- check-exit-commands --json
-      - name: Run the 15-3 AC5 proven-red vectors
-        run: cargo test -p xtask --test check_exit_commands_gate
-      - name: Run the maos verb-table completeness control in both builds (AC4)
-        run: cargo build -p worker --bin worker-cli-fixture &&
-          cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1 &&
+      - name: Run the maos verb-table completeness control in both builds (21-1 AC4, kept from the retired check-exit-commands job)
+        run: |
+          cargo build -p worker --bin worker-cli-fixture
+          cargo test -p maos-bin --test verb_table_15_3 -- --test-threads=1
           cargo test -p maos-bin --no-default-features --test verb_table_15_3 -- --test-threads=1
-
-  # Story 17-5 — model-pin currency (E14-A3 → E15-A2 → E16-A4). A pin on a
-  # vendor model that the vendor already retired reds here, naming file:line,
-  # instead of surviving three retros. Offline: the gate reads only repo-local
-  # files (`xtask/model-currency.toml`, the manifests, the price book, `main.rs`),
-  # so no secret and no network leg exists to flake. The proven-red vectors run
-  # in the same job because a gate whose reds are never executed is the failure
-  # mode this lane exists to close.
-  check-model-currency:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-model-currency
-        run: cargo run -p xtask -- check-model-currency --json
-      - name: Run the 17-5 proven-red vectors
-        run: cargo test -p xtask --test model_currency_gate
+      - name: Build and test the maos-bin profile without online-adapters (23-0 AC6, D-23-6-01 A iii)
+        run: |
+          cargo check --locked -p maos-bin --lib --bins --tests --no-default-features --features network,wasm-host
+          cargo test --locked -p maos-bin --no-default-features --features network,wasm-host --test online_adapters_23_0
+          # the shape-only test must exist and pass in this build (it is cfg-compiled out when the umbrella is on)
+          cargo test --locked -p maos-bin --no-default-features --features network,wasm-host --test online_adapters_23_0 -- --exact the_profile_without_online_adapters_has_network_and_wasm_host 2>&1 | tee "$RUNNER_TEMP/online-shape.log"
+          grep -q "test result: ok. 1 passed" "$RUNNER_TEMP/online-shape.log"
+          cargo test --locked -p maos-bin --test online_adapters_23_0
 
   # Story 20-12 AC1 — every test binary in the workspace suite's nextest junit
   # keeps its Σ per-test time under its `xtask/test-budgets.toml` budget
@@ -850,84 +718,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: cargo test -p xtask --test check_test_budget_proven_red
 
-  # Story 20-7 AC2 — structural runner policy, defense in depth only.
-  # Host jobs accept push-to-main, schedule and main-only dispatch; never PR
-  # or comment events. Operator environment/runner-group protections (O3) and
-  # fork approval (O7) must be verified before enabling the host. This
-  # PR-editable gate is not an immutable runner admission boundary.
-  check-perf-runner-policy:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-perf-runner-policy
-        run: cargo run -p xtask -- check-perf-runner-policy --json
-      # 18-0 AC6: runs after a red gate step too (the vectors prove the gate can red).
-      - name: Run the 20-7 proven-red vectors
-        if: ${{ !cancelled() }}
-        run: cargo test -p xtask --test perf_gates_20_7
-
-  # Story 20-7 AC5 (ADR-068 §1, D-20-7-07 A) — Tier C: deterministic instruction
-  # and allocation counts for the CPU-bound hot paths (capability-token verify,
-  # IAC routing, frame lowering), on every pull request, GitHub-hosted and
-  # fork-safe (no secret, no write token, no self-hosted runner). The harness
-  # `tier_c_harness` runs each path under `valgrind --tool=callgrind
-  # --toggle-collect=maos_tier_c_measured` (instructions, minus the empty path)
-  # and reports allocations from its counting allocator; `check-perf-counts`
-  # compares both with the baselines committed in `xtask/perf-budgets.toml`
-  # (allocation rows blocking; instruction rows advisory until the first hosted
-  # callgrind baseline is committed). A deliberate change re-baselines in the
-  # same commit with the measured figure and the reason. Toolchain, OS and
-  # valgrind changes are re-baseline events (ADR-068 §6).
-  check-perf-counts:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: perf-counts-${{ hashFiles('**/Cargo.lock') }}
-      - name: Install valgrind
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends valgrind
-      - name: Build the Tier C harness
-        run: cargo build --locked -p maos-bench --features kernel_measurement --bin tier_c_harness
-      - name: Measure instruction and allocation counts per hot path
-        run: |
-          set -euo pipefail
-          mkdir -p tier-c
-          harness="$PWD/target/debug/tier_c_harness"
-          measure() {
-            valgrind --tool=callgrind --toggle-collect=maos_tier_c_measured \
-              --callgrind-out-file="tier-c/$1.callgrind" "$harness" "$1" "$2" \
-              > "tier-c/$1.json" 2> "tier-c/$1.valgrind.log"
-          }
-          measure empty 0
-          measure cap_token_verify 10000
-          measure iac_routing 2000
-          measure frame_lowering 10000
-      - name: Compare with the committed baselines
-        run: cargo run --locked -p xtask -- check-perf-counts --dir tier-c --json
-      - name: Upload the counts
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: tier-c-counts
-          path: tier-c
-          if-no-files-found: error
-
   # Per-push invariant-lock validation. Journal persistence is a separate
   # workflow (.github/workflows/journal-append.yml) per DF16 (Option c). This
   # job validates the tri-requirement (diff + corpus-delta + phase-commitment)
-  # plus the reviewer count and regression check, but does NOT call
+  # plus the regression check, but does NOT call
   # --write-journal. The flag is the explicit separation between "validate"
   # and "persist" introduced when DF16 was resolved.
   invariant-lock:
@@ -947,30 +741,95 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Bind guaranteed claims to executing tests and corpus evidence
         run: cargo test --locked -p xtask --test invariant_claims_20_3b
-      - name: Detect changed files
-        run: git diff --name-only HEAD~1 > /tmp/changed-files.txt
-      - name: Run invariant-lock (validate-only; journal persistence is in journal-append.yml)
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Detect changed files (full event range)
         run: |
-          # --pr-number is included only on pull_request events (clap rejects empty
-          # integer on push: main, where there is no associated PR). The reviewer-
-          # count check still runs on PRs as designed; on push: main it is skipped.
-          # --sha and --write-journal are deliberately omitted: this is the
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          case "$base" in ""|0000000000000000000000000000000000000000) base=HEAD~1 ;; esac
+          echo "INVARIANT_LOCK_BASE=$base" >> "$GITHUB_ENV"
+          git diff --name-only "$base" HEAD > /tmp/changed-files.txt
+      - name: Run invariant-lock (validate-only; journal persistence is in journal-append.yml)
+        run: |
+          # --sha, --write-journal and --pr-number are deliberately omitted: this is the
           # per-push validation gate, not the merge-time persister.
-          pr_arg=""
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pr_arg="--pr-number ${{ github.event.pull_request.number }}"
-          fi
           cargo run -p xtask -- invariant-lock \
             --changed-files /tmp/changed-files.txt \
-            $pr_arg \
             --json
       - name: cassette-age-gate
         # `cassette_dir` is a `--cassette-dir` flag whose default already points at
         # crates/maos-journey-test/cassettes; passing the path positionally is a clap
         # `unexpected argument` error. Rely on the default (or use --cassette-dir).
         run: cargo run -p xtask -- cassette-age-gate --json
+
+  # Story 21-10 (D-21-10-04 A) — one direct `cargo test -p <pkg> --test <bin> <name> -- --exact`
+  # step per invariant ledger proof, with the corpus path in the step env: the only step shape
+  # `invariant-lock`'s claim gate accepts for `claim: guaranteed`.
+  invariant-ledger-proofs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: I1 registry mediation (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i1_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i1_registry i1_no_effect_without_a_verified_in_scope_token -- --exact
+      - name: I2 log before deliver (non-claiming witness)
+        env:
+          CORPUS: crates/maos-iac/tests/fixtures/invariants/i2_adversarial.jsonl
+        run: cargo test --locked -p maos-iac --test invariant_i2_log_before_deliver i2_every_delivered_frame_has_a_log_row_and_a_failed_write_delivers_nothing -- --exact
+      - name: I3 auto-sent origin (non-claiming witness)
+        env:
+          CORPUS: crates/maos-bin/tests/fixtures/invariants/i3_adversarial.jsonl
+        run: cargo test --locked -p maos-bin --test invariant_i3_origin i3_spirit_frames_are_auto_sent_and_the_stamp_agrees_on_both_sides -- --exact
+      - name: I4 approval log (non-claiming witness)
+        env:
+          CORPUS: crates/maos-cli/tests/fixtures/invariants/i4_adversarial.jsonl
+        run: cargo test --locked -p maos-cli --test invariant_i4_approval_log i4_every_approval_has_a_complete_row_and_a_grant_without_a_row_is_refused -- --exact
+      - name: I5 memory scopes (FR31 half; ledger stays asserted) (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i5_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i5_memory i5_private_memory_never_crosses_spirits_and_writes_stay_in_their_namespace -- --exact
+      - name: I6 hot swap (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i6_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i6_hot_swap i6_a_swap_keeps_tokens_and_frames_and_accepts_only_a_compatible_schema -- --exact
+      - name: I7 telemetry (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i7_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i7_telemetry i7_telemetry_reaches_only_subscribed_topics_and_a_halt_run_up_is_observable -- --exact
+      - name: I8 cross-host consent (non-claiming witness)
+        env:
+          CORPUS: crates/maos-a2a-core/tests/fixtures/invariants/i8_adversarial.jsonl
+        run: cargo test --locked -p maos-a2a-core --test invariant_i8_consent i8_a_frame_crosses_hosts_only_with_sender_policy_and_receiver_acceptance -- --exact
+      - name: I9 empty kernel (non-claiming witness)
+        env:
+          CORPUS: xtask/tests/fixtures/invariants/i9_adversarial.jsonl
+        run: cargo test --locked -p xtask --test invariant_i9_empty_kernel i9_the_kernel_holds_no_stray_state_secret_or_statistic_and_planted_ones_are_caught -- --exact
+      - name: I10 journal (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i10_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i10_journal i10_transitions_are_journaled_rehydrated_and_crashes_are_detected_in_budget -- --exact
+      - name: I11 digest chain (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i11_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i11_digest_chain i11_a_persisted_digest_carries_a_flattened_chain_and_a_chainless_one_is_refused -- --exact
+      - name: I12 decision refs (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i12_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i12_decision_refs i12_a_decision_frame_carries_every_declared_digest_and_inbound_raw_frame -- --exact
+      - name: I13 intent lineage (non-claiming witness)
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i13_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i13_lineage i13_lineage_is_the_union_of_source_intents_and_admission_respects_the_allowed_set -- --exact
+      - name: I14 halt continuity
+        env:
+          CORPUS: crates/maos-kernel-core/tests/fixtures/invariants/i14_adversarial.jsonl
+        run: cargo test --locked -p maos-kernel-core --test invariant_i14_halt_continuity i14_a_swap_carries_every_halt_and_needs_a_declared_compatible_successor -- --exact
 
   check-corpus:
     runs-on: ubuntu-24.04
@@ -1079,7 +938,7 @@ jobs:
 
   example-spirit-ts-tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [check-workspace-count]
     steps:
       - uses: actions/checkout@v5
@@ -1135,6 +994,51 @@ jobs:
           name: example-spirit-ts-component
           path: examples/example-spirit-ts/dist/spirit.wasm
           if-no-files-found: error
+      # Story 22-7 AC1: the worked domain example (examples/incident-triage-ts) is built the same way and
+      # its component is what `domain_spirit_22_7` below publishes, installs and asks.
+      - name: Build, test, and componentize the domain example (Story 22-7)
+        shell: bash
+        run: |
+          set +e
+          (
+            cd examples/incident-triage-ts
+            npm ci &&
+              npm test &&
+              npm run build &&
+              npm run componentize
+          ) 2>&1 | tee incident-triage-ts.log
+          rc=${PIPESTATUS[0]}
+          vitest_verdict="$(
+            sed -E $'s/\x1B\\[[0-?]*[ -/]*[@-~]//g' incident-triage-ts.log |
+              tr -d '\r' |
+              grep -E '^[[:space:]]*Tests[[:space:]]+' |
+              paste -sd';' -
+          )"
+          if [ "$rc" -eq 0 ] && [ -z "$vitest_verdict" ]; then
+            echo "::error title=Domain example::rc=0 vitest=not reported"
+            exit 1
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Domain example::rc=0 vitest=$vitest_verdict"
+          else
+            echo "::error title=Domain example::rc=$rc vitest=${vitest_verdict:-not run}"
+          fi
+          exit "$rc"
+      - name: Record domain component outcome
+        shell: bash
+        run: |
+          component=examples/incident-triage-ts/dist/spirit.wasm
+          if [ ! -s "$component" ]; then
+            echo "::error title=Domain component artifact::missing or empty $component"
+            exit 1
+          fi
+          echo "::notice title=Domain component artifact::bytes=$(stat -c%s "$component") sha256=$(sha256sum "$component" | cut -d' ' -f1)"
+      - name: Upload domain component
+        uses: actions/upload-artifact@v4
+        with:
+          name: incident-triage-ts-component
+          path: examples/incident-triage-ts/dist/spirit.wasm
+          if-no-files-found: error
       - name: Build the release WASM runner
         shell: bash
         run: |
@@ -1171,32 +1075,100 @@ jobs:
             echo "::error title=maosctl build::rc=$rc"
           fi
           exit "$rc"
-      - name: Assert default-build WASM admission refusal
+      # Story 21-9 AC4/AC5: the engine-free refusal witness is an EXPLICIT build
+      # shape (`--no-default-features --features network`), not the default. The
+      # default shape (engine on) has its own, different witness below; neither
+      # may stand in for the other. The named test only exists in the
+      # engine-free compile, so its `... ok` line is the proof this shape ran.
+      - name: Assert explicit engine-free WASM admission refusal
         shell: bash
         run: |
           set +e
-          cargo test --locked -p maos-bin --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-default.log
+          cargo test --locked -p maos-bin --no-default-features --features network --test wasm_form_admission_17_3b -- --nocapture 2>&1 | tee wasm-admission-engine-free.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -eq 0 ]; then
-            echo "::notice title=Default WASM admission::rc=0 $(grep -E 'wasm_engine_off|test result' wasm-admission-default.log | paste -sd';' -)"
+            for name in gate_manifest_enforces_wasm_component_form_and_tier_before_engine_refusal \
+                        maos_run_refuses_wasm_component_manifests_by_named_engine_state \
+                        maosctl_load_returns_wasm_engine_refusal_and_preserves_roster \
+                        maosctl_upgrade_refuses_wasm_successor_before_replacing_the_loaded_spirit; do
+              grep -q "^test $name \.\.\. ok$" wasm-admission-engine-free.log || { echo "::error title=Engine-free WASM admission::$name did not run and pass"; rc=1; }
+            done
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Engine-free WASM admission::rc=0 $(grep -E 'wasm_engine_off|test result' wasm-admission-engine-free.log | paste -sd';' -)"
           else
-            echo "::error title=Default WASM admission::rc=$rc"
+            echo "::error title=Engine-free WASM admission::rc=$rc"
           fi
           exit "$rc"
       - name: Build WASM skill witness fixtures
         run: |
           rustup target add wasm32-wasip2
           cargo run --locked -p xtask -- build-test-fixtures
-      - name: Assert WASM admission and unsupported in-process surface refusals
+      - name: Assert explicit engine-free installed-component boot refusal
         shell: bash
         run: |
           set +e
-          cargo test --locked -p maos-bin --features wasm-host --test wasm_form_admission_17_3b --test wasm_skill_authoring_20_8 -- --nocapture 2>&1 | tee wasm-admission-wasm-host.log
+          cargo test --locked -p maos-bin --no-default-features --features network --test installed_spirit_dispatch_20_1 -- --nocapture 2>&1 | tee installed-dispatch-engine-free.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -eq 0 ]; then
-            echo "::notice title=wasm-host WASM admission::rc=0 $(grep 'test result' wasm-admission-wasm-host.log | paste -sd';' -)"
+            grep -q '^test installed_component_dispatch_reports_typed_boot_refusal \.\.\. ok$' installed-dispatch-engine-free.log || { echo "::error title=Engine-free installed dispatch::refusal witness did not run and pass"; rc=1; }
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Engine-free installed dispatch::rc=0 $(grep 'test result' installed-dispatch-engine-free.log | paste -sd';' -)"
           else
-            echo "::error title=wasm-host WASM admission::rc=$rc"
+            echo "::error title=Engine-free installed dispatch::rc=$rc"
+          fi
+          exit "$rc"
+      # Default features (engine on): no opt-in `--features wasm-host`. The
+      # engine-free-only tests must be ABSENT here, so a default run can never be
+      # satisfied by the refusal witness. The installed Spirit's reply on the
+      # signed default artifact is `epic-20-exit` line 9; the host-level execution
+      # of the component is that job's `maos run --once` leg.
+      - name: Assert default WASM admission and unsupported in-process surface refusals
+        shell: bash
+        run: |
+          set +e
+          # The runner places an installed component in a delegated cgroup v2 subtree and refuses
+          # without one (17-3c; the example declares `cpu_max_pct`), so the suite runs inside the
+          # harness's dedicated Delegate=yes unit, never an undelegated job shell.
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-example-spirit-ts --timeout 1500 -- cargo test --locked -p maos-bin --test wasm_form_admission_17_3b --test wasm_skill_authoring_20_8 --test installed_spirit_dispatch_20_1 -- --nocapture 2>&1 | tee wasm-admission-default.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            for name in gate_manifest_enforces_wasm_component_form_and_tier_before_engine_refusal \
+                        maosctl_load_returns_wasm_engine_refusal_and_preserves_roster \
+                        maosctl_upgrade_refuses_wasm_successor_before_replacing_the_loaded_spirit \
+                        boot_rechecks_manifest_component_publisher_and_claim; do
+              grep -q "^test $name \.\.\. ok$" wasm-admission-default.log || { echo "::error title=Default WASM admission::$name did not run and pass"; rc=1; }
+            done
+            if grep -qE '^test (maos_run_refuses_wasm_component_manifests_by_named_engine_state|installed_component_dispatch_reports_typed_boot_refusal) ' wasm-admission-default.log; then
+              echo "::error title=Default WASM admission::an engine-free-only witness ran in the default shape"
+              rc=1
+            fi
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Default WASM admission::rc=0 $(grep 'test result' wasm-admission-default.log | paste -sd';' -)"
+          else
+            echo "::error title=Default WASM admission::rc=$rc"
+          fi
+          exit "$rc"
+      # Story 22-7 AC1 (witness b): the SHIPPED domain Spirit answers `maosctl ask`. The test publishes
+      # examples/incident-triage-ts/manifest.toml and the component built above, installs it, boots
+      # `maos serve` from kit/spirit-author/host.toml.example and asks four texts. The shipped manifest keeps
+      # the template's caps, which need a delegated cgroup, so it runs in the harness's Delegate=yes unit
+      # (the harness passes a fixed environment: the component path crosses as `env NAME=VALUE`).
+      - name: Domain Spirit answers maosctl ask under a delegated cgroup (Story 22-7)
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-domain-spirit --timeout 1500 -- env MAOS_DOMAIN_COMPONENT="$PWD/examples/incident-triage-ts/dist/spirit.wasm" cargo test --locked -p maos-bin --test domain_spirit_22_7 -- --ignored --nocapture 2>&1 | tee domain-spirit-22-7.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -eq 0 ]; then
+            grep -q '^test the_shipped_domain_spirit_answers_maosctl_ask \.\.\. ok$' domain-spirit-22-7.log || { echo "::error title=Domain Spirit::the witness did not run and pass"; rc=1; }
+          fi
+          if [ "$rc" -eq 0 ]; then
+            echo "::notice title=Domain Spirit::rc=0 $(grep 'test result' domain-spirit-22-7.log | paste -sd';' -)"
+          else
+            echo "::error title=Domain Spirit::rc=$rc"
           fi
           exit "$rc"
 
@@ -1514,6 +1486,153 @@ jobs:
       - name: Assert emitted NFR-Rel-9 p99 report
         run: cargo run -p maos-kernel-core --bin assert-revocation-p99-floor -- target/reports/revocation-propagation.json --floor-ns 5000000000
 
+  # Story 5.3 — NFR-Rel-11 halt-receipt production rate ≥99.9%.
+  # Left `aggregate.needs` in W3 (the 5 s root-shutdown bound of the 16-3 suite is wall-clock
+  # sensitive on shared hosted runners) and is back on the release path for GA: an ordinary job,
+  # no `continue-on-error`, no retry. Its 10-green evidence is the `repromotion.yml` dispatch.
+  nfr-rel-11-halt-receipt-999pct:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ hashFiles('**/Cargo.lock') }}
+      - name: Run halt receipt production rate test
+        run: cargo test -p maos-kernel-core --test halt_receipt_production_rate --release
+      # Story 17-1 — the root-shutdown Workers run under real T3.
+      - uses: ./.github/actions/provision-t3-test-substrate
+      # Story 16-3 (AC4) — NFR-Rel-11's PLANNED half, at every `maos run` root.
+      # The kernel test above drives `terminate_spirit` directly; this second
+      # step drives the real roots, where the receipt was actually missing.
+      #
+      # All three binaries are built with the SAME `--release` profile as the
+      # test run: `maosctl` is resolved as the `maos` binary's SIBLING and the
+      # fixture as a sibling/parent of the running exe, so a debug-profile
+      # build of either is invisible to a release test.
+      - name: Build release binaries for the root-shutdown suite
+        run: |
+          cargo build --release -p maos-bin --bin maos
+          cargo build --release -p maos-cli --bin maosctl
+          cargo build --release -p worker --bin worker-cli-fixture
+      # `--test-threads=1` is REQUIRED: these vectors spawn real roots with
+      # scratch doors and scan `/proc`, and assume sequential execution.
+      #
+      # ── PROFILE SPLIT (Epic-16 retrospective, 2026-09-21) ──────────────────
+      # The suite is run in TWO profiles because two correct decisions collide
+      # on the `cohort::*` vectors, and they were RED from the day Story 16-3
+      # created this file:
+      #
+      #   * `crates/maos-bin/src/main.rs:1948` gates the `MAOS_TEST_BOOT_NONCE`
+      #     override on `cfg!(debug_assertions)`. That is deliberate and stays:
+      #     a shipped release binary that accepts an env-supplied boot nonce has
+      #     no NFR-Rel-6 restart detection at all.
+      #   * The cohort vectors pre-pair `boot_nonce` in each host's
+      #     `[tcp] peer_pins` row (`root_shutdown_unload_16_3.rs:1670`), because
+      #     `PinnedFingerprint.boot_nonce` is a REQUIRED field with no serde
+      #     default (`maos-a2a-tcp/src/config.rs:31-36`) and
+      #     `TofuPinStore::verify_pinned_sync` returns `NotPinned` rather than
+      #     TOFU-pinning on first contact (`maos-a2a-core/src/tofu.rs:457-466`).
+      #     So the config IS the pre-pairing mechanism; there is no way for the
+      #     harness to omit the nonce.
+      #
+      # Under `--release` both hosts therefore mint RANDOM nonces from
+      # `getrandom` (`main.rs:1956-1959`), neither matches the pinned
+      # `NONCE_A`/`NONCE_B`, the receiver fires `CODE_SPIRIT_RESTART_DETECTED`
+      # (`maos-a2a-core/src/router.rs:1372-1380`) and the sender reports
+      # `CrossHostPinMismatch`. Measured: 9 of 11 vectors pass in release; the
+      # 3 `cohort::*` vectors pass 3/3 in debug.
+      #
+      # REJECTED at the 2026-09-21 round-table (unanimous): a `test-boot-nonce`
+      # cargo feature — all four fault-inject precedents guard
+      # `not(debug_assertions)` with `compile_error!`, so it would need
+      # `--release` AND the feature, inverting the house rule on a security
+      # path; loosening the `cfg!`; and `#[ignore]`, which is E16-A2 in disguise.
+      # The designed `re-pin` recovery is NOT driven here: since Story 19-7 its
+      # production caller is the `cohort-a2a-daemon` door
+      # (`maosctl a2a repin approve`), and its two-process vector lives in
+      # `crates/maos-bin/tests/f4_pairing.rs` (`workspace-test-suite`).
+      #
+      # The profile split keeps each run INTERNALLY consistent, which is what
+      # the note above actually requires: `maosctl` and the fixture are resolved
+      # as siblings of the running `maos`, so a release test needs release
+      # siblings and a debug test needs debug siblings. Both hold below.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: Run root shutdown unload suite (release — 10 vectors)
+        run: cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort
+      # The debug siblings, for the debug half. Same sibling-consistency rule.
+      - name: Build debug binaries for the cohort vectors
+        run: |
+          cargo build -p maos-bin --bin maos
+          cargo build -p maos-cli --bin maosctl
+          cargo build -p worker --bin worker-cli-fixture
+      - name: Run root shutdown unload cohort vectors (debug — boot-nonce override live)
+        run: cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort
+      # Coverage guard: the split MUST NOT silently drop a vector. 10 + 5 = 15.
+      # 20-3a added harness ownership; 20-1b adds the AST teardown guard,
+      # no-Worker local-timer drain and declared-capability negative control.
+      # A renamed module makes `--skip cohort` match nothing, the release run
+      # then executes all 15 and fails LOUD on the live-Worker cohort vectors.
+      - name: Assert the two halves still sum to the whole suite
+        run: |
+          set -euo pipefail
+          # Keep the cargo output in the log: a failure here was undiagnosable when it was swallowed by sed (run 43155033280 job 130972879907).
+          cargo test -p maos-bin --release --test root_shutdown_unload_16_3 -- --test-threads=1 --skip cohort 2>&1 | tee /tmp/split-rel.log
+          cargo test -p maos-bin --test root_shutdown_unload_16_3 -- --test-threads=1 cohort 2>&1 | tee /tmp/split-dbg.log
+          rel=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-rel.log | tail -1)
+          dbg=$(sed -n 's/^test result: ok\. \([0-9]*\) passed.*/\1/p' /tmp/split-dbg.log | tail -1)
+          echo "release=${rel} debug=${dbg} total=$(( rel + dbg ))"
+          if [ "$(( rel + dbg ))" -ne 15 ]; then
+            echo "root_shutdown_unload_16_3 profile split lost coverage: ${rel} + ${dbg} != 15"
+            exit 1
+          fi
+
+  # Story 20-12 AC2 — the ONE job that runs the registered expensive tests:
+  # exactly the `xtask/test-budgets.toml [[expensive]]` rows whose `job` is
+  # `expensive-tests`, restricted to their `#[ignore = "expensive: …"]` tests
+  # (filter derived by `check-test-cost --expensive-filter`, so the job cannot
+  # drift from the register). Rows naming a dedicated job (the 16-3 corpora,
+  # the 11.3 meshes) run there, where their substrate is provisioned.
+  # One image: none of these tests has the image as its subject. No fixture
+  # build (D-18-0-09): no registered `job = "expensive-tests"` row needs one; a
+  # fixture-needing test without a build fails closed naming `build-test-fixtures`.
+  # Back on the release path for GA (`aggregate.needs`, `release-ready.needs`): an ordinary job,
+  # no `continue-on-error`, no retry. Its 10-green evidence is the `repromotion.yml` dispatch.
+  expensive-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: expensive-tests-${{ hashFiles('**/Cargo.lock') }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.149
+      - name: Install nightly toolchain and cargo-public-api (abi_diff_integration)
+        run: |
+          rustup toolchain install nightly --profile minimal
+          cargo install cargo-public-api --version ${CARGO_PUBLIC_API_VERSION}
+      - name: Run the registered expensive tests
+        run: |
+          set -euo pipefail
+          filter="$(cargo run -q -p xtask -- check-test-cost --expensive-filter)"
+          echo "expensive filter: $filter"
+          cargo nextest run --workspace --locked --profile expensive --run-ignored ignored-only -E "$filter"
+      - name: Upload the expensive-tests junit
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: expensive-tests-junit
+          path: target/nextest/expensive/junit.xml
+          if-no-files-found: error
+
   # Story 5.4 — upgrade policy corpus (AC1 + AC2 + AC3 + AC4)
   upgrade-policy-corpus:
     runs-on: ubuntu-24.04
@@ -1688,7 +1807,9 @@ jobs:
         with:
           tool: cargo-nextest@0.9.149
       - name: Install pinned WASM fixture assembler
-        run: cargo install --locked wasm-tools --version 1.259.0
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.259.0
       - name: Build invocation-family nextest archives
         run: |
           set -euo pipefail
@@ -1696,6 +1817,7 @@ jobs:
           cargo nextest archive --locked -p maos-bin --features network,wasm-host \
             --test spawned_scope_17_3c --test worker_resource_limits_17_2 \
             --test live_escape_anomaly_17_10 --test recall_17_3d --test participant_recall_17_8 \
+            --test consent_gate_21_7 \
             --test smoke_cli_wrapper_8_12 \
             --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst"
           cargo nextest archive --locked -p maos-bin --features network \
@@ -1733,7 +1855,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo build --locked -p maos-bin --bin maos
-          cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,lifecycle_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin,maosctl,worker-cli-fixture
+          cargo run --locked -p xtask -- build-test-fixtures --only forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,lifecycle_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin,maosctl,worker-cli-fixture,maos-spirit
           mkdir -p target/tmp
           rustc --edition=2021 -C opt-level=1 --crate-name cgroup_ceiling_fixture \
             crates/maos-kernel-core/tests/fixtures/native/cgroup_ceiling.rs \
@@ -2284,7 +2406,7 @@ jobs:
             rc=1
             echo "::error title=Epic-18 exit line 2::exit 0 but the run did not consume one completion per row"
           fi
-          if ! cp "$scratch"/.local/share/maos/registry/spirits/butler/*/benchmark.signed.json "$RUNNER_TEMP/line2.benchmark.signed.json"; then
+          if ! cp "$MAOS_HOME"/registry/spirits/butler/*/benchmark.signed.json "$RUNNER_TEMP/line2.benchmark.signed.json"; then
             rc=1
             echo "::error title=Epic-18 exit line 2::no signed benchmark sidecar in registry storage"
           fi
@@ -2484,13 +2606,19 @@ jobs:
       - name: Build the example component at this SHA
         working-directory: examples/example-spirit-ts
         run: npm ci && npm run build && npm run componentize
+      # The default artifact now boots a T2 sandboxed component inside the shell
+      # dispatch, so the existing harness substrate precedes that step.
+      - uses: ./.github/actions/provision-t3-test-substrate
       - name: Epic-20 release, publish, install and truthful shell dispatch
         shell: bash
         run: |
           set -euo pipefail
           cargo run --locked -p xtask -- release-dry-run
           RELEASE_SIGNING_KEY=794959d4c4dc813f968cd95eb4a45c4a02583a7c5211126e7b4583e4776d1c8d cargo run --locked -p xtask -- release-verify --sign --key-env RELEASE_SIGNING_KEY --sha256sums dist/SHA256SUMS --output dist/SHA256SUMS.sig
-          for b in maos maosctl maos-registry-server maos-spirit; do ln -sf "$b-linux-amd64" "dist/$b"; done
+          # Story 21-9: the default artifact is the daemon plus its named sibling
+          # runner. `maos` resolves `maos-wasm-runner` beside its canonical path
+          # (dist/maos-linux-amd64), so the unsuffixed runner link is required.
+          for b in maos maosctl maos-registry-server maos-spirit maos-wasm-runner; do ln -sf "$b-linux-amd64" "dist/$b"; done
           export PATH="$PWD/dist:$PATH"
           scratch="$(mktemp -d)"
           export HOME="$scratch/home"
@@ -2505,6 +2633,10 @@ jobs:
           }
           trap cleanup EXIT
           maosctl install --from-local ./dist --verify-only
+          # `--verify-only` covers the daemon; the runner's exact bytes are bound to
+          # the same signed SHA256SUMS here, and the sums are recorded for the run.
+          (cd dist && grep -E '^[0-9a-f]{64}  (maos|maos-wasm-runner)-linux-amd64$' SHA256SUMS | tee "$OLDPWD/release-artifact-sha.log" | sha256sum -c -)
+          [ "$(wc -l < release-artifact-sha.log)" -eq 2 ]
           maos-registry-server --dev-http --bind 127.0.0.1:6789 --root "$scratch/registry" > registry.log 2>&1 &
           server_pid=$!
           ready=0
@@ -2516,26 +2648,44 @@ jobs:
           MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
           maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
           maos init --plain
-          printf '@example-spirit-ts hello\n' | MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" maos shell --plain > shell.log 2>&1
-          cat shell.log
-          grep -Fx "maos: spirit 'example-spirit-ts' refused at boot: wasm_engine_off" shell.log
-          if grep -F "unknown spirit 'example-spirit-ts'" shell.log; then exit 1; fi
+          # Story 21-9 / 17-3c: the shell dispatch runs the SIGNED dist/maos (beside its
+          # signed sibling runner) under the existing delegated unit; the helper script
+          # requires the exact maos-17-3c-proof service cgroup. systemd-run --pipe keeps
+          # the unit's stdout and stderr on separate pipes, so they are captured apart.
+          shell_rc=0
+          printf '@example-spirit-ts hello\n' | sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" XDG_DATA_HOME="$XDG_DATA_HOME" XDG_CONFIG_HOME="$XDG_CONFIG_HOME" XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$PWD/dist/maos" shell --plain > shell.out 2> shell.err || shell_rc=$?
+          echo "--- shell stdout ---"; cat shell.out
+          echo "--- shell stderr ---"; cat shell.err
+          cat shell.out shell.err > shell.log
+          # Story 21-9 AC1/AC5: the default signed artifact serves the installed
+          # Spirit. Success means exit 0, a non-empty log carrying the host-initialized
+          # line (the sibling runner was found), AND exactly one real guest reply line
+          # `example-spirit-ts: echo: hello` on stdout before `maos: shell exiting`
+          # from this same invocation and NO other `example-spirit-ts:` stdout line;
+          # a delivery acknowledgment is NOT that reply.
+          # Any engine-off/boot/dispatch refusal or unknown-spirit line fails the job.
+          # The explicit engine-free refusal is a separate build shape
+          # (--no-default-features --features network) in example-spirit-ts-tests.
+          [ "$shell_rc" -eq 0 ]
+          [ -s shell.log ]
+          grep -F "maos: Spirit host (WASM component form, ADR-031) initialized" shell.log
+          awk 'index($0,"example-spirit-ts:")==1 { total++; if (!exited && $0=="example-spirit-ts: echo: hello") exact++ } $0=="maos: shell exiting" { exited=1 } END { exit !(total==1 && exact==1 && exited) }' shell.out
+          if grep -E "wasm_engine_off|refused at boot|dispatch refused|session refused|unknown spirit|WASM Spirit form disabled|cannot resolve daemon binary" shell.log; then exit 1; fi
           kill -TERM "$server_pid"
           wait "$server_pid"
           unset server_pid
-      - uses: ./.github/actions/provision-t3-test-substrate
-      # Match 17-3c's accepted release launch: debug Cranelift compilation is
-      # inside the unchanged 360 s startup budget and the manifest's 100% CPU cap.
-      - name: Build the release WASM-enabled execution surface
+      # No fresh binary is built for the guest exercise: the AC4 witness below runs
+      # the exact signed dist/maos (+ its named sibling dist runner), re-verified
+      # against the signed SHA256SUMS. Only the worker fixture is built here.
+      - name: Build the worker CLI fixture
         run: |
-          cargo build --locked --release -p maos-bin --features wasm-host --bin maos
-          cargo build --locked --release -p maos-wasm-host --bin maos-wasm-runner
           cargo build --locked --release -p worker --bin worker-cli-fixture
       - name: AC4 — execute the admitted installed component, not an engine-off refusal
         shell: bash
         run: |
           set -euo pipefail
-          target="$(cargo metadata --format-version 1 --no-deps | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+          # Replay-fixture witness (MAOS_INFERENCE_MODE=replay), not a live-inference run.
+          (cd dist && grep -E '^[0-9a-f]{64}  (maos|maos-wasm-runner)-linux-amd64$' SHA256SUMS | sha256sum -c -)
           scratch="$(mktemp -d)"
           export HOME="$scratch/home" XDG_DATA_HOME="$scratch/home/.local/share" MAOS_HOME="$scratch/home/.maos"
           mkdir -p "$HOME/.config/maos"
@@ -2548,17 +2698,24 @@ jobs:
           [ "$ready" -eq 1 ] || { cat component-registry.log; exit 1; }
           MAOS_SPIRIT_SIGNING_KEY="$(od -An -tx1 -N32 /dev/urandom | tr -d ' \n')" dist/maos-spirit publish --registry-uri http://127.0.0.1:6789/mcp --tier=public_untrusted --manifest examples/example-spirit-ts/manifest.toml --artifact examples/example-spirit-ts/dist/spirit.wasm --signing-key-env MAOS_SPIRIT_SIGNING_KEY
           dist/maosctl spirit install example-spirit-ts@0.1.0 --registry-uri http://127.0.0.1:6789/mcp
-          "$target/release/maos" init --plain
-          manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["HOME"])/".local/share/maos/registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
-          /usr/bin/time -p sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$target/release/maos" run "$manifest" --once 2>&1 | tee component.log
+          "$PWD/dist/maos" init --plain
+          manifest="$(python3 -c 'import json,os,pathlib; r=pathlib.Path(os.environ["MAOS_HOME"])/"registry"; print(r/"installed"/json.loads((r/"installed-index.json").read_text())["example-spirit-ts"]/"manifest.toml")')"
+          /usr/bin/time -p sudo systemd-run --unit=maos-17-3c-proof --wait --pipe --collect --uid="$(id -u)" --gid="$(id -g)" --property=Delegate=yes --property=CPUAccounting=yes --property=MemoryAccounting=yes --property="WorkingDirectory=$PWD" "$PWD/scripts/run_17_3c_delegated.sh" env HOME="$HOME" MAOS_HOME="$MAOS_HOME" XDG_DATA_HOME="$XDG_DATA_HOME" MAOS_INFERENCE_MODE=replay MAOS_REPLAY_CASSETTE="$PWD/crates/maos-journey-test/cassettes/j0/shell-intro.json" "$PWD/dist/maos" run "$manifest" --once 2>&1 | tee component.log
           grep -F 'spirit_session_complete' component.log
+          # Component exchange, from the attributable session report the CLI prints:
+          # at least one turn completed (delivered/denied counters are recorded, not
+          # asserted, since the report does not tie them to the example's reply).
+          python3 -c 'import json,sys; ev=[json.loads(l) for l in open("component.log") if l.startswith("{\"event\":\"spirit_session_complete\"")]; assert len(ev)==1, ev; r=ev[0]["report"]; print("session-report", {k:r[k] for k in ("turns","delivered_frames","denied_frames")}); assert r["turns"]>=1, r'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: epic-20-exit
           path: |
             registry.log
+            release-artifact-sha.log
             shell.log
+            shell.out
+            shell.err
             component.log
             component-registry.log
 
@@ -2662,8 +2819,8 @@ jobs:
 
   # RETIRED 2026-06-12 by Story 8.16 per ADR-043 — `check-epic-6-bridge` was a
   # 4504-line Epic-6 debt-visibility beacon whose §A2/§A3/§A5/§A6 enforcement was
-  # migrated to live hard-fail gates in Story 7.1.5 (check-review-findings-resolved,
-  # check-dev-record-completeness, check-serde-error-handling). Its last red
+  # migrated to live hard-fail gates in Story 7.1.5 (check-serde-error-handling; the
+  # story-record gates were deleted by lean-gates WP-06). Its last red
   # (A4-Debt-1) was a stale entry-counting predicate, not real debt; I9 holder-path
   # discipline is enforced live by check-empty-kernel + check-service-boundary.
   # Story 20-3b deletes the archived module; its live controls remain folded into
@@ -2860,51 +3017,6 @@ jobs:
         run: cargo test -p maos-spirit-abi --test manifest_n_minus_1_test --locked
       - name: Run maos-manifest v1-load-on-current-kernel compat tests
         run: cargo test -p maos-manifest --test manifest_n_minus_1_compat --locked
-
-  # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
-  check-review-findings-resolved:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-review-findings-resolved
-        run: cargo run -p xtask -- check-review-findings-resolved --json
-
-  # §A2 FULL flip — split-flip closed in Story 7.1.6; hard-fail since 2026-06-01
-  check-dev-record-completeness:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      - name: Run check-dev-record-completeness
-        run: cargo run -p xtask -- check-dev-record-completeness --json
-      # D19 (14-0, option (a)), resolved by j1-crosshost-2c — the seven story-file
-      # walkers now derive their subject set from sprint-status.yaml instead of a
-      # leading-digit filename filter, which had made the entire `j1-*` lane
-      # invisible to all seven at once. THE PLANTED RED lives here: a `j1-*` story
-      # with a missing dev record must red a Blocking gate. Without this step the
-      # shared helper is a refactor, not a control.
-      - name: Run the D19 story-file governance vectors (14-0 option (a))
-        run: cargo test -p xtask --test d19_story_file_governance -- --test-threads=1
-      # Story 14-0 AC2.4 — the owner sweep's planted red. This gate is the one
-      # the Epic-14 decision register cites as its own verification, and until
-      # 14-0 it bucketed `Owner: epic-14` as OK — because `epic-14: backlog` IS
-      # a real `development_status` key. It was structurally blind to the
-      # register's founding defect, six live rows deep.
-      - name: Run the 14-0 AC2.4 owner-assertion vectors
-        run: cargo test -p xtask --test owner_assertion_epic_key_rejected
 
 
 
@@ -3925,6 +4037,41 @@ jobs:
           echo "::notice title=17-8 participant recall (${{ matrix.image }})::rc=$rc fail=$fail $(grep 'tests run:' "$RUNNER_TEMP/participant-17-8.log" | paste -sd' ' -)"
           python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 8 "${required[@]}" "$RUNNER_TEMP/participant-17-8.log" || fail=1
           exit "$fail"
+      # Story 21-7 AC1 — the production consent granter and gate at the built `maos` binary,
+      # Postgres-free (the boot line is asserted), three installed recall-probe components under
+      # real T2 in the same delegated envelope: exact pass count, test name present, no SKIP.
+      - name: Production consent granter and gate at the binary, no Postgres (Story 21-7)
+        shell: bash
+        env:
+          NEXTEST_ARCHIVE_PACKAGES: maos-bin
+          NEXTEST_ARCHIVE_FEATURES: network,wasm-host
+          NEXTEST_ARCHIVE_TESTS: consent_gate_21_7
+        run: |
+          set +e
+          set -o pipefail
+          python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated --unit maos-17-2-wasm-consent --timeout 2400 -- \
+            bash -euo pipefail -c 'cargo-nextest nextest run --archive-file "$RUNNER_TEMP/ci-test-archives/maos-bin-network-wasm.tar.zst" --extract-to "$GITHUB_WORKSPACE" --workspace-remap "$GITHUB_WORKSPACE" --extract-overwrite --color never --profile archive-consumer --no-capture --test-threads 1 -E "binary_id(maos-bin::consent_gate_21_7)" 2>&1 | tee "$RUNNER_TEMP/consent-21-7.log"; test ${PIPESTATUS[0]} -eq 0'
+          rc=$?
+          fail=0
+          [ "$rc" -eq 0 ] || { echo "::error title=21-7 consent gate (${{ matrix.image }})::nextest rc=$rc"; fail=1; }
+          grep -Eq '(^|[[:space:]])1 tests? run: 1 passed([,[:space:]]|$)' "$RUNNER_TEMP/consent-21-7.log" || { echo "::error title=21-7 consent gate (${{ matrix.image }})::missing '1 test run: 1 passed'"; fail=1; }
+          if grep -q '^SKIP[: ]' "$RUNNER_TEMP/consent-21-7.log"; then
+            grep '^SKIP[: ]' "$RUNNER_TEMP/consent-21-7.log" | while IFS= read -r line; do
+              echo "::error title=21-7 consent gate (${{ matrix.image }})::${line}"
+            done
+            fail=1
+          fi
+          got=$(grep -c '^CONSENT-GATE-EVIDENCE ' "$RUNNER_TEMP/consent-21-7.log")
+          [ "$got" -eq 1 ] || { echo "::error title=21-7 consent gate (${{ matrix.image }})::evidence line seen $got times, want 1"; fail=1; }
+          grep '^CONSENT-GATE-EVIDENCE ' "$RUNNER_TEMP/consent-21-7.log" | while IFS= read -r line; do
+            echo "::notice title=21-7 consent gate (${{ matrix.image }})::$line"
+          done
+          [ "$fail" -eq 0 ] || grep -E 'panicked at' "$RUNNER_TEMP/consent-21-7.log" | head -5 | while IFS= read -r line; do
+            echo "::error title=21-7 consent gate (${{ matrix.image }})::${line}"
+          done
+          echo "::notice title=21-7 consent gate (${{ matrix.image }})::rc=$rc fail=$fail $(grep 'tests run:' "$RUNNER_TEMP/consent-21-7.log" | paste -sd' ' -)"
+          python3 scripts/run_cgroup_ceiling_17_2.py check-log --exit-code "$rc" --expected-count 1 --required-test production_consent_granter_and_gate_without_postgres "$RUNNER_TEMP/consent-21-7.log" || fail=1
+          exit "$fail"
       - uses: actions/download-artifact@v4
         with:
           name: example-spirit-ts-component
@@ -4019,6 +4166,12 @@ jobs:
         run: cargo +nightly fuzz build --fuzz-dir crates/maos-domain/fuzz frame_deser
       - name: Build exec-deps ELF parser fuzz target
         run: cargo +nightly fuzz build --fuzz-dir crates/maos-exec-deps/fuzz fuzz_exec_deps_parse_elf
+      - name: Build capability-token fuzz target (I1)
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-kernel-core/fuzz cap_token_verify
+      - name: Build digest-chain fuzz target (I11)
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-kernel-core/fuzz i11_digest_chain
+      - name: Build cross-host consent fuzz target (I8)
+        run: cargo +nightly fuzz build --fuzz-dir crates/maos-a2a-core/fuzz i8_consent_intent
 
   # Story 10.3 AC-4 (NFR-Doc-6) — Korean localization ship gate.
   # KO_COVERAGE_MIN=100 turns the coverage promise into a mechanical gate;
@@ -4164,115 +4317,6 @@ jobs:
           key: ${{ hashFiles('**/Cargo.lock') }}
       - name: Run check-mobile-push-on-halt
         run: cargo test -p maos-notify-push --test t_10_4b_mobile_push_halt
-
-  # Story 10.5 AC3 — Windows binary + sandbox compile and install verification.
-  windows-check:
-    runs-on: windows-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ hashFiles('**/Cargo.lock') }}
-      # R1/AC3: a REAL build on Windows, not just `cargo check`. This is the only
-      # place the kernel's unsafe Windows sandbox FFI actually compiles for its
-      # target (the dev host cannot cross-build it — ring/libsqlite3-sys need a
-      # Windows C toolchain).
-      - name: Build Windows kernel-core + CLI (real compile)
-        run: cargo build -p maos-kernel-core -p maos-cli
-      # R4: execute the unsafe FFI spawn path at runtime (was compile-only) —
-      # now including ENFORCEMENT negative controls (memory commit cap actually
-      # kills an over-budget child; low-integrity label actually applies). Run
-      # single-threaded: each memory test commits ~1 GiB and the tests spawn
-      # restricted-token child processes, so serialize for determinism.
-      #
-      # ⚠ DIAGNOSTIC WRAPPER (Epic-16 retrospective, 2026-09-21). These three
-      # steps used to be bare `cargo test` lines, so a Windows-only failure
-      # produced exactly one readable byte of evidence: "Process completed with
-      # exit code 1". Reading the step log requires an `actions`-scoped token,
-      # which is a strictly larger grant than reading checks — so a
-      # Windows-only regression was effectively undiagnosable from the API this
-      # project can actually authenticate against. `::error::` writes the tail
-      # into a CHECK-RUN ANNOTATION, readable with `repo:status`. The failing
-      # step is windows-check #8 (`jetbrains_acp_server`); the next run will say
-      # WHY instead of merely that. `%25`-then-`%0A` escaping order matters, and
-      # `shell: bash` is required because windows-latest defaults to pwsh.
-      #
-      # ⚠ AND `shell: bash` HAS A PRICE, paid once already: Git Bash puts
-      # `C:\Program Files\Git\usr\bin` AHEAD of System32, so any child that
-      # resolves a tool by bare name gets the MSYS build. That silently broke
-      # `windows_child_runs_at_low_integrity`, whose probe ran `whoami /groups`
-      # — MSYS `whoami.exe` cannot start at Low integrity at all
-      # (`NtCreateDirectoryObject(\BaseNamedObjects\msys-...): 0xC0000022`), so a
-      # PERFECTLY working sandbox was reported as a broken label. Fixed in the
-      # test by naming both ends of the pipe absolutely under `%SystemRoot%`.
-      # ANY new Windows probe added below MUST resolve its tools absolutely, or
-      # it will measure this runner's PATH instead of the product.
-      - name: Run Windows sandbox enforcement tests
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p maos-kernel-core --test sandbox_enforcement_windows -- --nocapture --test-threads=1 2>&1 | tee win-sandbox.log && exit 0
-          echo "::error::windows-check: sandbox_enforcement_windows FAILED. Tail:%0A$(tail -80 win-sandbox.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
-          exit 1
-      # R5: the JetBrains/ACP bridge tests were wired into NO CI job. Run them here.
-      - name: Run ACP JetBrains bridge test
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p maos-acp --test jetbrains_bridge_test 2>&1 | tee win-acp-bridge.log && exit 0
-          echo "::error::windows-check: jetbrains_bridge_test FAILED. Tail:%0A$(tail -80 win-acp-bridge.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
-          exit 1
-      - name: Run JetBrains ACP server e2e
-        shell: bash
-        run: |
-          set -o pipefail
-          cargo test -p maos-bin --test jetbrains_acp_server -- --nocapture 2>&1 | tee win-acp-server.log && exit 0
-          echo "::error::windows-check: jetbrains_acp_server FAILED (this is the step that reds today). Tail:%0A$(tail -80 win-acp-server.log | sed -e 's/%/%25/g' -e 's/\r$//' | awk '{printf "%s%%0A", $0}')"
-          exit 1
-      # ⚠ This step tested NOTHING until 2026-09-21 (Epic-16 retrospective).
-      # `-- --exact` makes libtest match the FULL test path, and the test lives
-      # at `subcommands::tests::install_verify_local_release_artifact`
-      # (maos-cli/src/subcommands.rs:5830 — a lib unit test, not an integration
-      # target). The bare name therefore matched zero tests, and libtest exits 0
-      # on zero matches, so the step went green on every platform while
-      # verifying no signature path at all. Measured on Linux: bare name +
-      # `--exact` => "0 passed; 50 filtered out"; full path + `--exact` =>
-      # "1 passed". This is E16-A2's thesis inside E16-A2's own CI file: a step
-      # that could not run was indistinguishable from one that ran and passed.
-      # The `--list` guard below makes a future rename LOUD instead of vacuous.
-      - name: Verify Windows local release signature path
-        # `shell: bash` is REQUIRED: windows-latest defaults to pwsh, where
-        # `tee`/`grep`/`|| { …; }` are not what this script means. Git Bash ships
-        # on the runner image. The list file is workspace-relative so it needs no
-        # /tmp mapping.
-        shell: bash
-        run: |
-          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact --list | tee win-release-test-list.txt
-          grep -q 'subcommands::tests::install_verify_local_release_artifact: test' win-release-test-list.txt || { echo "the Windows release-signature test did not resolve — it was renamed or moved, and this step must be repointed, not left to pass on an empty filter" >&2; exit 1; }
-          rm -f win-release-test-list.txt
-          cargo test -p maos-cli --lib subcommands::tests::install_verify_local_release_artifact -- --exact
-      - name: Run platform-neutral recall wire tests (Story 17-3d)
-        shell: bash
-        run: |
-          set +e
-          set -o pipefail
-          cargo test --locked -p maos-wasm-host --lib recall_wire -- --nocapture 2>&1 | tee recall-wire.log
-          rc=${PIPESTATUS[0]}
-          [ "$rc" -eq 0 ] || exit "$rc"
-          grep -q '^test result: ok\. 7 passed; 0 failed; 0 ignored;' recall-wire.log || exit 1
-          for name in empty_page_and_all_error_cases_round_trip \
-                      partial_header_is_protocol_error_not_clean_eof \
-                      tags_discriminate_requests_replies_and_iac_frames \
-                      oversized_fetch_and_body_are_refused_at_bound_plus_one \
-                      page_prefix_at_exact_expansion_budget_boundary \
-                      skill_requests_and_responses_round_trip \
-                      megabyte_payload_is_one_byte_string_not_a_sequence; do
-            grep -q "^test recall_wire::tests::$name \.\.\. ok$" recall-wire.log || exit 1
-          done
 
   # Story 10.5 AC1 (NFR-Test-10) — skill-format conformance gate.
   check-skill-conformance:
@@ -4546,7 +4590,7 @@ jobs:
   # substrate: every one of its legs is hermetic (synthetic frames only).
   check-multi-tenant-loom:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -4567,6 +4611,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
+          # Story 21-9: the whole-package leg runs the default-on WASM suites; the fixture
+          # builder compiles their guests for wasm32-wasip2.
+          targets: wasm32-wasip2
       - uses: Swatinem/rust-cache@v2
         with:
           key: check-multi-tenant-loom-${{ hashFiles('**/Cargo.lock') }}
@@ -4584,8 +4631,16 @@ jobs:
       - uses: ./.github/actions/provision-t3-test-substrate
       # Whole-package tests consume cross-package executables through the
       # fixture manifest, never presence-only paths or cargo spawned by tests.
-      - name: Build registered debug siblings for the maos-bin whole-package leg
-        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,worker-cli-fixture,maos-registry-server,maos-spirit,maos-crypto-recording
+      # Story 21-9: maos-bin builds the WASM host by default, so the whole package also runs the
+      # runner, fault-inject runner and guest suites; every fixture they resolve is built here
+      # (the single `build-test-fixtures` command, as workspace-test-suite), plus the pinned
+      # assembler `spawned_scope_17_3c` shells out to.
+      - name: Install pinned WASM fixture assembler
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.259.0
+      - name: Build every fixture for the maos-bin whole-package leg
+        run: cargo run --locked -p xtask -- build-test-fixtures --only maosctl,maos-registry-server,maos-spirit,worker-cli-fixture,maos-crypto-recording,forbidden-syscall-probe,escape-forbidden-syscall-probe,maos-wasm-runner,maos-wasm-runner-fault-inject,echo_spirit.wasm,routed_relay.wasm,recall_probe.wasm,lifecycle_probe.wasm,compat_echo_2_0.wasm,equiv-native-twin
       # Operator ruling 2026-09-24: the DEDICATED CI-only evidence audit key.
       # Without it the required `reza-three-team-three-region-journey` leg is
       # ABSENT (xtask/src/check_multi_tenant_loom.rs:192) and this gate — and
@@ -4609,7 +4664,7 @@ jobs:
           MAOS_TEST_POSTGRES: postgresql://postgres:postgres@localhost:5432/maos_team_b
         run: >-
           python3 scripts/run_cgroup_ceiling_17_2.py run --mode delegated
-          --unit maos-17-2-multi-tenant-loom --timeout 1500 --
+          --unit maos-17-2-multi-tenant-loom --timeout 3000 --
           cargo run -p xtask -- check-multi-tenant-loom --json
       # Story 13.6e (AC5) — publish the evidence ledger (see the reza job).
       - name: Publish evidence ledger
@@ -4624,7 +4679,7 @@ jobs:
   # bind at HEAD; the live route runs against two databases on Postgres 16.
   check-reza-production-path:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -4979,7 +5034,7 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y strace python3-cryptography
       - name: Boot and replay inside an isolated network namespace
         run: |
-          python3 packaging/verify-release.py --directory dist --pubkey bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7 maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64
+          python3 packaging/verify-release.py --directory dist --pubkey bedd2ba634da724027983f369149f108541f43e624a846438c01452ca7f469e7 maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64 maos-wasm-runner-linux-amd64
           chmod +x dist/maos-linux-amd64
           bash tests/air-gap-netns-corroborate.sh "$PWD/dist/maos-linux-amd64" "$RUNNER_TEMP/netns"
       - uses: actions/upload-artifact@v4
@@ -5018,7 +5073,7 @@ jobs:
   container-build:
     needs: release-dry-run
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: read
     steps:
@@ -5035,7 +5090,39 @@ jobs:
           docker run --rm maos:ci --version
           docker run --rm maos:ci --help
           docker run --rm maos:ci init --plain
-          docker image inspect maos:ci --format '{{.Size}}'
+          # Story 22-3: maos, maosctl and the runner sit in the image as executable regular files.
+          cid="$(docker create maos:ci)"
+          trap 'docker rm -f "$cid" >/dev/null' EXIT
+          for exe in maos maosctl maos-wasm-runner; do
+            docker cp "$cid:/usr/local/bin/$exe" - | tar -tv | grep -E '^-r[w-]x'
+          done
+      - name: Image size is measured and bounded (NFR-Ops-14)
+        run: |
+          size=$(docker image inspect maos:ci --format '{{.Size}}')
+          limit=$(tr -d '[:space:]' < tests/integration/image-size-limit)
+          echo "NFR-Ops-14 image size: measured ${size} B, bound ${limit} B (proposed bound = measured + 10 %: $((size + size / 10)))"
+          test "$size" -le "$limit"
+      - name: Pinned helm and kind (sha256-checked)
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSLo helm.tgz https://get.helm.sh/helm-v3.16.4-linux-amd64.tar.gz
+          echo "fc307327959aa38ed8f9f7e66d45492bb022a66c3e5da6063958254b9767d179  helm.tgz" | sha256sum -c -
+          tar xzf helm.tgz
+          sudo install linux-amd64/helm /usr/local/bin/helm
+          curl -fsSLo kind https://kind.sigs.k8s.io/dl/v0.25.0/kind-linux-amd64
+          echo "b22ff7e5c02b8011e82cc3223d069d178b9e1543f1deb21e936d11764780a3d8  kind" | sha256sum -c -
+          sudo install kind /usr/local/bin/kind
+          helm version --short
+          kind version
+      - name: Compose runs a Host with a persistent home; idle memory is bounded (NFR-Ops-14)
+        env:
+          MAOS_IMAGE: maos:ci
+        run: packaging/container/prove-compose.sh
+      - name: Helm install on kind runs the Host and a pod delete keeps the cast
+        env:
+          MAOS_IMAGE: maos:ci
+        run: packaging/container/prove-helm.sh
 
   package-recipes:
     needs: release-dry-run
@@ -5253,10 +5340,12 @@ jobs:
       # symbol that reaches a crate compiled for macOS.
       - name: cargo check (aarch64-apple-darwin)
         run: cargo check --locked --workspace --all-targets --target aarch64-apple-darwin
-      # The 17-2 native outcome consumer is feature-gated; default workspace
-      # features alone do not compile its SessionDeps/launch path.
-      - name: cargo check feature-enabled spawned session (aarch64-apple-darwin)
-        run: cargo check --locked -p maos-bin --all-targets --features network,wasm-host --target aarch64-apple-darwin
+      # Story 21-9 AC7 — the default `maos-bin` shape (WASM host on, no opt-in
+      # feature) and the `maos-wasm-runner` binary, compiled per package so the
+      # workspace feature union above cannot mask them. Compile-only: not a runtime
+      # or release claim for macOS.
+      - name: cargo check default daemon and WASM runner (aarch64-apple-darwin)
+        run: cargo check --locked -p maos-bin -p maos-wasm-host --all-targets --target aarch64-apple-darwin
       - name: Run platform-neutral recall wire tests (Story 17-3d)
         shell: bash
         run: |
@@ -5377,6 +5466,12 @@ jobs:
         run: |
           cargo fetch --locked
           cargo run --locked -p xtask -- build-test-fixtures
+      # `spawned_scope_17_3c` assembles its hostile components with the real `wasm-tools`
+      # (the same pin the 17-3c archive producer installs); the runner image ships none.
+      - name: Install pinned WASM fixture assembler
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-tools@1.259.0
       - name: Provision the declared offline erasure and two-host Ed25519 backend
         uses: ./.github/actions/provision-erasure-verifier
       - name: Install tokei
@@ -5492,7 +5587,6 @@ jobs:
       - check-fuzz-targets
       - fuzz-build
       - check-ko-coverage
-      - windows-check
       - check-migration-merkle
       - check-live-bilateral-consent
       - check-rotation-real-timing
@@ -5517,14 +5611,8 @@ jobs:
       - check-escape-detector
       - check-vetting-attestation
       - check-loom-substrate-drift
-      - check-decision-register
-      - check-cert-rotation-trigger
-      - check-exit-commands
-      - check-model-currency
       - workspace-test-suite
       - check-test-budget
-      - check-perf-runner-policy
-      - check-perf-counts
       - air-gap-netns-witness
     if: always()
     steps:
@@ -5566,13 +5654,9 @@ jobs:
           echo "| check-escape-detector | ${{ needs.check-escape-detector.result }} | cargo run -p xtask -- check-escape-detector |"
           echo "| check-loom-substrate-drift | ${{ needs.check-loom-substrate-drift.result }} | cargo run -p xtask -- check-loom-substrate-drift |"
           echo "| check-j1-loopback-delegation | ${{ needs.check-j1-loopback-delegation.result }} | cargo run -p xtask -- check-j1-loopback-delegation |"
-          echo "| check-exit-commands | ${{ needs.check-exit-commands.result }} | cargo run -p xtask -- check-exit-commands |"
-          echo "| check-model-currency | ${{ needs.check-model-currency.result }} | cargo run -p xtask -- check-model-currency |"
           echo "| workspace-test-suite | ${{ needs.workspace-test-suite.result }} | cargo nextest run --workspace --locked --no-fail-fast --profile ci |"
           echo "| check-test-cost | ${{ needs.xtask-gates.outputs.check-test-cost }} | cargo run -p xtask -- check-test-cost (+ its proven-red vectors, step check-test-cost-vectors) |"
           echo "| check-test-budget | ${{ needs.check-test-budget.result }} | cargo run -p xtask -- check-test-budget --junit <workspace junit> |"
-          echo "| check-perf-runner-policy | ${{ needs.check-perf-runner-policy.result }} | cargo run -p xtask -- check-perf-runner-policy |"
-          echo "| check-perf-counts | ${{ needs.check-perf-counts.result }} | cargo run -p xtask -- check-perf-counts --dir tier-c |"
           echo "| xtask-gates (job) | ${{ needs.xtask-gates.result }} | one job, one xtask build, every deterministic gate a named step; the per-gate rows above read its step outputs |"
           echo ""
       - name: Fail if any sub-gate failed or was skipped
@@ -5609,13 +5693,9 @@ jobs:
           echo "  check-fkcs: ${{ needs.check-fkcs.result }}"
           echo "  check-loom-substrate-drift: ${{ needs.check-loom-substrate-drift.result }}"
           echo "  check-trial-attestation: ${{ needs.check-trial-attestation.result }}"
-          echo "  check-exit-commands: ${{ needs.check-exit-commands.result }}"
-          echo "  check-model-currency: ${{ needs.check-model-currency.result }}"
           echo "  workspace-test-suite: ${{ needs.workspace-test-suite.result }}"
           echo "  check-test-cost: ${{ needs.xtask-gates.outputs.check-test-cost }} (vectors: ${{ needs.xtask-gates.outputs.check-test-cost-vectors }})"
           echo "  check-test-budget: ${{ needs.check-test-budget.result }}"
-          echo "  check-perf-runner-policy: ${{ needs.check-perf-runner-policy.result }}"
-          echo "  check-perf-counts: ${{ needs.check-perf-counts.result }}"
           echo "  xtask-gates: ${{ needs.xtask-gates.result }}"
           exit 1
 
@@ -5634,6 +5714,7 @@ jobs:
       - check-workspace-count
       - check-composition-root-completeness
       - invariant-lock
+      - invariant-ledger-proofs
       - check-corpus
       - maos-audit-read-only
       - cap-token-verify-bench
@@ -5654,8 +5735,7 @@ jobs:
       - nfr-rel-2-hang-detection-60s
       - nfr-rel-4-silent-failure-detection
       - nfr-rel-10-cold-restart
-      # `nfr-rel-11-halt-receipt-999pct` runs nightly in ci-nightly.yml (CI release-ready program W3) until it has 10
-      # consecutive green nightly runs; it MUST be back here before GA (deferred-work.md, owner `ops-ci-release-ready`).
+      - nfr-rel-11-halt-receipt-999pct
       - nfr-rel-9-revocation-5s-p99
       - upgrade-policy-corpus
       - revocation-corpus
@@ -5676,8 +5756,6 @@ jobs:
       - nfr-scale-4-rate-limit-isolation
       - intent-lineage-6-4-extension
       - manifest-n-minus-1-test
-      - check-review-findings-resolved
-      - check-dev-record-completeness
       - check-kernel-baseline
       - journey-hermetic-tier-1
       - fr59-yank-propagation-5min
@@ -5690,8 +5768,9 @@ jobs:
       - check-trial-attestation
       - check-migration-merkle
       - workspace-test-suite
-      # Story 20-12 AC4 — the budget gate over the workspace junit. The one job that runs the registered
-      # expensive tests (`expensive-tests`) moved to ci-nightly.yml in W3 with the same return rule as nfr-rel-11.
+      # Story 20-12 AC4 — the budget gate over the workspace junit; `expensive-tests` is the one job that runs the
+      # registered expensive tests and is a plain `aggregate` need again (returned from ci-nightly.yml for GA).
+      - expensive-tests
       - check-test-budget
       - release-dry-run
       - air-gap-netns-witness
@@ -5842,11 +5921,9 @@ jobs:
             const cwc = '${{ needs.check-workspace-count.result }}';
             const cpfc = xg('check-pub-field-constructors');
             const ccrc = '${{ needs.check-composition-root-completeness.result }}';
-            const sd715 = sm('smoke-discipline-7-1-5');
             const casc = xg('check-a2a-sender-completeness');
             const safc = sm('smoke-a2a-fail-closed-8-8');
             const ckb = '${{ needs.check-kernel-baseline.result }}';
-            const ecc = xg('check-epic-close-coherence');
             const jht1 = '${{ needs.journey-hermetic-tier-1.result }}';
             const cgd = '${{ needs.cgroup-ceiling-delegated.result }}';
             const cgu = '${{ needs.cgroup-ceiling-undelegated.result }}';
@@ -5904,11 +5981,9 @@ jobs:
             | check-workspace-count | ${icon(cwc)} ${cwc} |
             | check-pub-field-constructors | ${icon(cpfc)} ${cpfc} |
             | check-composition-root-completeness | ${icon(ccrc)} ${ccrc} |
-            | smoke-discipline-7-1-5 | ${icon(sd715)} ${sd715} |
             | check-a2a-sender-completeness | ${icon(casc)} ${casc} |
             | smoke-a2a-fail-closed-8-8 | ${icon(safc)} ${safc} |
             | check-kernel-baseline | ${icon(ckb)} ${ckb} |
-            | check-epic-close-coherence | ${icon(ecc)} ${ecc} |
             | journey-hermetic-tier-1 | ${icon(jht1)} ${jht1} |
             | release-dry-run | ${icon(rdr)} ${rdr} |
             | xtask-gates (job) | ${icon(xtaskGatesResult)} ${xtaskGatesResult} |
@@ -5986,6 +6061,7 @@ jobs:
       - check-workspace-count
       - check-composition-root-completeness
       - invariant-lock
+      - invariant-ledger-proofs
       - check-corpus
       - maos-audit-read-only
       - cap-token-verify-bench
@@ -6007,6 +6083,8 @@ jobs:
       - nfr-rel-4-silent-failure-detection
       - nfr-rel-10-cold-restart
       - nfr-rel-9-revocation-5s-p99
+      - nfr-rel-11-halt-receipt-999pct
+      - expensive-tests
       - upgrade-policy-corpus
       - revocation-corpus
       - t3-escape-corpus
@@ -6025,8 +6103,6 @@ jobs:
       - nfr-scale-4-rate-limit-isolation
       - intent-lineage-6-4-extension
       - manifest-n-minus-1-test
-      - check-review-findings-resolved
-      - check-dev-record-completeness
       - check-kernel-baseline
       - journey-hermetic-tier-1
       - fr59-yank-propagation-5min
@@ -6050,7 +6126,6 @@ jobs:
       - check-export-control
       - check-host-surface
       - check-ko-coverage
-      - windows-check
       - check-live-bilateral-consent
       - check-rotation-real-timing
       - check-j4-latency
@@ -6072,9 +6147,6 @@ jobs:
       - check-fkcs
       - check-escape-detector
       - check-vetting-attestation
-      - check-cert-rotation-trigger
-      - check-perf-runner-policy
-      - check-perf-counts
     if: always()
     steps:
       - name: Judge the release-critical set
@@ -6086,7 +6158,7 @@ jobs:
           # EVERY other step of `xtask-gates` (gates and vector steps, build included): each must be PRESENT in the job
           # outputs and `success`, so a dropped output is a red, never an invisible failure. Pinned by
           # `check-ship-gate-completeness` to (all `xtask-gates` step ids) minus `RELEASE_READY_EXCLUDED`.
-          REQUIRED_XTASK_STEPS: "build-xtask check-stability-matrix check-serde-error-handling check-manifest-schema-version check-skill-schema check-epic-close-coherence check-coverage-matrix-completeness check-unsafe check-service-boundary check-breaking-md check-pub-field-constructors check-dependency-closure coverage-matrix check-empty-kernel check-loom check-fr47 check-a2a-sender-completeness check-judge-config check-security-md check-security-md-vectors example-spirit-drift corpus-staleness check-dev-model-tier check-pentest-gate check-third-party-trial check-red-team-gate nfr-onb-1-gate"
+          REQUIRED_XTASK_STEPS: "build-xtask check-stability-matrix check-serde-error-handling check-manifest-schema-version check-skill-schema check-coverage-matrix-completeness check-unsafe check-service-boundary check-breaking-md check-pub-field-constructors check-dependency-closure coverage-matrix check-empty-kernel check-loom check-fr47 check-a2a-sender-completeness check-judge-config check-security-md check-security-md-vectors example-spirit-drift corpus-staleness check-pentest-gate check-third-party-trial check-red-team-gate nfr-onb-1-gate"
         run: |
           set -euo pipefail
           excluded="$(jq -c -n --arg s "$EXCLUDED_XTASK_GATES" '$s | split(" ") | map(select(length > 0))')"

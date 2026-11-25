@@ -4,12 +4,11 @@ description: |
   nightly in `ci-nightly.yml`; its result must be RECORDED so a regression is
   seen. This writes one line per job to the job summary and uploads the same
   line as the artifact `nightly-result-<job>` (retained 90 days), so the history
-  of a job (for example the 10-consecutive-green rule that re-promotes
-  `nfr-rel-11-halt-receipt-999pct` and `expensive-tests`) can be read from the
-  run list and the artifacts instead of from memory.
+  of a job can be read from the run list and the artifacts instead of from
+  memory.
 
-  Call it as the LAST step with `if: ${{ always() }}` and
-  `status: ${{ job.status }}` (or a step output when a step carries its own
+  Call it as the LAST step, configured to run regardless of job outcome, and
+  pass the job status (or a step output when a step carries its own
   `continue-on-error`, as `determinism-tests` does). The checkout must already
   have run: a local action is read from the workspace.
 

@@ -1,0 +1,16 @@
+AC2 plant: crates/maos-bin/src/operator_door.rs CompletionReceipt: 'task_id: None' instead of the accepted task id (marker PLANT22_4_RED). Command: cargo nextest run --locked -p maos-bin --test directed_task_22_4 -E 'test(every_ask_writes_one_completion_row_naming_its_task)'. Result: FAILS - the completion row receipt has no task_id (Null vs the 26-char id). Plant reverted.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+        FAIL [   0.906s] (1/1) maos-bin::directed_task_22_4 every_ask_writes_one_completion_row_naming_its_task
+  stdout 
+    running 1 test
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.90s
+  stderr 
+    thread 'every_ask_writes_one_completion_row_naming_its_task' (3841276) panicked at crates/maos-bin/tests/directed_task_22_4.rs:391:5:
+    assertion `left == right` failed: {"operation_id":"op-4130c71d95faa0cb890beed7","verb":"ask","spirit_id":"probe-d","outcome":"completed","replayed":false}
+      left: Null
+     right: "01M846W43A07H1THETEHFT9MDA"
+     Summary [   0.907s] 1 test run: 0 passed, 1 failed, 4 skipped
+        FAIL [   0.906s] (1/1) maos-bin::directed_task_22_4 every_ask_writes_one_completion_row_naming_its_task
+rc=100

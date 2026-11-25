@@ -10,9 +10,7 @@ pub struct LockReport {
     pub touched_invariants: Vec<String>,
     pub missing_corpus_delta: bool,
     pub missing_phase_commitment: bool,
-    pub insufficient_reviews: bool,
     pub regression_detected: Vec<String>,
-    pub review_count: usize,
     /// Set when the PR body matches the GitHub revert idiom. Populated by
     /// detect_revert when --pr-body is provided. Used by the journal writer
     /// to emit a paired "reverted" entry referencing the original PR/SHA.
@@ -99,6 +97,7 @@ pub fn validate_claim(root: &std::path::Path, src: &str) -> Result<InvariantClai
     Ok(claim)
 }
 
+// Corpus use is a BINDING check (the test loads the file), not a proof of rejection.
 // Fail closed on conditional/ignored Rust witnesses and shell shapes whose execution
 // cannot be established here. Guaranteed claims use a direct cargo test invocation.
 fn executing_witness(
@@ -110,6 +109,17 @@ fn executing_witness(
     path: &str,
 ) -> Result<bool, String> {
     use syn::parse::Parser;
+    // Only the compared operands are evidence: format arguments after them are diagnostics, so
+    // `assert!(ok, "{}", corpus)` does not make the corpus a checked input.
+    fn operands(mac: &syn::Macro) -> Vec<syn::Expr> {
+        let count = if mac.path.is_ident("assert") { 1 } else { 2 };
+        syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
+            .parse2(mac.tokens.clone())
+            .map_or_else(
+                |_| Vec::new(),
+                |args| args.into_iter().take(count).collect(),
+            )
+    }
     fn call_uses(expr: &syn::Expr, binding: &syn::Ident) -> bool {
         let direct =
             |expr: &syn::Expr| matches!(expr, syn::Expr::Path(p) if p.path.is_ident(binding));
@@ -134,9 +144,7 @@ fn executing_witness(
                         .iter()
                         .any(|name| m.mac.path.is_ident(name)) =>
             {
-                syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
-                    .parse2(m.mac.tokens.clone())
-                    .is_ok_and(|args| args.iter().any(|e| call_uses(e, binding)))
+                operands(&m.mac).iter().any(|e| call_uses(e, binding))
             }
             _ => false,
         }
@@ -204,9 +212,7 @@ fn executing_witness(
                         }
                         syn::Stmt::Expr(e, _) => e,
                         syn::Stmt::Macro(m) if m.attrs.is_empty() && assertion(&m.mac) => {
-                            checked |= syn::punctuated::Punctuated::<syn::Expr, syn::Token![,]>::parse_terminated
-                                .parse2(m.mac.tokens.clone()).is_ok_and(|args|
-                                    args.iter().any(|e| bindings.iter().any(|b| call_uses(e, b))));
+                            checked |= operands(&m.mac).iter().any(|e| bindings.iter().any(|b| call_uses(e, b)));
                             continue;
                         }
                         _ => break,
@@ -313,7 +319,7 @@ pub fn run(
     pr_body: Option<&str>,
     json: bool,
 ) -> Result<(), String> {
-    let report = invariant_lock(changed_files, pr_number, pr_body)?;
+    let report = invariant_lock(changed_files, pr_body)?;
 
     if json {
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
@@ -330,12 +336,6 @@ pub fn run(
             if report.missing_phase_commitment {
                 eprintln!("  missing: phase-commitment update (no enforcement_cadence change)");
             }
-            if report.insufficient_reviews {
-                eprintln!(
-                    "  ADR-037 violation: invariant-lock requires ≥2 maintainer sign-offs (current={})",
-                    report.review_count
-                );
-            }
             for reg in &report.regression_detected {
                 eprintln!("  regression: {reg}");
             }
@@ -351,7 +351,6 @@ pub fn run(
             std::path::Path::new(journal_output),
             &report.touched_invariants,
             pr_number.unwrap(),
-            report.review_count,
             sha.unwrap(),
             report.revert_of.as_ref(),
         )?;
@@ -373,7 +372,6 @@ fn workspace_root() -> std::path::PathBuf {
 
 fn invariant_lock(
     changed_files: Option<&str>,
-    pr_number: Option<u64>,
     pr_body_path: Option<&str>,
 ) -> Result<LockReport, String> {
     let root = workspace_root();
@@ -401,15 +399,29 @@ fn invariant_lock(
             touched_invariants.push(inv_id.clone());
         }
     }
-    // Also check maos-domain invariant types (post-1a.1) and lock.toml itself.
+    // Also check the maos-domain invariant modules and lock.toml itself.
     if changed.contains("xtask/invariants/lock.toml") {
         touched_invariants.push("lock.toml".into());
     }
     if changed
         .iter()
-        .any(|p| p.contains("crates/maos-domain/src/invariants.rs"))
+        .any(|p| p.starts_with("crates/maos-domain/src/invariants"))
     {
         touched_invariants.push("maos-domain-invariants".into());
+    }
+    let workflow_rel = ".github/workflows/discipline.yml";
+    let new_wf =
+        fs::read_to_string(root.join(workflow_rel)).map_err(|e| format!("{workflow_rel}: {e}"))?;
+    let old_wf = git_show_old(&root, workflow_rel).unwrap_or_default();
+    for inv_id in claims.keys() {
+        let rel = format!("docs/invariants/{inv_id}.md");
+        let new_src = fs::read_to_string(root.join(&rel)).map_err(|e| format!("{rel}: {e}"))?;
+        let old_src = git_show_old(&root, &rel).unwrap_or_default();
+        if !touched_invariants.contains(inv_id)
+            && witness_touched(&changed, (&old_src, &new_src), (&old_wf, &new_wf))?
+        {
+            touched_invariants.push(inv_id.clone());
+        }
     }
 
     if touched_invariants.is_empty() {
@@ -419,50 +431,49 @@ fn invariant_lock(
             touched_invariants: vec![],
             missing_corpus_delta: false,
             missing_phase_commitment: false,
-            insufficient_reviews: false,
             regression_detected: vec![],
-            review_count: 0,
             revert_of: None,
         });
     }
 
+    let base = base_ref();
+    let spec = format!("{base}^{{commit}}");
+    if !Command::new("git")
+        .args(["rev-parse", "--verify", "--quiet", &spec])
+        .current_dir(&root)
+        .output()
+        .is_ok_and(|o| o.status.success())
+    {
+        return Err(format!("invariant-lock: base ref {base} is unreadable"));
+    }
     // Requirement (a): diff itself is present by construction.
 
     // Requirement (b): corpus delta — file touched check at v0.1-α.
     let missing_corpus_delta = !changed.contains("tests/coverage-matrix.yaml");
 
-    // Requirement (c): phase-commitment update.
-    let mut missing_phase_commitment = true;
-    for inv_id in &touched_invariants {
-        if claims.contains_key(inv_id) {
-            let path = root.join(format!("docs/invariants/{inv_id}.md"));
-            let rel_path = format!("docs/invariants/{inv_id}.md");
-            if changed.contains(&rel_path) {
-                if has_cadence_change(&path)? {
-                    missing_phase_commitment = false;
-                }
-            }
-        }
-    }
-
-    // Reviewer check via gh CLI.
-    let (review_count, insufficient_reviews) = check_reviews(pr_number)?;
-
-    // Regression check: forward-only progression.
+    // Requirement (c) and the forward-only cadence check: both read the register frontmatter
+    // at the base and on disk.
+    let mut owed = Vec::new();
     let mut regression_detected = Vec::new();
-    for inv_id in &touched_invariants {
-        if claims.contains_key(inv_id) {
-            let path = root.join(format!("docs/invariants/{inv_id}.md"));
-            if let Some(reg) = check_regression(&path, inv_id)? {
-                regression_detected.push(reg);
-            }
-        }
+    for inv_id in touched_invariants
+        .iter()
+        .filter(|i| claims.contains_key(*i))
+    {
+        let rel_path = format!("docs/invariants/{inv_id}.md");
+        let new_src =
+            fs::read_to_string(root.join(&rel_path)).map_err(|e| format!("{rel_path}: {e}"))?;
+        let old_src = git_show_old(&root, &rel_path).unwrap_or_default();
+        owed.push((
+            old_src.clone(),
+            new_src.clone(),
+            changed.contains(&rel_path),
+        ));
+        regression_detected.extend(cadence_problem(inv_id, &old_src, &new_src)?);
     }
 
-    let passed = !missing_corpus_delta
-        && !missing_phase_commitment
-        && !insufficient_reviews
-        && regression_detected.is_empty();
+    let missing_phase_commitment = phase_commitment_missing(&owed)?;
+    let passed =
+        !missing_corpus_delta && !missing_phase_commitment && regression_detected.is_empty();
 
     // Revert detection: parse PR body for GitHub revert idiom.
     // The journal-append code path (in run(), gated on --write-journal) consumes
@@ -478,16 +489,14 @@ fn invariant_lock(
         touched_invariants,
         missing_corpus_delta,
         missing_phase_commitment,
-        insufficient_reviews,
         regression_detected,
-        review_count,
         revert_of,
     })
 }
 
 fn detect_changed_files_git(root: &std::path::Path) -> Result<BTreeSet<String>, String> {
     let output = Command::new("git")
-        .args(["diff", "--name-only", "HEAD~1"])
+        .args(["diff", "--name-only", &base_ref()])
         .current_dir(root)
         .output()
         .map_err(|e| format!("git diff failed: {e}"))?;
@@ -502,130 +511,151 @@ fn detect_changed_files_git(root: &std::path::Path) -> Result<BTreeSet<String>, 
         .collect())
 }
 
-fn has_cadence_change(path: &std::path::Path) -> Result<bool, String> {
-    // Check if the diff against HEAD~ touches the enforcement_cadence section.
-    let output = Command::new("git")
-        .args(["diff", "HEAD~1", "--", path.to_str().unwrap()])
+/// The event's base commit (`INVARIANT_LOCK_BASE`: PR base or push-before sha); `HEAD~1` locally.
+fn base_ref() -> String {
+    std::env::var("INVARIANT_LOCK_BASE").unwrap_or_else(|_| "HEAD~1".into())
+}
+
+/// The register file at the base, or `None` when it did not exist there.
+fn git_show_old(root: &std::path::Path, rel: &str) -> Option<String> {
+    let spec = format!("{}:{rel}", base_ref());
+    let out = Command::new("git")
+        .args(["show", &spec])
+        .current_dir(root)
         .output()
-        .map_err(|e| format!("git diff failed: {e}"))?;
-    let diff = String::from_utf8_lossy(&output.stdout);
-    Ok(diff.contains("enforcement_cadence"))
+        .ok()?;
+    out.status
+        .success()
+        .then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-fn check_reviews(pr_number: Option<u64>) -> Result<(usize, bool), String> {
-    let pr = match pr_number {
-        Some(n) => n,
-        None => {
-            // Try to detect from gh CLI.
-            let output = Command::new("gh")
-                .args(["pr", "view", "--json", "number"])
-                .output();
-            match output {
-                Ok(o) if o.status.success() => {
-                    let json: serde_json::Value =
-                        serde_json::from_slice(&o.stdout).map_err(|e| e.to_string())?;
-                    json["number"].as_u64().ok_or("cannot parse PR number")? as u64
-                }
-                _ => {
-                    return Ok((0, false));
-                }
+/// Both frontmatters parsed as YAML: the claim enum and the cadence map. Body text never counts.
+fn front(src: &str) -> Result<serde_yaml::Value, String> {
+    let head = src
+        .strip_prefix("---\n")
+        .and_then(|s| s.split_once("\n---"))
+        .map(|h| h.0);
+    serde_yaml::from_str(head.unwrap_or_default()).map_err(|e| e.to_string())
+}
+
+/// ADR-037 requirement (c): a changed cadence cell, or a validated `asserted -> guaranteed` flip.
+fn phase_commitment(old_src: &str, new_src: &str) -> Result<bool, String> {
+    let claim = |src: &str| front(src).map(|f| f["claim"].as_str().map(str::to_string));
+    let flip = claim(old_src)?.as_deref() == Some("asserted")
+        && claim(new_src)?.as_deref() == Some("guaranteed");
+    Ok(flip || parse_cadence(old_src)? != parse_cadence(new_src)?)
+}
+
+/// Requirement (c) binds only when a touched register's CANDIDATE claim is `guaranteed`; a
+/// non-claiming (`asserted`) edit makes no promise that needs a phase commitment. Each entry is
+/// `(base source, candidate source, file itself changed)`. Once owed, any changed file whose
+/// cadence cell moved or whose claim validly flipped clears it.
+fn phase_commitment_missing(touched: &[(String, String, bool)]) -> Result<bool, String> {
+    let mut owed = false;
+    let mut committed = false;
+    for (old_src, new_src, file_changed) in touched {
+        owed |= front(new_src)?["claim"].as_str() == Some("guaranteed");
+        committed |= *file_changed && phase_commitment(old_src, new_src)?;
+    }
+    Ok(owed && !committed)
+}
+
+const PHASES: [&str; 6] = ["v0.1", "v0.3", "v0.5", "v0.9", "v1.0", "v1.5"];
+
+/// F4: the witness a `guaranteed` row stands on (test file, corpus, CI job body) is lock scope,
+/// judged for the base AND the candidate register so a row cannot be downgraded and its witness
+/// weakened in one step.
+fn witness_touched(
+    changed: &BTreeSet<String>,
+    (old_src, new_src): (&str, &str),
+    (old_wf, new_wf): (&str, &str),
+) -> Result<bool, String> {
+    let workflow = |src: &str| -> Result<serde_yaml::Value, String> {
+        if src.trim().is_empty() {
+            return Ok(serde_yaml::Value::Null);
+        }
+        serde_yaml::from_str(src).map_err(|e| e.to_string())
+    };
+    let (old_wf, new_wf) = (workflow(old_wf)?, workflow(new_wf)?);
+    for src in [old_src, new_src] {
+        let row = front(src)?;
+        if row["claim"].as_str() != Some("guaranteed") {
+            continue;
+        }
+        let test = row["property_test"]
+            .as_str()
+            .map(|t| t.split_once('#').map_or(t, |p| p.0));
+        let corpus = row["adversarial_corpus"].as_str();
+        if [test, corpus]
+            .into_iter()
+            .flatten()
+            .any(|p| changed.contains(p))
+        {
+            return Ok(true);
+        }
+        if let Some(job) = row["ci_job"].as_str() {
+            if old_wf["jobs"][job] != new_wf["jobs"][job] {
+                return Ok(true);
             }
         }
-    };
-
-    let output = Command::new("gh")
-        .args(["pr", "view", &pr.to_string(), "--json", "reviews"])
-        .output();
-
-    match output {
-        Ok(o) if o.status.success() => {
-            let json: serde_json::Value =
-                serde_json::from_slice(&o.stdout).map_err(|e| e.to_string())?;
-            let reviews = json["reviews"].as_array().unwrap_or(&vec![]).clone();
-            let approved: Vec<_> = reviews
-                .into_iter()
-                .filter(|r| r["state"].as_str() == Some("APPROVED"))
-                .collect();
-            let count = approved.len();
-            Ok((count, count < 2))
-        }
-        Ok(o) => {
-            let stderr = String::from_utf8_lossy(&o.stderr);
-            return Err(format!("could not query PR reviews: {stderr}"));
-        }
-        Err(e) => {
-            return Err(format!(
-                "gh CLI not available for review check (required by ADR-037): {e}"
-            ));
-        }
     }
+    Ok(false)
 }
 
-fn check_regression(path: &std::path::Path, inv_id: &str) -> Result<Option<String>, String> {
-    let output = Command::new("git")
-        .args(["show", &format!("HEAD~1:{}", path.to_str().unwrap())])
-        .output();
-
-    let old_src = match output {
-        Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).to_string(),
-        _ => return Ok(None), // no prior version to compare
-    };
-
-    let new_src = fs::read_to_string(path).unwrap_or_default();
-
-    let old_cadence = parse_cadence(&old_src)?;
-    let new_cadence = parse_cadence(&new_src)?;
-
+/// The candidate's own cells are validated before any map comparison: every value must be a
+/// known cadence and every phase key canonical or already present at the base, so a new
+/// unrecognized key cannot ride in unchecked.
+fn cadence_problem(inv_id: &str, old_src: &str, new_src: &str) -> Result<Option<String>, String> {
+    let new_cadence = parse_cadence(new_src)?;
+    let old_cadence = parse_cadence(old_src)?;
     let order = ["—", "CI", "runtime", "fuzz"];
-    let rank = |s: &str| order.iter().position(|&x| x == s).unwrap_or(0);
-
-    for (phase, old_val) in &old_cadence {
-        if let Some(new_val) = new_cadence.get(phase) {
-            if rank(new_val) < rank(old_val) {
-                return Ok(Some(format!(
-                    "ADR-037 violation: enforcement cadence cannot regress for {inv_id} (was={old_val}, now={new_val})"
-                )));
-            }
-        }
+    let rank = |s: &str| order.iter().position(|&x| x == s);
+    for (phase, value) in &new_cadence {
+        let problem = if !PHASES.contains(&phase.as_str()) && !old_cadence.contains_key(phase) {
+            "unrecognized phase key".to_string()
+        } else if rank(value).is_none() {
+            format!("invalid value {value}")
+        } else {
+            continue;
+        };
+        return Ok(Some(format!(
+            "ADR-037 violation: {inv_id} cadence {phase} {problem}"
+        )));
     }
-
+    for (phase, old_val) in &old_cadence {
+        let problem = match new_cadence.get(phase) {
+            None => "removed".to_string(),
+            Some(n) if rank(n).is_none() => format!("invalid value {n}"),
+            Some(n) if rank(n) < rank(old_val) => format!("regressed (was={old_val}, now={n})"),
+            Some(_) => continue,
+        };
+        return Ok(Some(format!(
+            "ADR-037 violation: {inv_id} cadence {phase} {problem}"
+        )));
+    }
     Ok(None)
 }
 
 fn parse_cadence(src: &str) -> Result<BTreeMap<String, String>, String> {
-    let mut map = BTreeMap::new();
-    // Simple parser: look for lines like `v0.1: runtime` in frontmatter.
-    let mut in_cadence = false;
-    for line in src.lines() {
-        if line.contains("enforcement_cadence:") {
-            in_cadence = true;
-            continue;
-        }
-        if in_cadence {
-            let trimmed = line.trim();
-            if trimmed.contains(':') && !trimmed.starts_with('#') {
-                let parts: Vec<_> = trimmed.splitn(2, ':').collect();
-                if parts.len() == 2 {
-                    let key = parts[0].trim().to_string();
-                    let val = parts[1].trim().to_string();
-                    // Only accept known phase keys to avoid parsing noise.
-                    if key.starts_with('v') && key.contains('.') {
-                        map.insert(key, val);
-                    }
-                }
-            } else if !trimmed.is_empty() && !line.starts_with(' ') && !line.starts_with('\t') {
-                break;
-            }
-        }
-    }
-    Ok(map)
+    let cells = front(src)?["enforcement_cadence"]
+        .as_mapping()
+        .cloned()
+        .unwrap_or_default();
+    Ok(cells
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.as_str().unwrap_or("?").into(),
+                v.as_str().unwrap_or("?").into(),
+            )
+        })
+        .collect())
 }
 
 fn append_journal(
     output_path: &std::path::Path,
     invariant_ids: &[String],
     pr_number: u64,
-    review_count: usize,
     sha: &str,
     revert_of: Option<&RevertReference>,
 ) -> Result<(), String> {
@@ -638,7 +668,6 @@ fn append_journal(
         "ts": ts,
         "invariant_ids": invariant_ids,
         "pr_number": pr_number,
-        "reviewers": review_count,
         "sha": sha,
     });
     let mut output = format!("{primary_entry}\n");

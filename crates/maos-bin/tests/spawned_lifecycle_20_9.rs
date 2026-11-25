@@ -9,6 +9,7 @@
 mod world;
 
 use maos_kernel_core::iac::transparency_log::FrameKind as TlKind;
+use sha2::Digest as _;
 use std::time::{Duration, Instant};
 use world::{manifest, manifest_capped, Running, World, ALL_HOOKS, ID};
 
@@ -54,11 +55,9 @@ async fn each_kernel_trigger_reaches_its_lifecycle_export_through_its_caller() {
     } else {
         eventually(&mut world, ID, "consolidate", 1).await
     };
-    let report = if World::count(&report, "schedule") >= 1 {
-        report
-    } else {
-        eventually(&mut world, ID, "schedule", 1).await
-    };
+    if World::count(&report, "schedule") < 1 {
+        eventually(&mut world, ID, "schedule", 1).await;
+    }
     // Telemetry (HookPump) reaches a guest that lists it, with the scalar's own tag.
     world
         .capability
@@ -176,10 +175,27 @@ async fn a_2_3_guest_receives_nothing_and_keeps_running() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn a_looping_idle_exceeds_its_budget_and_ends_the_session_with_a_journaled_cause() {
     let mut world = World::new().await;
-    let text = manifest(ID, "1.0.0", "lifecycle_probe.wasm", &ALL_HOOKS, "")
-        .replace("time_cap_seconds = 30", "time_cap_seconds = 1");
+    let text = manifest_capped(ID, "1.0.0", "lifecycle_probe.wasm", &ALL_HOOKS, "", 1);
     let path = world.write("loop.toml", &text);
-    let running = world.start(&path).await;
+    // The 1 s `[budget]` cap is what is under test: it is the dispatcher's wall for the idle firing.
+    // The child's startup and probe are not, and a manifest cap would hand them the same 1 s, which
+    // a loaded runner cannot always meet; the session's own walls get the usual 30 s.
+    let running = world
+        .start_with_turn_budget(&path, Duration::from_secs(30))
+        .await;
+    // The IdleWatchdog fires once per quiet period, and a Spirit never sent a frame fires one idle
+    // window after load. That first firing must be over (its stamp is what ends the period) before
+    // the quiet period below is begun, or its late stamp would end the new period unfired.
+    let scb = world.scb(ID);
+    let first = Instant::now() + Duration::from_secs(20);
+    while scb
+        .last_idle_fire_ns
+        .load(std::sync::atomic::Ordering::Acquire)
+        == 0
+    {
+        assert!(Instant::now() < first, "the first idle firing never ended");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
     // The next idle sleeps well past the 1 s cap.
     world.turn(ID, "sleep-idle 20").await;
     world.quiet(ID);
@@ -210,6 +226,169 @@ async fn a_looping_idle_exceeds_its_budget_and_ends_the_session_with_a_journaled
         !world.rows(TlKind::BudgetExceeded, "").is_empty(),
         "the kernel's BudgetExceeded for the hook"
     );
+    world.finish().await;
+}
+
+/// Story 21-9 AC8 — the host's actual firing deadline (the dispatcher's
+/// `firing_ceiling_seconds`, 1 s here) ends the owning session's export long before the
+/// guest's own 60 s session budget would. The 20 s join bound is only a hang guard: a session
+/// ended by the 60 s budget could not satisfy it, and no timing is asserted.
+enum Firing {
+    Idle,
+    Schedule,
+}
+
+async fn firing_deadline_ends_the_session(firing: Firing) {
+    let mut world = World::bare().await;
+    let text = manifest_capped(ID, "1.0.0", "lifecycle_probe.wasm", &ALL_HOOKS, "", 60);
+    let path = world.write("firing.toml", &text);
+    let running = world.start(&path).await;
+    // The next scheduled export of this ordinary workload stays busy for 40 s.
+    let (script, report_hook) = match firing {
+        Firing::Idle => ("sleep-in idle 40", "idle"),
+        Firing::Schedule => ("sleep-in schedule 40", "schedule"),
+    };
+    world.turn(ID, script).await;
+    let scb = world.scb(ID);
+    let mut dispatcher = maos_kernel_core::scheduler::HookDispatcher::new(
+        std::sync::Arc::clone(&world.tl),
+        std::sync::Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new()),
+    )
+    .with_spirits(world.scheduler.scbs());
+    dispatcher.firing_ceiling_seconds = 1;
+    match firing {
+        Firing::Idle => {
+            let _ = dispatcher.fire_on_idle(&scb).await;
+        }
+        Firing::Schedule => {
+            let _ = dispatcher.fire_on_schedule(&scb, b"tick").await;
+        }
+    }
+    let ended = tokio::time::timeout(Duration::from_secs(20), running.session)
+        .await
+        .unwrap_or_else(|_| panic!("the {report_hook} firing deadline ends the session"))
+        .expect("no join failure");
+    assert!(
+        matches!(
+            ended,
+            Err(maos_bin::spirit_session::SessionError::Deadline(
+                "lifecycle export"
+            ))
+        ),
+        "{ended:?}"
+    );
+    let rows = world.rows(TlKind::GovernanceEvent, "spirit.lifecycle.deadline");
+    assert!(
+        rows.iter().any(|row| {
+            String::from_utf8_lossy(&row.payload_redacted).contains("lifecycle export")
+        }),
+        "the cause is journaled with the export stage: {rows:?}"
+    );
+    world.finish().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_idle_firing_deadline_shorter_than_the_session_budget_ends_the_owning_session() {
+    firing_deadline_ends_the_session(Firing::Idle).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_schedule_firing_deadline_shorter_than_the_session_budget_ends_the_owning_session() {
+    firing_deadline_ends_the_session(Firing::Schedule).await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn an_idle_deadline_stops_the_exact_child_while_read_only_recall_is_still_in_flight() {
+    use rustix::process::{waitid, WaitId, WaitIdOptions};
+    use std::sync::{mpsc, Arc, Mutex};
+
+    let world = World::bare().await;
+    let text = manifest_capped(ID, "1.0.0", "lifecycle_probe.wasm", &ALL_HOOKS, "", 60);
+    let manifest = world.write("recall-wall.toml", &text);
+    let (entered_tx, entered_rx) = tokio::sync::oneshot::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let latch = Mutex::new(Some((entered_tx, release_rx)));
+    let running = world
+        .start_with_recall_clock(
+            &manifest,
+            Some(Arc::new(move || {
+                let waiting = latch.lock().unwrap().take();
+                if let Some((entered, release)) = waiting {
+                    let _ = entered.send(());
+                    let _ = release.recv();
+                }
+                maos_domain::frame::consent_wall_now_ns()
+            })),
+        )
+        .await;
+    let child = world
+        .supervisor
+        .bindings()
+        .into_iter()
+        .find(|binding| binding.spirit_pid == running.pid)
+        .and_then(|binding| binding.child)
+        .expect("the Linux supervisor owns the live child's exact identity");
+    let mut dispatcher = maos_kernel_core::scheduler::HookDispatcher::new(
+        Arc::clone(&world.tl),
+        Arc::new(maos_kernel_core::telemetry::iac_rt::IacRtMetrics::new()),
+    )
+    .with_spirits(world.scheduler.scbs());
+    dispatcher.firing_ceiling_seconds = 5;
+    let scb = world.scb(ID);
+    let dispatch = tokio::spawn(async move { dispatcher.fire_on_idle(&scb).await });
+    tokio::time::timeout(Duration::from_secs(15), entered_rx)
+        .await
+        .expect("the normal lifecycle import entered the consent clock")
+        .unwrap();
+    let exit = tokio::time::timeout(Duration::from_secs(15), async {
+        loop {
+            // NOWAIT observes the exact child without reaping anything owned by the bridge.
+            if let Some(status) = waitid(
+                WaitId::PidFd(child.pidfd()),
+                WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+            )
+            .expect("observe the still-owned child")
+            {
+                break status;
+            }
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await;
+    let session_still_held = !running.session.is_finished();
+    let deadline_before_release = !world
+        .rows(TlKind::GovernanceEvent, "spirit.lifecycle.deadline")
+        .is_empty();
+    drop(release_tx);
+    assert!(
+        exit.is_ok(),
+        "the child must exit before the release of host recall"
+    );
+    assert!(
+        session_still_held,
+        "child exit cannot complete the held host call"
+    );
+    assert!(
+        !deadline_before_release,
+        "the stop did not require the deadline journal row"
+    );
+    let ended = tokio::time::timeout(Duration::from_secs(20), running.session)
+        .await
+        .expect("session finalized after the host call returned")
+        .unwrap();
+    assert!(
+        matches!(
+            ended,
+            Err(maos_bin::spirit_session::SessionError::Deadline(
+                "lifecycle export"
+            ))
+        ),
+        "{ended:?}"
+    );
+    let _ = dispatch.await.unwrap();
+    assert!(!world
+        .rows(TlKind::GovernanceEvent, "spirit.lifecycle.deadline")
+        .is_empty());
     world.finish().await;
 }
 
@@ -568,6 +747,62 @@ async fn a_telemetry_export_past_its_wall_is_cut_loose_so_shutdown_is_not_held_f
     stop(world, running).await;
 }
 
+// Story 21-9 AC8 — the link deadline ends the executing session, not only its waiting hook: a
+// telemetry export that sleeps 25 s inside a 60 s budget is given up on at the pump wall's link
+// deadline (about 9.5 s), and the session (whose own export deadline is 60 s away) is gone well
+// before the export could have finished. Returning the deadline to the hook alone would leave the
+// session alive here, so this distinguishes termination from a completed wait.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_telemetry_export_past_its_link_deadline_ends_the_executing_session() {
+    let mut world = World::bare().await;
+    let path = world.write(
+        "link-deadline.toml",
+        &manifest_capped(
+            ID,
+            "1.0.0",
+            "lifecycle_probe.wasm",
+            &["on_telemetry_event"],
+            "",
+            60,
+        ),
+    );
+    let running = world.start(&path).await;
+    world.turn(ID, "sleep-in telemetry 25").await;
+    world
+        .capability
+        .set_scalar(903, "emitter", "queue.depth", 0.5, "test")
+        .unwrap();
+    world.pump.flush().await.unwrap();
+    let began = Instant::now();
+    let ended = tokio::time::timeout(Duration::from_secs(20), running.session)
+        .await
+        .expect("the link deadline ended the session before the export could finish")
+        .expect("no join failure");
+    assert!(
+        began.elapsed() < Duration::from_secs(20),
+        "session outlived the link deadline by {:?}",
+        began.elapsed()
+    );
+    assert!(
+        matches!(
+            ended,
+            Err(maos_bin::spirit_session::SessionError::LinkDeadline(
+                "lifecycle export"
+            ))
+        ),
+        "the hook's link deadline, not the session's own 60 s deadline or a bare kill, ended it: {ended:?}"
+    );
+    assert!(
+        !world
+            .rows(TlKind::GovernanceEvent, "spirit.lifecycle.deadline")
+            .is_empty(),
+        "the link-deadline cause is journaled"
+    );
+    assert!(ended.is_err(), "the session ended without a clean exit");
+    world.pump.shutdown().await;
+    world.finish().await;
+}
+
 // GLM r3 F4 — a telemetry export that queued behind the component's own frame turn and then ran
 // is held to its wall from its own start: two seconds of queue and four of run fit a 5 s wall.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -697,4 +932,157 @@ async fn a_telemetry_event_that_finds_the_queue_slot_taken_is_dropped_not_delive
         "an event that never entered the queue is not a delivery"
     );
     stop(world, running).await;
+}
+
+/// Story 21-9 — `maos run`'s standalone arm with the component taken into custody first: the
+/// authored path is acquired once, retired (and a decoy left in its place), and only then does
+/// the launch begin, so the runner can only be running the exact held bytes.
+async fn start_after_retiring_authored_path(
+    world: &World,
+    manifest_path: &std::path::Path,
+    authored: &std::path::Path,
+) -> (Running, [u8; 32]) {
+    use std::sync::Arc;
+    let text = std::fs::read_to_string(manifest_path).unwrap();
+    let gated = maos_bin::admission::gate_manifest(&text, &|_| false).unwrap();
+    let artifact = maos_bin::spirit_session::LaunchArtifact::acquire_local(
+        authored.parent().unwrap(),
+        authored.file_name().unwrap().to_str().unwrap(),
+        None,
+    )
+    .expect("the authored component is taken into custody");
+    let digest = artifact.sha256();
+    // Retire the authored path; a different regular file takes its name.
+    std::fs::remove_file(authored).unwrap();
+    std::fs::write(authored, b"not the component").unwrap();
+    let launch = maos_bin::spirit_session::manifest_launch_held(
+        &*world.handles.host,
+        &gated,
+        manifest_path,
+        authored.parent().unwrap(),
+        false,
+        artifact,
+    )
+    .expect("a launch from the held component");
+    let (core, obj) = world
+        .supervisor
+        .prepare_spawned(&gated.spirit_id, &gated.bundle())
+        .unwrap();
+    let bound = Arc::clone(&core);
+    let admitted = maos_bin::admission::load_admit_start_unarchived(
+        &maos_bin::admission::AdmissionDeps {
+            providers: None,
+            iac: Some(&world.iac),
+            scheduler: &world.scheduler,
+            security: &world.security,
+            transparency_log: &world.tl,
+            journal: &world.journal,
+            memory: &world.memory,
+            pid_by_spirit_id: &world.lookup,
+            hooks: Some(&world.pump),
+            quarantine: None,
+        },
+        &gated,
+        obj,
+        world::NONCE,
+        maos_bin::admission::StartPolicy::StartNow,
+        &mut |pid| bound.bind_scheduler_pid(pid),
+        &world.handles.archive_root,
+    )
+    .await
+    .unwrap();
+    let pid = admitted.pid;
+    let deps = (world.handles.session)(Arc::clone(&world.supervisor));
+    let session = tokio::spawn(maos_bin::spirit_session::run_admitted_session(
+        deps, admitted, core, launch,
+    ));
+    let deadline = Instant::now() + Duration::from_secs(30);
+    loop {
+        if let Some(target) = world.supervisor.spawned_target(&gated.spirit_id) {
+            if target
+                .lifecycle()
+                .wait_supported(Duration::from_millis(50))
+                .is_some()
+            {
+                break;
+            }
+        }
+        assert!(
+            Instant::now() < deadline && !session.is_finished(),
+            "the held component never became ready"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    (Running { pid, session }, digest)
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_held_component_runs_after_its_authored_path_is_retired() {
+    let mut world = World::new().await;
+    let authored = world.dir.path().join("held_probe.wasm");
+    let bytes = std::fs::read(world.dir.path().join("lifecycle_probe.wasm")).unwrap();
+    std::fs::write(&authored, &bytes).unwrap();
+    let path = world.write(
+        "held.toml",
+        &manifest(ID, "1.0.0", "held_probe.wasm", &ALL_HOOKS, ""),
+    );
+    let (running, digest) = start_after_retiring_authored_path(&world, &path, &authored).await;
+    // The runner compiled exactly the bytes taken into custody (it re-hashes its buffer against
+    // this digest), and the retired path now names a different file.
+    let expected: [u8; 32] = sha2::Sha256::digest(&bytes).into();
+    assert_eq!(digest, expected);
+    assert_eq!(std::fs::read(&authored).unwrap(), b"not the component");
+    let report = world.turn(ID, "").await;
+    assert_eq!(
+        World::count(&report, "frames"),
+        1,
+        "the held component serves a turn:\n{report}"
+    );
+    stop(world, running).await;
+}
+
+#[test]
+fn local_component_custody_refuses_absent_wrong_kind_escaping_oversize_and_mismatched() {
+    use maos_bin::spirit_session::{LaunchArtifact, SessionError};
+    let dir = tempfile::TempDir::new().unwrap();
+    let origin = dir.path();
+    let probe = std::fs::read(world::fixtures::fixture("lifecycle_probe.wasm")).unwrap();
+    std::fs::write(origin.join("ok.wasm"), &probe).unwrap();
+
+    // The plain component is held, and reports the digest of its bytes.
+    let held = LaunchArtifact::acquire_local(origin, "ok.wasm", None).expect("plain component");
+    let digest: [u8; 32] = sha2::Sha256::digest(&probe).into();
+    assert_eq!(held.sha256(), digest);
+
+    // Absence: no file by that name.
+    assert!(matches!(
+        LaunchArtifact::acquire_local(origin, "absent.wasm", None),
+        Err(SessionError::Bridge(_))
+    ));
+    // Kind: a directory is not a component.
+    std::fs::create_dir(origin.join("dir.wasm")).unwrap();
+    assert!(matches!(
+        LaunchArtifact::acquire_local(origin, "dir.wasm", None),
+        Err(SessionError::HeldComponent(_))
+    ));
+    // A symlink named as the component is not followed.
+    std::os::unix::fs::symlink(origin.join("ok.wasm"), origin.join("link.wasm")).unwrap();
+    assert!(matches!(
+        LaunchArtifact::acquire_local(origin, "link.wasm", None),
+        Err(SessionError::ArtifactEscapesOrigin(_))
+    ));
+    // Size: one byte past the cap is refused.
+    let big = std::fs::File::create(origin.join("big.wasm")).unwrap();
+    big.set_len(64 * 1024 * 1024 + 1).unwrap();
+    drop(big);
+    assert!(matches!(
+        LaunchArtifact::acquire_local(origin, "big.wasm", None),
+        Err(SessionError::HeldComponent(_))
+    ));
+    // Integrity: bytes that differ from the digest they were pinned to.
+    assert!(matches!(
+        LaunchArtifact::acquire_local(origin, "ok.wasm", Some([0u8; 32])),
+        Err(SessionError::ArtifactDigestMismatch(_))
+    ));
+    assert!(LaunchArtifact::acquire_local(origin, "ok.wasm", Some(digest)).is_ok());
 }

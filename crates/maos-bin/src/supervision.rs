@@ -894,6 +894,14 @@ mod worker {
             self.cleanup_container(Instant::now() + TEARDOWN_BUDGET);
         }
 
+        /// The planned-stop transition alone, for an owner that signals through its own exact
+        /// child handle: the phase latches `PlannedStop` (so the exit is not a crash and the run
+        /// may not complete), and nothing is signalled, torn down, dispositioned or unloaded here.
+        /// It takes only the binding's short state lock, never held across any other work.
+        pub fn begin_planned_stop(&self) {
+            let _ = self.begin_stop();
+        }
+
         /// Story 19-2 (D-19-2-14 A) — freeze or thaw the container, bounded by
         /// `TEARDOWN_BUDGET`; only a `Running` binding with a CID freezes. A
         /// freeze that fails is undone best-effort under its own fresh
@@ -1820,9 +1828,22 @@ mod worker {
             }
             let core =
                 self.prepare_core(spirit_id.to_owned(), &WorkerTask::Standalone, bundle, false);
-            let spirit = maos_kernel_core::scheduler::control_block::make_spirit_obj(
-                WorkerSpirit::new(Arc::clone(&core)),
-            );
+            let spirit =
+                maos_kernel_core::scheduler::control_block::make_spirit_obj_with_host_hooks(
+                    WorkerSpirit::new(Arc::clone(&core)),
+                    WorkerSpirit::finalize,
+                    maos_kernel_core::scheduler::control_block::FiringHooks {
+                        idle: |spirit, ctx, deadline| spirit.fire_idle(ctx, deadline),
+                        schedule: |spirit, ctx, payload, deadline| {
+                            spirit.fire_schedule(ctx, payload, deadline)
+                        },
+                    },
+                );
+            // The one effective telemetry wall of this manifest's validated declaration, the
+            // pump's own value; without a declaration the link serves no telemetry.
+            #[cfg(feature = "wasm-host")]
+            core.lifecycle()
+                .set_telemetry_wall(crate::hook_pump::telemetry_wall(bundle));
             #[cfg(feature = "wasm-host")]
             core.note_spirit_object(&spirit);
             #[cfg(feature = "wasm-host")]
@@ -2316,6 +2337,7 @@ mod worker {
                 )
                 .map_err(|e| WorkerSupervisionError::Load(e.to_string()))?;
             core.bind_scheduler_pid(pid);
+            crate::operator_door::record_form(pid, "worker");
 
             if let Err(e) = self.exec.handle.block_on(self.exec.scheduler.start(pid)) {
                 // Story 16-6 — this used to read "the SCB is `Loaded` and
@@ -2714,7 +2736,7 @@ mod worker {
                 }
                 Some(Ok(_)) => {
                     if let Some(core) = core {
-                        self.iac.unregister_promotion_set(core.spirit_id());
+                        self.iac.withdraw_spirit(core.spirit_id(), spirit_pid);
                     }
                 }
                 None => eprintln!("maos run: worker unload thread panicked for pid {spirit_pid}"),
@@ -2804,12 +2826,71 @@ mod worker {
             Self { core }
         }
 
+        /// Host-only finalizer: the hot-swap coordinator accepted the outer swap-in and
+        /// published this object into the SCB. Only now does the guest's provisional `Done`
+        /// hand its child to the predecessor's session; a refused or stale candidate never
+        /// gets here. Non-blocking.
+        fn finalize(&self, event: maos_kernel_core::scheduler::control_block::HostLifecycleEvent) {
+            let maos_kernel_core::scheduler::control_block::HostLifecycleEvent::SwapCommitted {
+                pid,
+                ..
+            } = event;
+            #[cfg(feature = "wasm-host")]
+            if self.core.spirit_pid() == pid {
+                self.core.lifecycle().publish_commit();
+            }
+            #[cfg(not(feature = "wasm-host"))]
+            let _ = pid;
+        }
+
+        /// Typed host callback for the kernel's `on_idle` firing: `deadline` is the real
+        /// monotonic wall the kernel captured before queuing it, handed straight to the
+        /// lifecycle link so the owning session ends the export at it rather than at a
+        /// recomputed relative cap. No ambient state.
+        #[cfg(feature = "wasm-host")]
+        fn fire_idle(&self, _ctx: &mut Ctx, deadline: Instant) {
+            self.lifecycle_until(LifecycleRequest::Idle, Some(deadline));
+        }
+
+        /// Typed host callback for the kernel's `on_schedule` firing; see [`Self::fire_idle`].
+        #[cfg(feature = "wasm-host")]
+        fn fire_schedule(&self, _ctx: &mut Ctx, payload: &SchedulePayload<'_>, deadline: Instant) {
+            self.lifecycle_until(
+                LifecycleRequest::Schedule {
+                    payload: WireBytes(payload.schedule_data.to_vec()),
+                },
+                Some(deadline),
+            );
+        }
+
+        #[cfg(not(feature = "wasm-host"))]
+        fn fire_idle(&self, _ctx: &mut Ctx, _deadline: Instant) {}
+
+        #[cfg(not(feature = "wasm-host"))]
+        fn fire_schedule(
+            &self,
+            _ctx: &mut Ctx,
+            _payload: &maos_spirit_abi::lifecycle::SchedulePayload<'_>,
+            _deadline: Instant,
+        ) {
+        }
+
         /// One lifecycle export of a spawned Spirit, never waiting past the hook budget.
         /// `Unsupported` is a no-op; every other failure is the typed panic a `Spirit` hook
         /// reports as `HookOutcome::Panicked` (Story 20-9 AC2).
         #[cfg(feature = "wasm-host")]
         fn lifecycle(&self, request: LifecycleRequest) -> LifecycleReply {
-            match self.core.lifecycle().call(&self.core, request) {
+            self.lifecycle_until(request, None)
+        }
+
+        /// [`Self::lifecycle`] under the kernel firing's real absolute wall, if it has one.
+        #[cfg(feature = "wasm-host")]
+        fn lifecycle_until(
+            &self,
+            request: LifecycleRequest,
+            firing: Option<Instant>,
+        ) -> LifecycleReply {
+            match self.core.lifecycle().call(&self.core, request, firing) {
                 Ok(LifecycleReply::Declined(detail)) => panic!("lifecycle_declined: {detail}"),
                 Ok(LifecycleReply::Failed(detail)) => panic!("lifecycle_failed: {detail}"),
                 Ok(reply) => reply,
@@ -2818,6 +2899,16 @@ mod worker {
                 Err(code) if code == crate::spawned_lifecycle::BUSY => {
                     eprintln!(
                         "maos: lifecycle trigger dropped: '{}' stayed busy",
+                        self.core.spirit_id().escape_debug()
+                    );
+                    LifecycleReply::Unsupported
+                }
+                // A trigger issued after its session ended never entered the guest (D-22-9-08 B):
+                // dropped, never a panic or a strike. A session that dies INSIDE an export keeps
+                // `SESSION_ENDED` below, and with it `HookOutcome::Panicked`.
+                Err(code) if code == crate::spawned_lifecycle::NOT_ENTERED => {
+                    eprintln!(
+                        "maos: lifecycle trigger dropped: '{}' session ended",
                         self.core.spirit_id().escape_debug()
                     );
                     LifecycleReply::Unsupported
@@ -2895,7 +2986,7 @@ mod worker {
             let request = LifecycleRequest::Migrate {
                 state: WireBytes(state.to_vec()),
             };
-            match self.core.lifecycle().call(&self.core, request) {
+            match self.core.lifecycle().call(&self.core, request, None) {
                 Ok(LifecycleReply::State(migrated)) => Ok(migrated.0),
                 Ok(LifecycleReply::Declined(detail)) | Ok(LifecycleReply::Failed(detail)) => {
                     Err(MigratorError::new_internal(format!("lifecycle: {detail}")))
@@ -3029,7 +3120,11 @@ mod worker {
                     Arc::clone(&transparency_log),
                     root_cancel.clone(),
                 ) {
-                    Ok(egress) => Some(egress),
+                    Ok(egress) => {
+                        let fence = iac.sender_fence();
+                        egress.0.fence_senders(move |pid| fence.contains(&pid));
+                        Some(egress)
+                    }
                     Err(error) => {
                         eprintln!("maos: egress proxy unavailable: {error}");
                         None
@@ -3166,8 +3261,10 @@ mod worker {
     ///
     /// **The cursor is insertion-ordered and exclusive.** Wall-clock
     /// timestamps can move backwards under NTP, so `(timestamp_ns, frame_id)`
-    /// can permanently skip a later insert. SQLite `rowid` is monotonic for
-    /// this append-only table and returns each output row exactly once.
+    /// can permanently skip a later insert. The insertion id (SQLite `rowid`)
+    /// only grows, and returns each output row exactly once: rotation (Story
+    /// 22-6) removes only a sealed prefix, below the cursor this stamper
+    /// publishes as a rotation floor ([`ProgressCursor`]).
     fn spawn_progress_stamper(
         transparency_log: Arc<TransparencyLogAdapter>,
         spirits: Arc<
@@ -3181,7 +3278,7 @@ mod worker {
         cancel: tokio_util::sync::CancellationToken,
     ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
-            let mut cursor: Option<i64> = None;
+            let mut cursor = ProgressCursor::new(&transparency_log);
             let mut ticker = tokio::time::interval(STAMPER_TICK);
             ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
             loop {
@@ -3189,30 +3286,15 @@ mod worker {
                     _ = cancel.cancelled() => return,
                     _ = ticker.tick() => {}
                 }
-                let rows = match transparency_log.query_frames(FrameFilter {
-                    kind: Some(FrameKind::CliSubprocessOutput),
-                    cursor_insertion_id: cursor,
-                    order_by_insertion: true,
-                    ..Default::default()
-                }) {
-                    Ok(rows) => rows,
+                let progressed = match cursor.poll(&transparency_log) {
+                    Ok(progressed) => progressed,
                     Err(error) => {
                         eprintln!("maos: worker progress stamper query failed: {error}");
                         continue;
                     }
                 };
-                if rows.is_empty() {
+                if progressed.is_empty() {
                     continue;
-                }
-                // Both streams count as progress: a Worker printing to stderr
-                // is a Worker doing something.
-                let mut progressed: std::collections::BTreeSet<u32> =
-                    std::collections::BTreeSet::new();
-                for row in &rows {
-                    progressed.insert(row.spirit_pid);
-                    cursor = Some(
-                        cursor.map_or(row.insertion_id, |current| current.max(row.insertion_id)),
-                    );
                 }
                 let now_ns = maos_kernel_core::capability::cap_tokens::monotonic_now_ns();
                 let guard = match spirits.read() {
@@ -3226,6 +3308,54 @@ mod worker {
                 }
             }
         })
+    }
+
+    /// The progress stamper's insertion cursor and the rotation floor it publishes (Story 22-6,
+    /// D-22-6-10 A): every output row at or below the cursor has been polled, so rotation may
+    /// seal up to it and no further.
+    pub struct ProgressCursor {
+        cursor: Option<i64>,
+        floor: crate::audit_rotation::RotationFloor,
+    }
+
+    impl ProgressCursor {
+        pub fn new(transparency_log: &TransparencyLogAdapter) -> Self {
+            Self {
+                cursor: None,
+                floor: crate::audit_rotation::register_floor_for(transparency_log, 0),
+            }
+        }
+
+        /// One poll: the pids that wrote output since the last poll. Both streams count as
+        /// progress: a Worker printing to stderr is a Worker doing something.
+        pub fn poll(
+            &mut self,
+            transparency_log: &TransparencyLogAdapter,
+        ) -> Result<std::collections::BTreeSet<u32>, String> {
+            // High-water FIRST: the query below covers everything at or below it, so the
+            // cursor may move there even when no output row exists (a log with no Worker
+            // output must not pin the floor at 0 forever).
+            let high = transparency_log
+                .max_insertion_id()
+                .map_err(|error| error.to_string())?;
+            let rows = transparency_log
+                .query_frames(FrameFilter {
+                    kind: Some(FrameKind::CliSubprocessOutput),
+                    cursor_insertion_id: self.cursor,
+                    order_by_insertion: true,
+                    ..Default::default()
+                })
+                .map_err(|error| error.to_string())?;
+            let mut progressed = std::collections::BTreeSet::new();
+            let mut next = self.cursor.unwrap_or(0).max(high);
+            for row in &rows {
+                progressed.insert(row.spirit_pid);
+                next = next.max(row.insertion_id);
+            }
+            self.cursor = Some(next);
+            self.floor.publish(next);
+            Ok(progressed)
+        }
     }
 
     /// The root's signal listener (D-16-3-M).
@@ -3725,9 +3855,9 @@ pub mod exit_observation {
 #[cfg(feature = "network")]
 pub use worker::{
     ActivePathCount, BindingAction, BindingCore, BindingExecutor, BindingPhase, CrashHandlerHandle,
-    CrashOutcome, LiveWorker, ObserverGate, OnUnloadFault, PhaseRefusal, RootSupervision,
-    SupervisorCounters, SupervisorSeams, WorkerBinding, WorkerBindingView, WorkerSpirit,
-    WorkerSupervision, WorkerSupervisionError, WorkerSupervisor, WorkerTask, ARMED_MARKER,
-    CRASH_HANDLER_JOIN_BUDGET, DEFAULT_PROGRESS_THRESHOLD_MS, ROOT_GRACE, STAMPER_TICK,
-    WORKER_FREEZE_ENABLED,
+    CrashOutcome, LiveWorker, ObserverGate, OnUnloadFault, PhaseRefusal, ProgressCursor,
+    RootSupervision, SupervisorCounters, SupervisorSeams, WorkerBinding, WorkerBindingView,
+    WorkerSpirit, WorkerSupervision, WorkerSupervisionError, WorkerSupervisor, WorkerTask,
+    ARMED_MARKER, CRASH_HANDLER_JOIN_BUDGET, DEFAULT_PROGRESS_THRESHOLD_MS, ROOT_GRACE,
+    STAMPER_TICK, WORKER_FREEZE_ENABLED,
 };

@@ -14,8 +14,11 @@
 #   halts at a diagnostic boundary. The rule mirrors Butler's universal-arithmetic
 #   shape: the Spirit computes the `diagnostic_confidence` scalar; the kernel
 #   compares it against the threshold and halts when confidence falls too low.
-# - NO `[capabilities.required]` (Decision I): Mira does NO inference at v1.5
-#   (diagnosis is deterministic, Spirit-side) and uses NO MCP drivers.
+# - `[capabilities.required] provider.complete` (Story 22-8, D-22-8-04 A): Mira's PROMPT ADAPTER
+#   turns a free-text incident into an AnomalySignal with one completion, and only when the
+#   task text is not already an AnomalySignal JSON. The diagnosis itself stays deterministic
+#   (NFR-Testability-1). Under the Deterministic mode (MAOS_INFERENCE_MODE unset, ADR-064) the
+#   seam is unbound and only JSON signals are accepted. Mira uses NO MCP drivers.
 # - The pre-paired A2A peer cert fingerprints + ConsentAllowlists are NOT manifest
 #   fields (Decision L — the manifest is deployment-topology-agnostic, ADR-003);
 #   they live in the per-side A2APeerConfig constructed in tests / the smoke.
@@ -53,6 +56,10 @@ memory_max_mb = 64
 [sandbox]
 tier = "T0"
 
+[capabilities.required]
+# Inference Port — the prompt adapter's one completion per free-text task (Butler's pin).
+provider.complete = ["anthropic.claude-haiku-5-5"]
+
 [author]
 name = "MAOS Project"
 homepage = "https://github.com/lunarpulse/maos"
@@ -62,10 +69,10 @@ homepage = "https://github.com/lunarpulse/maos"
 # schema-constrained to reverse-DNS lineage references (NOT free-text — D5), so
 # "zero principal nexus" is structural. Validated at admission and journaled as
 # an FR62 governance event (queryable via `maosctl audit query --kind governance`).
-# Mira is deterministic (no live LLM at v1.5); its provenance describes the
-# deterministic diagnostic model lineage.
+# Story 22-8: the prompt adapter's model is the recorded one (the Butler pin); the diagnosis
+# itself is the deterministic rule set named in the lineage.
 [model_provenance]
-covered_model_id = "maos.mira.deterministic-diagnostic-v1"
+covered_model_id = "anthropic.claude-haiku-5-5"
 training_data_lineage = [
     "lineage.maos.prod-edge-anomaly-corpus-2026",
     "lineage.maos.diagnostic-rule-set-v1",

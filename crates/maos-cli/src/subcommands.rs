@@ -15,12 +15,12 @@ use std::collections::HashMap;
 
 use crate::accessibility::ColorChoice;
 use crate::cli::{
-    A2aArgs, A2aOp, AuditFormat, AuditQuery, BackupArgs, BackupOp, ForgetArgs, GovernanceArgs,
-    GovernanceOp, HaltArgs, HaltOp, ImportArgs, InstallArgs, LegalHoldArgs, LegalHoldOp, LoadArgs,
-    MigrateArgs, MigrateOp, OrchestratorArgs, OrchestratorOp, PauseArgs, PostureArgs,
-    PostureChoice, RepinArgs, RepinOp, ResolutionKindChoice, ResumeArgs, RevocationsArgs,
-    RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs, SpiritOp,
-    Subcommand, UninstallArgs, UpgradePolicyArg,
+    A2aArgs, A2aOp, AgentsArgs, AgentsOp, AskArgs, AuditFormat, AuditQuery, BackupArgs, BackupOp,
+    ForgetArgs, GovernanceArgs, GovernanceOp, HaltArgs, HaltOp, ImportArgs, InstallArgs,
+    LegalHoldArgs, LegalHoldOp, LoadArgs, MigrateArgs, MigrateOp, OrchestratorArgs, OrchestratorOp,
+    PauseArgs, PostureArgs, PostureChoice, RepinArgs, RepinOp, ResolutionKindChoice, ResumeArgs,
+    RevocationsArgs, RevocationsOp, RevokeTokenArgs, RunArgs, SkillsArgs, SkillsOp, SpiritArgs,
+    SpiritOp, Subcommand, TaskArgs, TaskOp, UninstallArgs, UpgradePolicyArg,
 };
 use crate::door_client::{self, DoorConfig, DoorError, DEFAULT_ROUTE_BUDGET, LONG_ROUTE_BUDGET};
 
@@ -43,6 +43,7 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::Orchestrator(args) => dispatch_orchestrator(args, color),
         Subcommand::Pause(args) => dispatch_pause(args, color),
         Subcommand::Resume(args) => dispatch_resume(args, color),
+        Subcommand::QuarantineRelease(args) => dispatch_quarantine_release(args, color),
         Subcommand::RevokeToken(args) => dispatch_revoke_token(args, color),
         Subcommand::Spirit(args) => dispatch_spirit(args, color),
         Subcommand::Revocations(args) => dispatch_revocations(args, color),
@@ -54,6 +55,10 @@ pub fn dispatch(cmd: &Subcommand, color: ColorChoice) -> ExitCode {
         Subcommand::ReleasePubkey => release_pubkey(),
         Subcommand::Cohort(args) => dispatch_cohort(args, color),
         Subcommand::A2a(args) => dispatch_a2a(args),
+        Subcommand::Agents(args) => dispatch_agents(args),
+        Subcommand::Status => dispatch_status(),
+        Subcommand::Ask(args) => dispatch_ask(args),
+        Subcommand::Task(args) => dispatch_task(args),
     }
 }
 
@@ -172,6 +177,356 @@ fn door_verb_mapped(
         },
         Err(error) => door_client::map_error(verb, error),
     }
+}
+
+/// A printable cell: control characters (tab, newline, escapes) become `?`; empty is `-`.
+fn cell(value: &serde_json::Value) -> String {
+    let text = match value {
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Null => String::new(),
+        other => other.to_string(),
+    };
+    if text.is_empty() {
+        return "-".to_string();
+    }
+    text.chars()
+        .map(|c| if c.is_control() { '?' } else { c })
+        .collect()
+}
+
+/// Story 22-1/22-5 (AC1) — `maosctl agents`: one line per Spirit the daemon holds, sorted by
+/// id, no header: `id pid state form originator task[+N] age spend`, tab-separated, from
+/// `GET /v1/agents`. `agents show <id>` is the session view.
+fn dispatch_agents(args: &AgentsArgs) -> ExitCode {
+    if let Some(AgentsOp::Show {
+        id,
+        limit,
+        follow,
+        interval,
+    }) = &args.op
+    {
+        return dispatch_agents_show(id, *limit, *follow, *interval);
+    }
+    door_verb_mapped(
+        "agents",
+        |config| door_client::exchange(config, "GET", "/v1/agents", None, DEFAULT_ROUTE_BUDGET),
+        |response| {
+            if response.status != 200 {
+                return door_client::map_response("agents", response);
+            }
+            for row in response.body_json().as_array().into_iter().flatten() {
+                let field = |key: &str| cell(row.get(key).unwrap_or(&serde_json::Value::Null));
+                let more = row.get("more_tasks").and_then(serde_json::Value::as_u64);
+                let task = match more {
+                    Some(n) if n > 0 && field("task") != "-" => format!("{}+{n}", field("task")),
+                    _ => field("task"),
+                };
+                let age = row
+                    .get("age_secs")
+                    .and_then(serde_json::Value::as_u64)
+                    .map_or("-".to_string(), |secs| format!("{secs}s"));
+                let spend = row
+                    .get("spend")
+                    .filter(|s| s.is_object())
+                    .map_or("-".to_string(), |s| {
+                        format!("{}/{}", cell(&s["in"]), cell(&s["out"]))
+                    });
+                println!(
+                    "{}\t{}\t{}\t{}\t{}\t{task}\t{age}\t{spend}",
+                    field("id"),
+                    field("pid"),
+                    field("state"),
+                    field("form"),
+                    field("originator"),
+                );
+            }
+            ExitCode::SUCCESS
+        },
+    )
+}
+
+/// Story 22-5 (AC2) — `maosctl agents show <id> [--limit N] [--follow] [--interval MS]`.
+/// The first read asks for the newest `limit` rows; `--follow` then polls with the rowid
+/// cursors of what it printed. Follow ends 0 when the id stops resolving or the response's
+/// `boot_nonce` or `pid` changes (said on stderr); an unreachable daemon is 69 (the door's).
+fn dispatch_agents_show(id: &str, limit: u16, follow: bool, interval_ms: u64) -> ExitCode {
+    let verb = "agents show";
+    if let Some(code) = checked_id(verb, id) {
+        return code;
+    }
+    let config = match door_client::resolve_door() {
+        Ok(config) => config,
+        Err(error) => return door_client::map_error(verb, error),
+    };
+    let interval = std::time::Duration::from_millis(interval_ms.max(100));
+    let mut cursor: Option<(u64, u64)> = None;
+    let mut identity: Option<(String, u64)> = None;
+    loop {
+        let mut query = serde_json::json!({ "limit": limit });
+        if let Some((rowid, decision)) = cursor {
+            query["after_rowid"] = rowid.into();
+            query["after_decision"] = decision.into();
+        }
+        let response = match door_client::exchange(
+            &config,
+            "GET",
+            &format!("/v1/spirits/{id}/session"),
+            Some(("application/json", query.to_string().as_bytes())),
+            DEFAULT_ROUTE_BUDGET,
+        ) {
+            Ok(response) => response,
+            Err(DoorError::ConnectRefused) => {
+                return door_client::door_class_connect_refused(verb, config.endpoint)
+            }
+            Err(error) => return door_client::map_error(verb, error),
+        };
+        if response.status == 404 && identity.is_some() {
+            eprintln!("maosctl: {verb} — {id} no longer resolves (unloaded); follow ends");
+            return ExitCode::SUCCESS;
+        }
+        if response.status != 200 {
+            return door_client::map_response(verb, response);
+        }
+        let body = response.body_json();
+        let seen = (
+            body["boot_nonce"].as_str().unwrap_or_default().to_string(),
+            body["pid"].as_u64().unwrap_or(0),
+        );
+        if identity.as_ref().is_some_and(|previous| *previous != seen) {
+            eprintln!("maosctl: {verb} — {id} was reloaded (boot or pid changed); follow ends");
+            return ExitCode::SUCCESS;
+        }
+        identity = Some(seen);
+        let (mut rowid, mut decision) = cursor.unwrap_or((0, 0));
+        for row in body["rows"].as_array().into_iter().flatten() {
+            let number = row["rowid"].as_u64().unwrap_or(0);
+            let approval = row["source"] == "approval";
+            if approval {
+                decision = decision.max(number);
+            } else {
+                rowid = rowid.max(number);
+            }
+            let nanos = row["timestamp_ns"].as_u64().unwrap_or(0);
+            println!(
+                "{}{number}\t{}.{:03}\t{}\t{}\t{}\t{}->{}\t{}\t{}",
+                if approval { "a" } else { "" },
+                nanos / 1_000_000_000,
+                nanos / 1_000_000 % 1000,
+                cell(&row["kind"]),
+                cell(&row["intent"]),
+                cell(&row["frame_id"]),
+                cell(&row["from"]),
+                cell(&row["to"]),
+                cell(&row["origin"]),
+                cell(&row["summary"]),
+            );
+        }
+        cursor = Some((rowid, decision));
+        if !follow {
+            return ExitCode::SUCCESS;
+        }
+        std::thread::sleep(interval);
+    }
+}
+
+/// Story 22-2 (AC2) — `maosctl status`: one line `pid=… version=… spirits=… audit_store_writable=…`.
+/// Exit 0 only when the daemon answers 200 and reports its audit store writable; 74 when it
+/// answers and the store is not writable; transport and refusal codes are the door's.
+fn dispatch_status() -> ExitCode {
+    door_verb_mapped(
+        "status",
+        |config| door_client::exchange(config, "GET", "/v1/daemon", None, DEFAULT_ROUTE_BUDGET),
+        |response| {
+            if response.status != 200 {
+                return door_client::map_response("status", response);
+            }
+            let body = response.body_json();
+            let Some(writable) = body
+                .get("audit_store_writable")
+                .and_then(serde_json::Value::as_bool)
+            else {
+                eprintln!(
+                    "maosctl: status — the daemon's /v1/daemon reports no audit_store_writable"
+                );
+                return ExitCode::from(1);
+            };
+            let pid = body
+                .get("pid")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0);
+            let version = body
+                .get("version")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("unknown");
+            let spirits = body
+                .get("spirit_ids")
+                .and_then(serde_json::Value::as_array)
+                .map_or(0, Vec::len);
+            println!(
+                "pid={pid} version={version} spirits={spirits} audit_store_writable={writable}"
+            );
+            if writable {
+                ExitCode::SUCCESS
+            } else {
+                eprintln!(
+                    "maosctl: status — the daemon answers but its audit store is not writable \
+                     (write lock refused or timed out)"
+                );
+                ExitCode::from(74)
+            }
+        },
+    )
+}
+
+/// Story 22-4 (AC1, AC4) — `maosctl ask <spirit> "<text>" [--wait[=SECS]] [--key K]`.
+///
+/// The door answers at once with a task id (200) or a typed refusal; none of the refusals
+/// minted an id. `task_queue_full` is the "nothing accepted, retry" family, exit 75; every
+/// other refusal is exit 1 (the door's mapping). `--wait` polls `GET /v1/tasks/{id}`.
+fn dispatch_ask(args: &AskArgs) -> ExitCode {
+    let verb = "ask";
+    if let Some(code) = checked_id(verb, &args.spirit) {
+        return code;
+    }
+    if let Some(key) = &args.key {
+        if let Some(code) = checked_id(verb, key) {
+            return code;
+        }
+    }
+    let body = match serde_json::to_vec(&door_client::AskRequest {
+        text: args.text.clone(),
+        idempotency_key: args.key.clone(),
+    }) {
+        Ok(body) => body,
+        Err(error) => {
+            eprintln!("maosctl: {verb} — {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let spirit = args.spirit.as_str();
+    let wait = args.wait;
+    door_verb_mapped(
+        verb,
+        |config| {
+            let accepted = door_client::exchange(
+                config,
+                "POST",
+                &format!("/v1/spirits/{spirit}/ask"),
+                Some(("application/json", &body)),
+                DEFAULT_ROUTE_BUDGET,
+            )?;
+            Ok(match (wait, accepted.status) {
+                (Some(secs), 200) => wait_for_task(config, &accepted, secs)?,
+                _ => accepted,
+            })
+        },
+        |response| map_ask_response(verb, wait.is_some(), response),
+    )
+}
+
+/// Poll `GET /v1/tasks/{id}` until the task ends or `secs` run out. Returns the finished task
+/// object, or a synthetic 200 marker whose `state` is still `queued`/`running` when the wait
+/// ran out (mapped to exit 75 by [`map_ask_response`]).
+fn wait_for_task(
+    config: &DoorConfig,
+    accepted: &door_client::Response,
+    secs: u64,
+) -> Result<door_client::Response, DoorError> {
+    let task_id = accepted
+        .body_json()
+        .get("task_id")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .unwrap_or_default();
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(secs);
+    loop {
+        let shown = door_client::exchange(
+            config,
+            "GET",
+            &format!("/v1/tasks/{task_id}"),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )?;
+        let ended = shown.status != 200
+            || !matches!(
+                shown
+                    .body_json()
+                    .get("state")
+                    .and_then(serde_json::Value::as_str),
+                Some("queued" | "running")
+            );
+        if ended || std::time::Instant::now() >= until {
+            return Ok(shown);
+        }
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+}
+
+/// Map the answer of `ask`. Without `--wait` a 200 body is the accepted task; with it, the
+/// body is the task object and only `completed` is success.
+fn map_ask_response(verb: &str, waited: bool, response: door_client::Response) -> ExitCode {
+    if response.status == 409 && response.error_parts().0 == "task_queue_full" {
+        let (code, detail) = response.error_parts();
+        eprintln!("maosctl: {verb} — {code}: {detail}; nothing was accepted; retry");
+        return ExitCode::from(75);
+    }
+    if response.status != 200 {
+        return door_client::map_response(verb, response);
+    }
+    let body = response.body_json();
+    if !waited {
+        return match body.get("task_id").and_then(serde_json::Value::as_str) {
+            Some(task_id) => {
+                println!("{task_id}");
+                ExitCode::SUCCESS
+            }
+            None => {
+                eprintln!("maosctl: {verb} — the door's answer carries no task_id");
+                ExitCode::FAILURE
+            }
+        };
+    }
+    door_client::print_body(&response.body);
+    let state = body.get("state").and_then(serde_json::Value::as_str);
+    let reason = body
+        .get("reason")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("none");
+    match state {
+        Some("completed") => ExitCode::SUCCESS,
+        Some("queued" | "running") => {
+            eprintln!(
+                "maosctl: {verb} — the task is still {}; read it later with: maosctl task show <id>",
+                state.unwrap_or("unknown")
+            );
+            ExitCode::from(75)
+        }
+        other => {
+            eprintln!(
+                "maosctl: {verb} — the task ended {} (reason: {reason})",
+                other.unwrap_or("unknown")
+            );
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Story 22-4 — `maosctl task show <id>`: the task object, `task_not_found` (exit 1) otherwise.
+fn dispatch_task(args: &TaskArgs) -> ExitCode {
+    let TaskOp::Show { id } = &args.op;
+    let verb = "task show";
+    if let Some(code) = checked_id(verb, id) {
+        return code;
+    }
+    door_verb(verb, |config| {
+        door_client::exchange(
+            config,
+            "GET",
+            &format!("/v1/tasks/{id}"),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
 }
 
 /// Story 19-7 (AC3, D-19-7-01/02/03 A) — `maosctl a2a repin`: door-class
@@ -2202,6 +2557,25 @@ fn dispatch_resume(args: &ResumeArgs, _color: ColorChoice) -> ExitCode {
     })
 }
 
+/// FR13 — the door-only release of a quarantined Spirit.
+fn dispatch_quarantine_release(
+    args: &crate::cli::QuarantineReleaseArgs,
+    _color: ColorChoice,
+) -> ExitCode {
+    if let Some(code) = checked_id("quarantine-release", &args.spirit) {
+        return code;
+    }
+    door_verb("quarantine-release", |config| {
+        door_client::exchange(
+            config,
+            "POST",
+            &format!("/v1/spirits/{}/quarantine-release", args.spirit),
+            None,
+            DEFAULT_ROUTE_BUDGET,
+        )
+    })
+}
+
 fn dispatch_orchestrator(args: &OrchestratorArgs, _color: ColorChoice) -> ExitCode {
     match &args.op {
         OrchestratorOp::Queue {
@@ -2856,6 +3230,13 @@ fn audit_dispatch(query_kind: &Option<AuditQuery>, color: ColorChoice) -> ExitCo
             pubkey,
             seed,
         }) => audit_verify_bundle(bundle, pubkey.as_deref(), seed.as_ref()),
+        Some(AuditQuery::Rotate) => audit_rotate(),
+        Some(AuditQuery::VerifySegments {
+            dir,
+            log,
+            pubkey,
+            seed,
+        }) => audit_verify_segments(dir, log.as_ref(), pubkey.as_deref(), seed.as_ref()),
         Some(AuditQuery::ReconcileHosts {
             bundle_a,
             pubkey_a,
@@ -3749,6 +4130,11 @@ fn resolve_verify_key(
         };
     }
     let pubkey_arg = pubkey_arg.ok_or("one of --pubkey or --seed is required")?;
+    read_pubkey_arg(pubkey_arg)
+}
+
+/// A hex public key, or the path of a file holding one.
+fn read_pubkey_arg(pubkey_arg: &str) -> Result<[u8; 32], String> {
     // Resolve public key: distinguish file path from hex string.
     // A hex pubkey is exactly 64 hex chars (32 bytes). A file path typically
     // has an extension or directory separator — use that as the discriminator.
@@ -3796,6 +4182,16 @@ fn audit_verify_bundle(
             return ExitCode::from(2);
         }
     };
+    // Story 22-6 (D-22-6-03 A): a `maos.audit-segment.v1` manifest is verified against its
+    // sibling segment file; every other document takes the unchanged bundle path below.
+    if serde_json::from_str::<serde_json::Value>(&bundle_bytes)
+        .ok()
+        .and_then(|doc| doc.get("schema_version")?.as_str().map(str::to_owned))
+        .as_deref()
+        == Some(maos_audit::segment::SEGMENT_SCHEMA)
+    {
+        return audit_verify_segment(bundle, &bundle_bytes, pubkey_arg, seed_path);
+    }
 
     let bundle: maos_audit::sealed_export::AuditBundle = match serde_json::from_str(&bundle_bytes) {
         Ok(b) => b,
@@ -3824,6 +4220,186 @@ fn audit_verify_bundle(
         }
         Err(e) => {
             eprintln!("maosctl: audit verify-bundle — verification failed: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+/// Story 22-6 — the verification key for a manifest claiming `region`, from exactly one
+/// operator-supplied source (never the `attester_pubkey` the manifest carries, R-RG1).
+fn segment_verify_key(
+    region: Option<&str>,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> Result<[u8; 32], String> {
+    if let Some(path) = seed_path {
+        let seed = maos_domain::audit_key::load_audit_key_seed(&Some(path.clone()))
+            .map_err(|e| format!("cannot load base seed: {e}"))?;
+        return maos_audit::segment::expected_pubkey(&seed, region).map_err(|e| e.to_string());
+    }
+    read_pubkey_arg(pubkey_arg.ok_or("one of --pubkey or --seed is required")?)
+}
+
+/// Story 22-6 — `verify-bundle` on one segment manifest: exit 0 verified, 1 verification
+/// failed (signature, file digest, content digest, Merkle root or shape), 2 input or key error.
+fn audit_verify_segment(
+    manifest_path: &std::path::Path,
+    text: &str,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> ExitCode {
+    let manifest = match maos_audit::segment::parse_manifest(text.as_bytes()) {
+        Ok(manifest) => manifest,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let key = match segment_verify_key(manifest.region.as_deref(), pubkey_arg, seed_path) {
+        Ok(key) => key,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    match maos_audit::segment::verify_segment(manifest_path, &key) {
+        Ok(manifest) => {
+            eprintln!(
+                "maosctl: audit verify-bundle — OK (segment {}, {} rows, insertion ids {}..={})",
+                manifest.seq, manifest.row_count, manifest.first_rowid, manifest.last_rowid
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit verify-bundle — verification failed: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+/// Story 22-6 (D-22-6-05 A) — `maosctl audit verify-segments <dir>`.
+fn audit_verify_segments(
+    dir: &std::path::Path,
+    log: Option<&PathBuf>,
+    pubkey_arg: Option<&str>,
+    seed_path: Option<&PathBuf>,
+) -> ExitCode {
+    if !dir.is_dir() {
+        eprintln!(
+            "maosctl: audit verify-segments — {} is not a directory",
+            dir.display()
+        );
+        return ExitCode::from(2);
+    }
+    let seed = match seed_path {
+        Some(path) => match maos_domain::audit_key::load_audit_key_seed(&Some(path.clone())) {
+            Ok(seed) => Some(seed),
+            Err(e) => {
+                eprintln!("maosctl: audit verify-segments — cannot load base seed: {e}");
+                return ExitCode::from(2);
+            }
+        },
+        None => None,
+    };
+    let fixed = match pubkey_arg.map(read_pubkey_arg).transpose() {
+        Ok(key) => key,
+        Err(e) => {
+            eprintln!("maosctl: audit verify-segments — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    let log_path = log.cloned().or_else(|| {
+        dir.parent()
+            .map(|parent| parent.join("transparency.sqlite"))
+            .filter(|path| path.is_file())
+    });
+    let expired = match &log_path {
+        Some(path) => match maos_audit::segment::expired_segments(path) {
+            Ok(rows) => rows,
+            Err(e) => {
+                eprintln!(
+                    "maosctl: audit verify-segments — cannot read expiry rows from {}: {e}",
+                    path.display()
+                );
+                return ExitCode::from(2);
+            }
+        },
+        None => Vec::new(),
+    };
+    let checked = seed.is_some() || fixed.is_some();
+    let key_for = |manifest: &maos_audit::segment::SegmentManifest| -> Option<[u8; 32]> {
+        seed.as_ref()
+            .and_then(|seed| {
+                maos_audit::segment::expected_pubkey(seed, manifest.region.as_deref()).ok()
+            })
+            .or(fixed)
+    };
+    let report = maos_audit::segment::verify_chain(dir, &expired, &key_for);
+    if report.problems.is_empty() {
+        eprintln!(
+            "maosctl: audit verify-segments — OK ({} segments, {} expired gap(s) explained, signatures {})",
+            report.segments,
+            report.explained_gaps,
+            if checked { "verified" } else { "not checked (no --seed/--pubkey)" }
+        );
+        ExitCode::SUCCESS
+    } else {
+        for problem in &report.problems {
+            eprintln!("maosctl: audit verify-segments — {problem}");
+        }
+        ExitCode::from(1)
+    }
+}
+
+/// Story 22-6 (D-22-6-08 A) — `maosctl audit rotate`: a door verb (operation id and completion
+/// row, ADR-062); with no Host answering it rotates the log offline, where no tail has a cursor.
+fn audit_rotate() -> ExitCode {
+    durable_verb(
+        "audit rotate",
+        |config| door_client::exchange(config, "POST", "/v1/audit/rotate", None, LONG_ROUTE_BUDGET),
+        audit_rotate_offline,
+    )
+}
+
+fn audit_rotate_offline() -> ExitCode {
+    use maos_iac::adapter::transparency_log::TransparencyLogAdapter;
+    let path = default_transparency_log_path();
+    if !path.is_file() {
+        eprintln!(
+            "maosctl: audit rotate — no Transparency Log at {}",
+            path.display()
+        );
+        return ExitCode::from(2);
+    }
+    let tl = match TransparencyLogAdapter::open(&path, 0) {
+        Ok(tl) => tl,
+        Err(e) => {
+            eprintln!(
+                "maosctl: audit rotate — cannot open {}: {e}",
+                path.display()
+            );
+            return ExitCode::from(2);
+        }
+    };
+    if let Err(e) = crate::audit_rotation::install_sealer(&tl) {
+        eprintln!("maosctl: audit rotate — refused: {e}");
+        return ExitCode::from(1);
+    }
+    let policy = match crate::audit_rotation::RotationPolicy::from_env() {
+        Ok(policy) => policy,
+        Err(e) => {
+            eprintln!("maosctl: audit rotate — {e}");
+            return ExitCode::from(2);
+        }
+    };
+    eprintln!("maosctl: audit rotate — no Host answered; rotating offline (no tail cursors)");
+    match crate::audit_rotation::rotate_once(&tl, &policy, i64::MAX, true, false) {
+        Ok(report) => {
+            println!("{}", report.to_json());
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("maosctl: audit rotate — refused: {e}");
             ExitCode::from(1)
         }
     }
@@ -5213,7 +5789,7 @@ fn audit_cost_reconcile(month: &str, pricing_path: &str, format: AuditFormat) ->
 /// precedence.  Matches `RegionSection::resolve_from_env_and_disk()` semantics so
 /// CLI sealed-exports region-pin identically to the in-process memory manager
 /// (Story 9.4b split-brain fix).
-fn resolve_region_home(
+pub(crate) fn resolve_region_home(
 ) -> Result<Option<maos_domain::region::Region>, maos_domain::region::RegionError> {
     let disk_tag = read_operator_toml_region_tag();
     maos_domain::region::Region::resolve_home(disk_tag.as_deref())

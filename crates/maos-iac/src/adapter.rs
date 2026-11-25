@@ -12,6 +12,7 @@
 //! stub.
 
 pub mod channels;
+pub mod consent_policy; // Story 21-7 production consent granter + gate policy
 pub mod context_signal; // Story 18-5 ADR-016 context-budget reporter
 pub mod decision_logger;
 pub mod distillate;
@@ -29,11 +30,13 @@ pub mod transparency_log; // NEW — Story 4.4 DistillateWriter
 pub use maos_domain::ports::IacBusPort;
 
 pub use channels::*;
+pub use consent_policy::ConsentPolicy;
 pub use drr_scheduler::{BudgetWarningEvent, DrrScheduler};
 pub use frame::*;
 pub use mailbox::Mailbox;
 pub use mailbox::*;
 pub use mailbox_stub::MailboxStub;
+use maos_domain::invariants::i13::AllowedPromotionSet;
 pub use metrics::IacRtMetrics;
 pub use redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 use transparency_log::capability_token_column;
@@ -42,6 +45,10 @@ pub use transparency_log::{
     FrameRecipient, FrameRowWrite, ParticipantAccess, ParticipantScope, RecipientResolver,
     TeamTransparencyLogEntry, TransparencyLogAdapter, TransparencyLogEntry,
 };
+
+/// FR13 (KQ2) — the pids whose own sends are refused. Shared by reference with
+/// [`distillate::DistillateWriter`] so one set fences every send path.
+pub type SenderFence = std::sync::Arc<dashmap::DashSet<u32>>;
 
 /// Adapter for the IAC Bus port trait.
 ///
@@ -52,6 +59,12 @@ pub use transparency_log::{
 #[maos_attrs::i9_exempt(
     reason = "IAC Bus adapter; holds Arc<Mailbox> + Arc<TransparencyLogAdapter> + Story 6.2 AC4 frame_lineage_cache (in-memory, bounded by session lifetime) — all I9-sanctioned"
 )]
+/// One recipient ID's promotion set and the PID whose runtime registered it.
+struct PromotionRegistration {
+    owner: u32,
+    set: AllowedPromotionSet,
+}
+
 #[derive(Clone)]
 pub struct IacBusAdapter {
     mailbox: std::sync::Arc<Mailbox>,
@@ -71,9 +84,11 @@ pub struct IacBusAdapter {
     /// Bounded by session lifetime; eviction at MAX_LINEAGE_CACHE_ENTRIES.
     frame_lineage_cache:
         std::sync::Arc<dashmap::DashMap<[u8; 16], maos_domain::invariants::i13::IntentLineage>>,
-    promotion_sets:
-        std::sync::Arc<dashmap::DashMap<String, maos_domain::invariants::i13::AllowedPromotionSet>>,
+    promotion_sets: std::sync::Arc<dashmap::DashMap<String, PromotionRegistration>>,
+    consent_policy: std::sync::Arc<ConsentPolicy>,
     promotion_audit_last: std::sync::Arc<std::sync::Mutex<Option<std::time::Instant>>>,
+    /// FR13 (KQ2) — pids a quarantine fenced: `deliver_typed` refuses them before the log append.
+    fenced_senders: SenderFence,
     /// Story 9.5b — optional OTel trace sink for IAC-frame span emission.
     /// `None` = off (no-op branch; zero allocation). Wired from
     /// composition root via [`IacBusAdapter::with_trace_sink`].
@@ -108,7 +123,9 @@ impl IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            consent_policy: std::sync::Arc::default(),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            fenced_senders: SenderFence::default(),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
@@ -198,27 +215,92 @@ impl IacBusAdapter {
         &self.mailbox
     }
 
+    /// The shared sender fence (handed to the distillate writer).
+    pub fn sender_fence(&self) -> SenderFence {
+        SenderFence::clone(&self.fenced_senders)
+    }
+
+    /// Fence (`true`) or release (`false`) every send of `spirit_pid`.
+    pub fn set_sender_fenced(&self, spirit_pid: u32, fenced: bool) {
+        if fenced {
+            self.fenced_senders.insert(spirit_pid);
+        } else {
+            self.fenced_senders.remove(&spirit_pid);
+        }
+    }
+
+    /// Whether `spirit_pid`'s sends are fenced by a quarantine.
+    pub fn is_sender_fenced(&self, spirit_pid: u32) -> bool {
+        self.fenced_senders.contains(&spirit_pid)
+    }
+
     /// Access the underlying transparency log.
     pub fn transparency_log(&self) -> &std::sync::Arc<TransparencyLogAdapter> {
         &self.transparency_log
     }
 
-    /// Register the current admitted recipient's I13 promotion set.
-    pub fn register_promotion_set(
+    /// Register (or, with `None`, clear) the promotion set of `spirit_id`
+    /// owned by the live runtime `pid`. Replaces any earlier registration for
+    /// the ID, whichever PID owned it.
+    pub fn register_promotion_set_for_pid(
         &self,
         spirit_id: &str,
-        set: Option<maos_domain::invariants::i13::AllowedPromotionSet>,
-    ) {
-        if let Some(set) = set {
-            self.promotion_sets.insert(spirit_id.to_owned(), set);
-        } else {
-            self.promotion_sets.remove(spirit_id);
+        pid: u32,
+        set: Option<AllowedPromotionSet>,
+    ) -> Option<AllowedPromotionSet> {
+        let old = match set {
+            Some(set) => self.promotion_sets.insert(
+                spirit_id.to_owned(),
+                PromotionRegistration { owner: pid, set },
+            ),
+            None => self.promotion_sets.remove(spirit_id).map(|(_, reg)| reg),
+        };
+        old.filter(|reg| reg.owner == pid).map(|reg| reg.set)
+    }
+
+    /// Withdraw `spirit_id`'s set only if `pid` still owns it. Atomic and
+    /// idempotent: release of a different PID cannot clear this registration.
+    pub fn unregister_promotion_set_for_pid(&self, spirit_id: &str, pid: u32) {
+        self.promotion_sets
+            .remove_if(spirit_id, |_, reg| reg.owner == pid);
+    }
+
+    /// Put back a displaced `set` for `spirit_id` in ONE entry-locked step, only
+    /// while the slot is empty or still owned by `pid`: a registration another PID
+    /// made meanwhile is never overwritten, and an owned slot is replaced in place
+    /// so delivery never observes a missing policy.
+    pub fn restore_promotion_set(&self, id: &str, pid: u32, set: AllowedPromotionSet) {
+        use dashmap::mapref::entry::Entry;
+        match self.promotion_sets.entry(id.to_owned()) {
+            Entry::Occupied(mut slot) if slot.get().owner == pid => slot.get_mut().set = set,
+            Entry::Vacant(slot) => drop(slot.insert(PromotionRegistration { owner: pid, set })),
+            Entry::Occupied(_) => {}
         }
     }
 
-    /// Withdraw a recipient's set when it is unloaded.
-    pub fn unregister_promotion_set(&self, spirit_id: &str) {
-        self.promotion_sets.remove(spirit_id);
+    /// Whether a promotion set is currently registered for `spirit_id`.
+    pub fn has_promotion_set(&self, spirit_id: &str) -> bool {
+        self.promotion_sets.contains_key(spirit_id)
+    }
+
+    /// The promotion set currently registered for `spirit_id`, if any.
+    pub fn promotion_set_of(&self, spirit_id: &str) -> Option<AllowedPromotionSet> {
+        self.promotion_sets
+            .get(spirit_id)
+            .map(|reg| reg.set.clone())
+    }
+
+    /// Withdraw everything admission registered for incarnation `pid` of `spirit_id`: its
+    /// promotion set and its consent declaration (the latter only while still `pid`'s).
+    pub fn withdraw_spirit(&self, spirit_id: &str, pid: u32) {
+        self.unregister_promotion_set_for_pid(spirit_id, pid);
+        self.consent_policy.unregister(spirit_id, pid);
+    }
+
+    /// Story 21-7 — the one production consent policy (granter and gate), over this bus's
+    /// admitted Spirits' declarations.
+    pub fn consent_policy(&self) -> &std::sync::Arc<ConsentPolicy> {
+        &self.consent_policy
     }
 
     fn check_promotion(
@@ -239,7 +321,7 @@ impl IacBusAdapter {
             let verdict = distillate::DistillateWriter::admit_from_log(
                 &self.transparency_log,
                 reference.digest_frame_id,
-                &allowed,
+                &allowed.set,
             );
             drop(allowed);
             if let Err(error) = verdict {
@@ -325,41 +407,28 @@ impl IacBusAdapter {
         frame_bytes: &[u8],
         origin: maos_domain::invariants::i3::FrameOrigin,
     ) -> maos_domain::invariants::i2::LogBeforeDeliver<()> {
-        self.transparency_log.insert_frame_event(
-            transparency_log::FrameKind::TaskAssign,
-            0,
-            None,
-            "",
-            frame_bytes,
-            origin,
-        )
+        self.enqueue_frame_bytes(frame_bytes, origin)
     }
 
     // ── Story 5.3 — FR50 disposition helpers ────────────────────
 
     /// Emit a `task.nacked` TL row for a dead-Spirit's in-flight task.
     pub fn emit_task_complete_nack(&self, task: &maos_domain::ports::task::TaskAssignmentRecord) {
-        let payload = serde_json::json!({
-            "task_id": task.task_id,
-            "originator_spirit_id": task.originator_spirit_id,
-            "capability_token": task.capability_token,
-        });
-        let _ = self.transparency_log.insert_frame_event_with_sender(
-            transparency_log::FrameKind::TaskComplete,
-            0,
-            &task.originator_spirit_id,
-            "",
-            None,
-            "task.nacked",
-            payload.to_string().as_bytes(),
-            maos_domain::invariants::i3::FrameOrigin::Kernel,
-        );
+        self.emit_task_complete(task, "task.nacked");
     }
 
     /// Emit a `task.escalated` TL row for a dead-Spirit's in-flight task.
     pub fn emit_task_complete_escalated(
         &self,
         task: &maos_domain::ports::task::TaskAssignmentRecord,
+    ) {
+        self.emit_task_complete(task, "task.escalated");
+    }
+
+    fn emit_task_complete(
+        &self,
+        task: &maos_domain::ports::task::TaskAssignmentRecord,
+        subject: &str,
     ) {
         let payload = serde_json::json!({
             "task_id": task.task_id,
@@ -372,7 +441,7 @@ impl IacBusAdapter {
             &task.originator_spirit_id,
             "",
             None,
-            "task.escalated",
+            subject,
             payload.to_string().as_bytes(),
             maos_domain::invariants::i3::FrameOrigin::Kernel,
         );
@@ -436,6 +505,76 @@ impl IacBusAdapter {
         >,
         maos_domain::iac_bus_types::IacBusError,
     > {
+        self.deliver_typed_inner(frame, spirit_pid, capability_token, None)
+            .await
+    }
+
+    /// Scoped one-response reply to the local human shell.
+    ///
+    /// Same pipeline as [`Self::deliver_typed`] (orchestrator gate, promotion,
+    /// intent lineage, prepared consent, I2 durable write, then delivery), with
+    /// one difference: the single `@maos-shell` pseudo-address is served by the
+    /// private receiver paired with `route`, not by a registered mailbox. That
+    /// pseudo-address cannot be registered and is refused on every ordinary
+    /// send, so no mailbox exists and nothing else can reach the receiver.
+    ///
+    /// The trusted host supplies the `route`, its current turn's `correlation`,
+    /// the actual `spirit_pid` and the kernel-minted `iac.send` token. Before
+    /// journaling, a reply must be a `SpiritAuto` `TaskComplete` from the
+    /// armed sender and PID to one local role-less `@maos-shell` on the
+    /// matching, unexpired route. Once the frame passes policy and the route
+    /// is spent, a duplicate, quarantine or later failure delivers no answer.
+    pub async fn deliver_shell_reply(
+        &self,
+        frame: maos_domain::frame::IacFrame,
+        spirit_pid: u32,
+        capability_token: maos_domain::invariants::i1::TokenId,
+        route: &mailbox::ShellReplyRoute,
+        correlation: [u8; 16],
+    ) -> Result<
+        maos_domain::invariants::i2::LogBeforeDeliver<
+            crate::adapter::transparency_log::FrameRowWrite,
+        >,
+        mailbox::ShellReplyError,
+    > {
+        route
+            .validate(&frame, spirit_pid, Some(capability_token), correlation)
+            .map_err(mailbox::ShellReplyError::Refused)?;
+        self.deliver_typed_inner(frame, spirit_pid, Some(capability_token), Some(route))
+            .await
+            .map_err(mailbox::ShellReplyError::Bus)
+    }
+
+    async fn deliver_typed_inner(
+        &self,
+        frame: maos_domain::frame::IacFrame,
+        spirit_pid: u32,
+        capability_token: Option<maos_domain::invariants::i1::TokenId>,
+        shell_reply: Option<&mailbox::ShellReplyRoute>,
+    ) -> Result<
+        maos_domain::invariants::i2::LogBeforeDeliver<
+            crate::adapter::transparency_log::FrameRowWrite,
+        >,
+        maos_domain::iac_bus_types::IacBusError,
+    > {
+        // The host-only `@maos-shell` pseudo-address is reachable only through
+        // a scoped route: an ordinary send to it is refused before any gate,
+        // journal write or delivery, so it can neither reach a Spirit nor
+        // leave a row that resembles a shell result.
+        if shell_reply.is_none() {
+            if let Some(addr) = frame.to.iter().find(|a| {
+                a.host_id.is_none() && mailbox::is_shell_reply_destination(a.spirit_id.as_str())
+            }) {
+                return Err(maos_domain::iac_bus_types::IacBusError::UnknownSpirit(
+                    addr.spirit_id.as_str().to_string(),
+                ));
+            }
+        }
+        // FR13 (KQ2): refuse before the I12 decoration and the log append — a fenced
+        // sender's frame is neither logged nor delivered.
+        if self.is_sender_fenced(spirit_pid) {
+            return Err(maos_domain::iac_bus_types::IacBusError::SenderQuarantined { spirit_pid });
+        }
         // 0. I12 decorate decision frames BEFORE serialization (Story 3.3 AC5)
         // so the logged payload already carries working_memory_digest_refs.
         // digest_provider is injected from the composition root.
@@ -602,6 +741,20 @@ impl IacBusAdapter {
             maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
         })?;
 
+        // Scoped shell reply: spend the one-shot route only now that every
+        // policy check has passed. A route spent concurrently (or closed or
+        // expired since validation) behaves as a closed channel.
+        let reply_delivery = shell_reply
+            .map(|route| {
+                route.reserve().map_err(|_| {
+                    maos_domain::iac_bus_types::IacBusError::ChannelClosed(
+                        mailbox::SHELL_REPLY_DESTINATION.to_owned(),
+                        maos_spirit_abi::identity::FrameKind::TaskComplete,
+                    )
+                })
+            })
+            .transpose()?;
+
         // 2. Log before deliver (I2)
         let intent_str = match &frame.intent {
             maos_domain::invariants::i1::IntentClass::HighPrivilege => "high",
@@ -675,12 +828,21 @@ impl IacBusAdapter {
         let prepared = self
             .mailbox
             .prepare(&frame, self.transparency_log.recipient_resolver());
+        let prepared = if reply_delivery.is_some() {
+            prepared.without_recipients()
+        } else {
+            prepared
+        };
 
         // I2: log before deliver — base row, recipients and consent envelope in
         // one transaction. Story 6.1 — via the DRR scheduler if present.
         let token_column = capability_token.as_ref().map(capability_token_column);
+        let reply_correlation = reply_delivery
+            .is_some()
+            .then(|| shell_reply.map(mailbox::ShellReplyRoute::journal_correlation))
+            .flatten();
         let write = if let Some(drr) = &self.drr_scheduler {
-            drr.submit(
+            drr.submit_correlated(
                 frame.clone(),
                 payload_bytes,
                 tl_kind,
@@ -688,12 +850,13 @@ impl IacBusAdapter {
                 intent_str.to_string(),
                 token_column,
                 prepared.recipients().to_vec(),
+                reply_correlation,
             )
             .await?
             .into_inner()
         } else {
             self.transparency_log
-                .insert_routed_frame(
+                .insert_routed_frame_correlated(
                     &frame,
                     tl_kind,
                     spirit_pid,
@@ -701,6 +864,7 @@ impl IacBusAdapter {
                     intent_str,
                     &payload_bytes,
                     prepared.recipients(),
+                    reply_correlation.as_deref(),
                 )
                 .into_inner()
         };
@@ -724,7 +888,16 @@ impl IacBusAdapter {
                 self.frame_lineage_cache
                     .insert(frame.frame_id, frame.intent_lineage.clone());
             }
-            self.mailbox.deliver_prepared(frame, prepared).await?;
+            match reply_delivery {
+                Some(reply) => {
+                    self.mailbox
+                        .deliver_prepared_shell_reply(frame, prepared, reply)
+                        .await?;
+                }
+                None => {
+                    self.mailbox.deliver_prepared(frame, prepared).await?;
+                }
+            }
         }
         Ok(maos_domain::invariants::i2::LogBeforeDeliver::new(write))
     }
@@ -781,7 +954,16 @@ impl IacBusAdapter {
                 },
             );
         }
-        if original_sender != retracting_spirit.as_str() {
+        // Story 21-7 — within this boot the authenticated sender must still be the incarnation
+        // that sent the frame, and only a same-boot audience is notified (pids restart per boot;
+        // the window between the resolver reads here and the enqueue is closed by the mailbox's
+        // per-destination incarnation recheck).
+        let same_boot = original_entry.boot_nonce == self.transparency_log.boot_nonce();
+        let resolver = self.transparency_log.recipient_resolver();
+        let live = |id: &str| resolver.map(|r| r.resolve(&[id])[0]);
+        let retired = same_boot
+            && live(original_sender).is_some_and(|pid| pid != Some(original_entry.spirit_pid));
+        if original_sender != retracting_spirit.as_str() || retired {
             return Err(
                 maos_domain::iac_bus_types::IacBusError::RetractAuthorityViolation {
                     caller: retracting_spirit.as_str().to_string(),
@@ -843,6 +1025,7 @@ impl IacBusAdapter {
         // either arm: the Retract row, its side rows, the retraction marker and
         // the delivered frame all name it (never the shared `last_frame_id`).
         let retract_frame_id = self.transparency_log.mint_frame_id();
+        let mut pinned: Vec<(String, u32)> = Vec::new();
         let retract_frame = maos_domain::frame::IacFrame {
             frame_id: retract_frame_id,
             timestamp_ns: 0,
@@ -868,13 +1051,39 @@ impl IacBusAdapter {
                     });
                     v.into()
                 } else {
-                    let mut v = Vec::new();
-                    v.push(maos_domain::frame::FrameAddress {
-                        spirit_id: maos_spirit_abi::identity::SpiritId::from(recipient_id.as_str()),
-                        host_id: None,
-                        role: None,
-                    });
-                    v.into()
+                    // Story 21-7 (D-21-7-03 A) — every recorded recipient that is still the
+                    // admitted incarnation; remote and gate-rejected addressees never received it.
+                    let recorded = self
+                        .transparency_log
+                        .recorded_recipients(original_frame_id)
+                        .map_err(|e| {
+                            maos_domain::iac_bus_types::IacBusError::SerializationFailed(
+                                e.to_string(),
+                            )
+                        })?;
+                    let ids: Vec<&str> = recorded.iter().map(|r| r.spirit_id.as_str()).collect();
+                    let live = self
+                        .transparency_log
+                        .recipient_resolver()
+                        .map_or_else(Vec::new, |resolver| resolver.resolve(&ids));
+                    // Each notified destination stays bound to its ORIGINAL incarnation: the
+                    // pins below feed `prepare`, so the journal and the enqueue recheck name
+                    // the original pid and a reload since never makes a replacement the
+                    // recipient.
+                    pinned = recorded
+                        .iter()
+                        .zip(live)
+                        .filter(|(recipient, pid)| same_boot && *pid == Some(recipient.pid))
+                        .map(|(recipient, _)| (recipient.spirit_id.clone(), recipient.pid))
+                        .collect();
+                    pinned
+                        .iter()
+                        .map(|(id, _)| maos_domain::frame::FrameAddress {
+                            spirit_id: maos_spirit_abi::identity::SpiritId::from(id.as_str()),
+                            host_id: None,
+                            role: None,
+                        })
+                        .collect()
                 }
             },
             kind: maos_spirit_abi::identity::FrameKind::Retract,
@@ -886,15 +1095,14 @@ impl IacBusAdapter {
             intent_lineage: original_lineage,
         };
 
-        // Step 3.5: atomically check-and-mark retracted BEFORE writing the TL row
-        // (prevents duplicate Retract rows on concurrent/replayed retractions).
-        if let Some(existing) = self
-            .transparency_log
-            .check_and_mark_retracted(original_frame_id, retract_frame_id)
-            .map_err(|e| {
+        // Step 3.5: an already-retracted original answers without any new work; the marker
+        // itself commits with the Retract row and its recipients (one transaction, step 4).
+        let already = |frame_id: [u8; 16]| {
+            self.transparency_log.is_retracted(frame_id).map_err(|e| {
                 maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
-            })?
-        {
+            })
+        };
+        if let Some(existing) = already(original_frame_id)? {
             return Ok(RetractOutcome::Already {
                 existing_retract_frame_id: existing,
             });
@@ -902,15 +1110,31 @@ impl IacBusAdapter {
 
         // Step 4: log the retract frame (I2) through the routed writer, via DRR
         // if configured. Story 17-8 AC2.4 — prepared once, consumed on delivery.
-        let prepared = self
-            .mailbox
-            .prepare(&retract_frame, self.transparency_log.recipient_resolver());
+        // A scoped shell reply was never delivered to any Spirit mailbox: its
+        // row carries the host-derived route correlation. Its retraction is
+        // journaled with that correlation but resolves no recipient, evaluates
+        // no consent gate and is sent to no Spirit (a real Spirit named
+        // `operator` included).
+        let shell_reply_correlation = if original_entry.kind
+            == transparency_log::FrameKind::TaskComplete
+            && mailbox::is_shell_reply_correlation(original_entry.correlation_id.as_deref())
+        {
+            original_entry.correlation_id.clone()
+        } else {
+            None
+        };
+        let pinned = PinnedRecipients(pinned);
+        let prepared = if shell_reply_correlation.is_some() {
+            mailbox::PreparedDelivery::default()
+        } else {
+            self.mailbox.prepare(&retract_frame, Some(&pinned))
+        };
         let token_column = capability_token.as_ref().map(capability_token_column);
         let payload_bytes = serde_json::to_vec(&retract_frame.payload).map_err(|e| {
             maos_domain::iac_bus_types::IacBusError::SerializationFailed(e.to_string())
         })?;
         let write = if let Some(drr) = &self.drr_scheduler {
-            drr.submit(
+            drr.submit_correlated(
                 retract_frame.clone(),
                 payload_bytes,
                 transparency_log::FrameKind::Retract,
@@ -918,12 +1142,13 @@ impl IacBusAdapter {
                 "retract".to_string(),
                 token_column,
                 prepared.recipients().to_vec(),
+                shell_reply_correlation.clone(),
             )
             .await?
             .into_inner()
         } else {
             self.transparency_log
-                .insert_routed_frame(
+                .insert_routed_frame_correlated(
                     &retract_frame,
                     transparency_log::FrameKind::Retract,
                     original_entry.spirit_pid,
@@ -931,23 +1156,48 @@ impl IacBusAdapter {
                     "retract",
                     &payload_bytes,
                     prepared.recipients(),
+                    shell_reply_correlation.as_deref(),
                 )
                 .into_inner()
         };
-        // A kernel-minted id cannot be a peer replay: a duplicate is a sequence
-        // defect and halts, exactly like `insert_frame_event_with_sender` (I2).
-        assert!(
-            write == transparency_log::FrameRowWrite::Written,
-            "MAOS kernel panic — Transparency Log write failed: duplicate frame_id on a \
-             KERNEL-MINTED retract id (Architecture §7.3 I2)."
-        );
+        // A kernel-minted id cannot be a peer replay: a duplicate is the marker of a
+        // concurrent retraction (nothing of this attempt committed), else a sequence
+        // defect that halts, exactly like `insert_frame_event_with_sender` (I2).
+        if write == transparency_log::FrameRowWrite::Duplicate {
+            let Some(existing) = already(original_frame_id)? else {
+                panic!(
+                    "MAOS kernel panic — Transparency Log write failed: duplicate frame_id on a \
+                     KERNEL-MINTED retract id (Architecture §7.3 I2)."
+                );
+            };
+            return Ok(RetractOutcome::Already {
+                existing_retract_frame_id: existing,
+            });
+        }
 
-        // Step 6: route through mailbox to the original recipient
-        self.mailbox
-            .deliver_with_overtake(retract_frame, original_frame_id, prepared)
-            .await?;
+        // Step 6: route through mailbox to the original recipient (a scoped
+        // shell reply has none: nothing is delivered).
+        if shell_reply_correlation.is_none() {
+            self.mailbox
+                .deliver_with_overtake(retract_frame, original_frame_id, prepared)
+                .await?;
+        }
 
         Ok(RetractOutcome::Retracted { retract_frame_id })
+    }
+}
+
+/// The original incarnations a retract notifies: `resolve` answers each pinned id with its
+/// original pid, never the live map's (a replacement of the same name is not the recipient).
+#[derive(Debug)]
+struct PinnedRecipients(Vec<(String, u32)>);
+
+impl transparency_log::RecipientResolver for PinnedRecipients {
+    fn resolve(&self, spirit_ids: &[&str]) -> Vec<Option<u32>> {
+        spirit_ids
+            .iter()
+            .map(|id| self.0.iter().find(|(p, _)| p == id).map(|(_, pid)| *pid))
+            .collect()
     }
 }
 
@@ -962,7 +1212,9 @@ impl Default for IacBusAdapter {
             }),
             frame_lineage_cache: std::sync::Arc::new(dashmap::DashMap::new()),
             promotion_sets: std::sync::Arc::new(dashmap::DashMap::new()),
+            consent_policy: std::sync::Arc::default(),
             promotion_audit_last: std::sync::Arc::new(std::sync::Mutex::new(None)),
+            fenced_senders: SenderFence::default(),
             trace_sink: None,
             #[cfg(feature = "spirit_test")]
             isolation_hook: None,
@@ -1280,5 +1532,19 @@ mod decision_audit_tests {
             "human-authored with pre-existing lineage should succeed"
         );
         // The frame was consumed; we verify delivery succeeded (no rejection).
+    }
+
+    #[test]
+    fn pid_bound_promotion_removal_spares_newer_registration() {
+        let adapter = IacBusAdapter::default();
+        adapter.register_promotion_set_for_pid("s", 1, Some(AllowedPromotionSet::new()));
+        // Successor commit for the same ID under pid 2 replaces the entry.
+        adapter.register_promotion_set_for_pid("s", 2, Some(AllowedPromotionSet::new()));
+        adapter.unregister_promotion_set_for_pid("s", 1);
+        assert!(adapter.has_promotion_set("s"), "stale pid must not clear");
+        adapter.unregister_promotion_set_for_pid("s", 2);
+        assert!(!adapter.has_promotion_set("s"));
+        adapter.unregister_promotion_set_for_pid("s", 2); // idempotent
+        assert!(!adapter.has_promotion_set("s"));
     }
 }

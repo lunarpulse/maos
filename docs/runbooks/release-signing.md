@@ -27,25 +27,29 @@ maosctl audit keygen --output /tmp/release-signing.key
 
 ## Signing flow (automated — `.github/workflows/release.yml`)
 
-1. Tag the pre-release: `git tag v0.1.0-alpha.1 && git push origin v0.1.0-alpha.1`
-2. CI builds `maos` and `maosctl` for `linux-amd64`, `linux-arm64`, and
-   `darwin-arm64` (six binaries total)
-   (`maos-linux-amd64`, `maosctl-linux-amd64`, `maos-linux-arm64`,
-   `maosctl-linux-arm64`, `maos-darwin-arm64`, `maosctl-darwin-arm64`)
+1. Tag the release: `git tag vX.Y.Z[-rc.N] <candidate_sha> && git push origin refs/tags/vX.Y.Z[-rc.N]`
+   (the exact procedure is `docs/release/tag-procedure.md`)
+2. CI builds five binaries (`maos`, `maosctl`, `maos-registry-server`, `maos-spirit`,
+   `maos-wasm-runner`) for each of `linux-amd64`, `linux-arm64` and `darwin-arm64`
+   (fifteen binaries total), named `<binary>-<suffix>`, e.g. `maos-linux-amd64`,
+   `maosctl-linux-arm64`, `maos-wasm-runner-darwin-arm64`
 3. CI runs `check-mock-not-in-release` on each `maos` binary
 4. CI flattens the per-binary artifacts into `dist/`
-5. CI generates `SHA256SUMS` for the explicit six-binary set via
+5. CI generates `SHA256SUMS` for the explicit fifteen-binary set via
    `xtask release-dry-run --manifest-only`
 6. CI signs `SHA256SUMS` via `xtask release-verify --sign`
 7. CI self-verifies via `xtask release-verify --verify`
-8. CI publishes the six binaries, `SHA256SUMS`, and `SHA256SUMS.sig`
+8. CI publishes the fifteen binaries, `SHA256SUMS`, and `SHA256SUMS.sig`; it then builds
+   the amd64/arm64 `.deb` and `.rpm` packages and publishes them with an independently
+   signed `SHA256SUMS-packages` and `SHA256SUMS-packages.sig`, the rendered `maos.rb`,
+   `PKGBUILD`, `maos.spec`, `debian-recipes.tar.gz` and `verify-release.py`
 
 ## Verification flow (operator)
 
 ```bash
 # Download release artifacts to a local directory
 mkdir maos-v0.1.0-alpha.1 && cd maos-v0.1.0-alpha.1
-# Download all six binaries, SHA256SUMS, and SHA256SUMS.sig
+# Download all fifteen binaries, SHA256SUMS, and SHA256SUMS.sig
 
 # Verify with the bundled public key (offline-capable)
 maosctl install --from-local . --verify-only

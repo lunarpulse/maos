@@ -89,6 +89,39 @@ pub struct PolicyTableInner {
     pub spirit_postures: HashMap<u32, crate::security::posture::PostureState>,
 }
 
+/// What [`PolicyTable::narrow_scopes`] changed, kept so the change can be undone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[maos_attrs::i9_exempt(
+    reason = "exact per-swap undo record; bounded by the predecessor and installed scope sets, released with the rollback window"
+)]
+pub(crate) struct ScopeInstall {
+    previous: Vec<Scope>,
+    installed: Vec<Scope>,
+}
+
+/// Why a successor scope set cannot be installed on a PID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ScopeInstallError {
+    /// The PID has no admitted policy entry; a swap never recreates one.
+    UnknownPid,
+    /// The successor declares a scope its predecessor neither holds nor entitles.
+    NotEntitled(Scope),
+}
+
+fn scopes_within(held: &[Scope], successor: &[Scope]) -> Result<(), ScopeInstallError> {
+    match successor
+        .iter()
+        .find(|s| !held.iter().any(|d| d == *s || d.entitles(s)))
+    {
+        Some(extra) => Err(ScopeInstallError::NotEntitled(extra.clone())),
+        None => Ok(()),
+    }
+}
+
+fn same_scope_set(a: &[Scope], b: &[Scope]) -> bool {
+    a.iter().all(|s| b.contains(s)) && b.iter().all(|s| a.contains(s))
+}
+
 /// Policy table — read-mostly copy-on-write.
 ///
 /// Readers take a single atomic load (free); writers swap the entire
@@ -252,6 +285,123 @@ impl PolicyTable {
         self.inner.store(Arc::new(new_policy));
     }
 
+    /// Retry-safe read-modify-write of the policy table (ArcSwap RCU).
+    ///
+    /// `f` receives a private clone of the CURRENT snapshot and may run more
+    /// than once if another writer lands first, so it must be pure (no I/O,
+    /// no audit emission) and recompute everything from its argument. Use
+    /// this instead of `inner().load_full()` + `update()`, which can undo a
+    /// concurrent change such as a same-PID scope narrowing.
+    pub fn mutate<R>(&self, mut f: impl FnMut(&mut PolicyTableInner) -> R) -> R {
+        let mut result = None;
+        self.inner.rcu(|current| {
+            let mut next = (**current).clone();
+            result = Some(f(&mut next));
+            Arc::new(next)
+        });
+        // rcu always runs the closure at least once.
+        result.expect("rcu closure executes at least once")
+    }
+
+    /// Whether the Spirit's CURRENT manifest scopes still entitle `scope`.
+    ///
+    /// Defensive re-check for holders of a capability minted before a
+    /// same-PID scope swap. Uses the same `Scope::entitles` match as
+    /// [`Self::evaluate`] (selector included) plus the implicit
+    /// always-allowed `SelfTelemetryRead`. Lock-free read; an unadmitted PID
+    /// entitles nothing but the implicit scope. Operator deny/approval
+    /// policy is deliberately not consulted.
+    pub fn still_entitles(&self, spirit_pid: u32, scope: &Scope) -> bool {
+        if matches!(scope, Scope::SelfTelemetryRead) {
+            return true;
+        }
+        self.inner
+            .load()
+            .manifest_scopes
+            .get(&spirit_pid)
+            .is_some_and(|m| m.scopes.iter().any(|s| s.entitles(scope)))
+    }
+
+    /// Preflight of [`Self::narrow_scopes`]: `Ok(())` exactly when the PID is
+    /// admitted and every successor scope is held (or entitled) by its current
+    /// effective scopes. Pure; mutates nothing.
+    pub(crate) fn check_scope_narrowing(
+        &self,
+        spirit_pid: u32,
+        successor: &[Scope],
+    ) -> Result<(), ScopeInstallError> {
+        let inner = self.inner.load();
+        let entry = inner
+            .manifest_scopes
+            .get(&spirit_pid)
+            .ok_or(ScopeInstallError::UnknownPid)?;
+        scopes_within(&entry.scopes, successor)
+    }
+
+    /// Hot-swap commit (Story 21-9, D-21-PF-14): replace an ALREADY-admitted
+    /// PID's effective scopes with the successor's declared set, atomically,
+    /// only if it never widens them. An unknown PID is refused (never
+    /// recreated) and a scope neither held nor entitled by the current set is
+    /// refused. `Ok(None)` ⇒ the set is unchanged and nothing was written
+    /// (tier, trust and posture are never touched either way). `Ok(Some(_))`
+    /// carries what is needed to undo it with [`Self::restore_scopes`].
+    pub(crate) fn narrow_scopes(
+        &self,
+        spirit_pid: u32,
+        successor: &[Scope],
+    ) -> Result<Option<ScopeInstall>, ScopeInstallError> {
+        let mut outcome = Err(ScopeInstallError::UnknownPid);
+        self.inner.rcu(|current| {
+            let Some(entry) = current.manifest_scopes.get(&spirit_pid) else {
+                outcome = Err(ScopeInstallError::UnknownPid);
+                return Arc::clone(current);
+            };
+            if let Err(refused) = scopes_within(&entry.scopes, successor) {
+                outcome = Err(refused);
+                return Arc::clone(current);
+            }
+            if same_scope_set(&entry.scopes, successor) {
+                outcome = Ok(None);
+                return Arc::clone(current);
+            }
+            outcome = Ok(Some(ScopeInstall {
+                previous: entry.scopes.clone(),
+                installed: successor.to_vec(),
+            }));
+            let mut next = (**current).clone();
+            if let Some(slot) = next.manifest_scopes.get_mut(&spirit_pid) {
+                slot.scopes = successor.to_vec();
+            }
+            Arc::new(next)
+        });
+        outcome
+    }
+
+    /// Undo [`Self::narrow_scopes`] (matching auto-revert or a failed publish):
+    /// restores the predecessor's scopes only while the PID is still admitted
+    /// and still holds exactly the set that install wrote. Returns whether it
+    /// restored; an unloaded PID is never recreated.
+    pub(crate) fn restore_scopes(&self, spirit_pid: u32, install: &ScopeInstall) -> bool {
+        let mut restored = false;
+        self.inner.rcu(|current| {
+            restored = false;
+            let held_exactly = current
+                .manifest_scopes
+                .get(&spirit_pid)
+                .is_some_and(|entry| same_scope_set(&entry.scopes, &install.installed));
+            if !held_exactly {
+                return Arc::clone(current);
+            }
+            restored = true;
+            let mut next = (**current).clone();
+            if let Some(slot) = next.manifest_scopes.get_mut(&spirit_pid) {
+                slot.scopes = install.previous.clone();
+            }
+            Arc::new(next)
+        });
+        restored
+    }
+
     /// Replace the operator posture ceiling and immediately re-clamp every
     /// admitted Spirit so a live policy change cannot leave stale authority.
     /// Story 16-6 review 2026-09-20.
@@ -259,13 +409,12 @@ impl PolicyTable {
         &self,
         ceiling: Option<crate::security::manifest::Posture>,
     ) {
-        let inner = self.inner.load_full();
-        let mut new_inner = (*inner).clone();
-        new_inner.operator_policy.operator_posture_ceiling = ceiling;
-        for state in new_inner.spirit_postures.values_mut() {
-            clamp_posture_state(state, ceiling);
-        }
-        self.update(new_inner);
+        self.mutate(|next| {
+            next.operator_policy.operator_posture_ceiling = ceiling;
+            for state in next.spirit_postures.values_mut() {
+                clamp_posture_state(state, ceiling);
+            }
+        });
     }
 
     /// Atomically shift a Spirit's posture under the ceiling constraint
@@ -278,40 +427,39 @@ impl PolicyTable {
         use crate::security::manifest::Posture;
         use crate::security::posture::PostureError;
 
-        let inner = self.inner.load_full();
-
         // Reject non-runtime postures
         if new_posture == Posture::Autonomous {
             return Err(PostureError::NonRuntimePosture(Posture::Autonomous));
         }
 
-        // Validate spirit exists
-        let state = inner
-            .spirit_postures
-            .get(&spirit_pid)
-            .ok_or(PostureError::UnknownSpirit(spirit_pid))?;
+        // Retry-safe RCU: validation and the swap both read the same current
+        // snapshot, so a concurrent writer (e.g. scope narrowing) is never
+        // overwritten by a stale clone. The closure is pure and recomputed
+        // on every retry.
+        let mut outcome = Err(PostureError::UnknownSpirit(spirit_pid));
+        self.inner.rcu(|current| {
+            let Some(state) = current.spirit_postures.get(&spirit_pid) else {
+                outcome = Err(PostureError::UnknownSpirit(spirit_pid));
+                return Arc::clone(current);
+            };
+            if new_posture > state.allowed_max {
+                outcome = Err(PostureError::AboveCeiling {
+                    requested: new_posture,
+                    allowed: state.allowed_max,
+                });
+                return Arc::clone(current);
+            }
+            let mut new_inner = (**current).clone();
+            let state = new_inner
+                .spirit_postures
+                .get_mut(&spirit_pid)
+                .expect("the cloned snapshot contains the checked posture");
+            state.current = new_posture;
+            outcome = Ok(state.posture_hash());
+            Arc::new(new_inner)
+        });
 
-        // Validate ceiling
-        if new_posture > state.allowed_max {
-            return Err(PostureError::AboveCeiling {
-                requested: new_posture,
-                allowed: state.allowed_max,
-            });
-        }
-
-        // CoW swap
-        let mut new_inner = (*inner).clone();
-        if let Some(s) = new_inner.spirit_postures.get_mut(&spirit_pid) {
-            s.current = new_posture;
-        }
-        let new_hash = new_inner
-            .spirit_postures
-            .get(&spirit_pid)
-            .map(|s| s.posture_hash())
-            .unwrap_or([0u8; 32]);
-        self.update(new_inner);
-
-        Ok(new_hash)
+        outcome
     }
 
     /// Posture-aware evaluation (Story 3.2, AC5).
@@ -667,5 +815,59 @@ mod tests {
             matches!(decision, PolicyDecision::RequireApproval { .. }),
             "operator override must take precedence over matrix Allow"
         );
+    }
+
+    #[test]
+    fn concurrent_policy_write_preserves_the_committed_narrowing() {
+        let table = PolicyTable::new();
+        let fs = Scope::FsRead {
+            subtree: "/tmp".into(),
+        };
+        table.mutate(|next| {
+            next.manifest_scopes.insert(
+                9,
+                ManifestCapabilityScope {
+                    scopes: vec![fs.clone(), Scope::LogRecall],
+                    declared_tier: SandboxTier(0),
+                    trust_tier: TrustTier::Verified,
+                },
+            );
+        });
+        assert!(table.still_entitles(9, &fs));
+        assert!(table.still_entitles(9, &Scope::LogRecall));
+
+        // Hold the writer after it has read the wider snapshot, commit the narrowing,
+        // then let the writer finish. Its policy change and the narrowing must both land.
+        std::thread::scope(|scope| {
+            let (ready, pending) = std::sync::mpsc::sync_channel(1);
+            let (release, resume) = std::sync::mpsc::sync_channel(1);
+            let watchdog = std::time::Duration::from_secs(10);
+            let writer_table = &table;
+            let writer = scope.spawn(move || {
+                let mut first = true;
+                writer_table.mutate(|next| {
+                    if std::mem::replace(&mut first, false) {
+                        ready.send(()).unwrap();
+                        resume.recv_timeout(watchdog).unwrap();
+                    }
+                    next.operator_policy.global_sandbox_floor = SandboxTier(1);
+                });
+            });
+            pending.recv_timeout(watchdog).unwrap();
+            let result = table.narrow_scopes(9, std::slice::from_ref(&fs));
+            release.send(()).unwrap();
+            writer.join().unwrap();
+            assert!(result.unwrap().is_some());
+        });
+        assert_eq!(
+            table.inner.load().operator_policy.global_sandbox_floor,
+            SandboxTier(1)
+        );
+        assert!(!table.still_entitles(9, &Scope::LogRecall));
+
+        // Implicit scope needs no manifest entry; unknown PIDs get nothing else.
+        assert!(table.still_entitles(9, &Scope::SelfTelemetryRead));
+        assert!(table.still_entitles(404, &Scope::SelfTelemetryRead));
+        assert!(!table.still_entitles(404, &fs));
     }
 }

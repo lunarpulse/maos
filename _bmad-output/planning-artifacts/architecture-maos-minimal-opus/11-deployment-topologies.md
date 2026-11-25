@@ -28,3 +28,17 @@ The J4 Mira-Nash deployment. Exactly two MAOS Hosts: Mira on a prod-edge node (r
 ## 11.3 What's the same across both topologies
 
 The substrate's invariants. The Spirit ABI. The manifest schema. The Capability Registry's mediation policy. The Transparency Log shape. The distillation pattern. The Approval Manager's UX. The hot-swap mechanism. The 14 invariants. The 39 ADRs (with their phased Status tags per §12.0). **Topology is configuration; architecture is invariant.** This is the substrate-positioning claim cashed: same primitives compose into either deployment.
+
+## 11.6 Standing Host (server)
+
+A Host that stays up is started from one file: `maos serve --config <host.toml>` (ADR-071). The file holds the
+Host's settings, each with one key and one registered `MAOS_*` name, and the standing cast as
+`[[host.spirits]]`. The cast is fed through the existing topology and installed boot paths, so a restart (a SIGTERM
+drain or a SIGKILL) brings back exactly the Spirits the file names; there is no separate restore mechanism.
+A bad file, an older config file that disagrees with it, or a region the signed cohort manifest contradicts is
+a typed boot refusal, never a warning. The data roots resolve by one precedence (an explicit `MAOS_HOME`, then XDG,
+then the legacy home).
+
+**As a service (Story 22-2).** The deb and the rpm ship `maos.service`: it runs `maos init --plain` (the one minter of the operator door config) and then `maos serve --config /etc/maos/host.toml`, restarts on failure except exit 78, and stops within 30 s. `maosctl status` is the probe: one authenticated read of `GET /v1/daemon`.
+
+**In a container (Story 22-3).** The image (`ghcr.io/<owner>/maos:<tag>`, multi-arch, cosign-signed) holds the signed `maos`, `maosctl` and `maos-wasm-runner`, the in-tree Spirit manifests and a default Host file naming nash and observer, so a pulled image serves a real cast with no provider key. Two deployments ship: `packaging/compose/compose.yaml` (a one-shot `init`, then `maos serve`, on the named volume `maos-home`) and the Helm chart `packaging/helm/maos` (a one-replica StatefulSet with a PVC at `/var/lib/maos`, the Host file from a ConfigMap, secrets from values or an existing Secret, an init container, read-only root filesystem, uid/gid/fsGroup 65532). **The door never leaves loopback:** neither deployment publishes a port or renders a Service, so the probe is an exec of `maosctl status` (readiness, liveness, compose healthcheck), not an HTTP probe. **T3 Workers are not supported in a container or pod:** they need a rootless container runtime, and neither mounts a container socket or requests privilege to provide one. Image size and idle memory are bounded per PR (NFR-Ops-14).

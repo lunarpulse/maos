@@ -25,6 +25,18 @@ compiles the guest entrypoint to `dist/index.js`. `npm run componentize` turns
 that JavaScript into `dist/spirit.wasm`; the component imports no
 `wasi:http` interface.
 
+## Validate before you publish
+
+```bash
+maos-spirit validate --manifest manifest.toml --artifact dist/spirit.wasm
+```
+
+`validate` needs no registry, daemon or signing key. It exits 0 when the package would pass the install gate and
+the Host's boot gate and the artifact is a component the runner can bind, and otherwise prints one
+`[check] code: detail` line per refusal (exit 1). To write a domain Spirit that answers `maosctl ask`, follow the
+authoring kit end to end: [`kit/spirit-author/AGENTS.md`](https://github.com/lunarpulse/maos/blob/main/kit/spirit-author/AGENTS.md)
+(or its skill), with a worked example in `examples/incident-triage-ts`.
+
 ## Publishing
 
 The scaffold declares `public-untrusted`; publish with `maos-spirit publish
@@ -83,6 +95,8 @@ swap of this example (which restarts the guest) outlasts the 90-second door
 wall for one swap attempt (hosted: Ready after ~220 s), while at 100% start
 plus hot swap took 49.5 s.
 Current kernel scope policy compares scope kinds, not MCP server/tool selectors.
+
+A request from the operator shell (`@maos-shell`, `task-assign`, success criteria "Answer the operator's shell message") is answered with one `task-complete` addressed back to the shell and reading `echo: <goal>`; the host, not the guest, stamps the sender and routes the reply. Every other frame is echoed unchanged.
 
 `handleFrame` echoes the inbound frame only after `onStart`. Before startup it
 throws `{ tag: "fault", val: "..." }`, which is the generated guest binding's

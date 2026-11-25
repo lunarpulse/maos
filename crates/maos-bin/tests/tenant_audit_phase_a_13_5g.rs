@@ -333,6 +333,14 @@ fn boot_tenant(home: &Path, team: &str) -> String {
     let output = Command::new(env!("CARGO_BIN_EXE_maos"))
         .env("MAOS_HOME", home)
         .env_remove("MAOS_AUDIT_DB")
+        // Story 22-6: the boot arms a rotation check, and a shard whose rows are older than
+        // `audit_rotate_days` (these fixtures stamp 1 ns, i.e. 1970) is sealed into a segment
+        // when an audit key resolves, leaving the live log the artifact reader counts shorter.
+        // Hosted CI exports `MAOS_AUDIT_KEY` job-wide, so this probe must not inherit a key:
+        // with none, rotation is refused and the legacy rows stay in the live log, which is
+        // what the leg asserts. Sealing old rows is covered by `audit_rotation_22_6`.
+        .env_remove("MAOS_AUDIT_KEY")
+        .env("XDG_CONFIG_HOME", home.join("no-operator-config"))
         .env("MAOS_LOOM_POSTGRES", "postgres://127.0.0.1:1/hermetic")
         .env("MAOS_LOOM_HOME_TEAM", team)
         .env("MAOS_ONE_SHOT", "cohort-a2a-daemon")

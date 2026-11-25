@@ -4,6 +4,10 @@ version = "0.0.0"
 publish = false
 edition = "2021"
 
+# Standalone cargo-fuzz workspace root (keeps this fuzz project out of the repository root
+# workspace — the standard cargo-fuzz convention for in-tree crates).
+[workspace]
+
 [package.metadata]
 cargo-fuzz = true
 
@@ -12,7 +16,12 @@ libfuzzer-sys = "0.4"
 arbitrary = { version = "1", features = ["derive"] }
 maos-kernel-core = { path = ".." }
 maos-domain = { path = "../../maos-domain" }
+tempfile = "3"
 
 [[bin]]
 name = "cap_token_verify"
 path = "fuzz_targets/cap_token_verify.rs"
+
+[[bin]]
+name = "i11_digest_chain"
+path = "fuzz_targets/i11_digest_chain.rs"

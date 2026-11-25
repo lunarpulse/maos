@@ -1,0 +1,4 @@
+{"reads":[{"reader":"spirit-b","value_owner":"spirit-a"}],"writes":[]}
+{"reads":[{"reader":"spirit-z","value_owner":"spirit-a"}],"writes":[]}
+{"reads":[],"writes":[{"writer":"spirit-c","authorized":false,"landed":true}]}
+{"reads":[{"reader":"spirit-a","value_owner":"spirit-a"},{"reader":"spirit-a","value_owner":"spirit-b"}],"writes":[{"writer":"spirit-a","authorized":true,"landed":true}]}

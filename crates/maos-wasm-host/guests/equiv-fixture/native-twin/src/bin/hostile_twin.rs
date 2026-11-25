@@ -85,10 +85,21 @@ fn main() -> ExitCode {
         // while its own hot swap is still running).
         if lifecycle_wire::is_request(&body) {
             let exits = mode == "snapshot-then-exit";
+            // `slow-probe` (Story 22-9) is a component still starting: its probe is answered
+            // only after 6 s, then it serves a lifecycle (a snapshot, no exit).
+            let serves = exits || mode == "slow-probe";
             let request = lifecycle_wire::decode_request(&body);
+            if mode == "slow-probe" && matches!(request, Ok(LifecycleRequest::Probe)) {
+                let until = std::time::Instant::now() + std::time::Duration::from_secs(6);
+                while std::time::Instant::now() < until {
+                    std::thread::park_timeout(
+                        until.saturating_duration_since(std::time::Instant::now()),
+                    );
+                }
+            }
             let reply = match request {
-                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(exits),
-                Ok(LifecycleRequest::Snapshot) if exits => {
+                Ok(LifecycleRequest::Probe) => LifecycleReply::Supported(serves),
+                Ok(LifecycleRequest::Snapshot) if serves => {
                     LifecycleReply::State(maos_wasm_host::recall_wire::WireBytes(7u64.to_le_bytes().to_vec()))
                 }
                 _ => LifecycleReply::Unsupported,
@@ -219,10 +230,12 @@ fn address(spirit_id: &str, host: Option<&str>) -> FrameAddress {
     }
 }
 
+// A swap successor is spawned with the runner's private `--held-component-*` handoff flags
+// appended; this twin stands in for a runner without a component and ignores exactly those.
 fn parse_mode() -> Result<String, String> {
-    let mut args = std::env::args().skip(1);
-    match (args.next().as_deref(), args.next(), args.next()) {
-        (Some("--mode"), Some(mode), None) => Ok(mode),
-        _ => Err("usage: hostile-twin --mode <mode>".into()),
+    let held = |r: &[String]| r.iter().step_by(2).all(|k| k.starts_with("--held-component-"));
+    match std::env::args().skip(1).collect::<Vec<_>>().as_slice() {
+        [f, m, r @ ..] if f == "--mode" && held(r) => Ok(m.clone()),
+        _ => Err("usage: hostile-twin --mode <mode> [--held-component-* <value>]...".into()),
     }
 }

@@ -86,8 +86,6 @@ use maos_kernel_core::iac::Mailbox;
 #[cfg(feature = "network")]
 use maos_kernel_core::inference::InferencePortAdapter;
 #[cfg(feature = "network")]
-use maos_kernel_core::security::approval::ApprovalManager;
-#[cfg(feature = "network")]
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
 #[cfg(feature = "network")]
 use maos_providers::AnthropicProvider;
@@ -1478,9 +1476,11 @@ fn main() {
             verbs::VerbName::Audit => air_gap_audit(&argv[1..]),
             verbs::VerbName::Install => air_gap_install(&argv[1..]),
             verbs::VerbName::Purge => run_purge(&argv[1..]),
-            verbs::VerbName::Shell | verbs::VerbName::Traceback | verbs::VerbName::Eval => {
-                unreachable!("shell, traceback and eval are not rows of the air-gap table")
-            }
+            verbs::VerbName::Shell
+            | verbs::VerbName::Traceback
+            | verbs::VerbName::Eval
+            | verbs::VerbName::Workflow
+            | verbs::VerbName::Serve => unreachable!("network-only verb in the air-gap table"),
         },
     }
 }
@@ -1803,6 +1803,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut shell_mode = false;
     let mut plain_flag = false;
     let (mut eval_record, mut distill_record, mut distill_judge_repeat) = (None, false, None);
+    let mut workflow = None;
+    let mut host_boot = None;
     let verb_args = if std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("registry-server")
         && argv
             .first()
@@ -1914,6 +1916,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 plain_flag = argv.iter().skip(1).any(|a| a == "--plain");
                 shell_mode = true;
             }
+            verbs::VerbName::Workflow => {
+                workflow = maos_bin::workflow::prepare(&argv[1..])?;
+                if workflow.is_none() {
+                    return Ok(());
+                }
+            }
+            // Story 22-1 — the Host file is read, validated and overlaid BEFORE the crypto
+            // provider, the stores or any Spirit is selected: a bad file refuses the boot here.
+            verbs::VerbName::Serve => host_boot = Some(boot_host_config(&argv[1..])),
             // Story 18-2 (CR-1) — replay runs now; `record` needs the
             // root's shared router and runs once it is built (D-18-2-06 A).
             verbs::VerbName::Eval => {
@@ -1988,11 +1999,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // production run surface FIRST. The action is dispatched after the full
     // composition root is built (it reuses the root's scheduler/inference/etc.).
     // When absent, the existing `MAOS_ONE_SHOT` / Spirit-less serving paths win.
-    let run_args = match parse_run_args(std::env::args().skip(1)) {
-        Ok(args) => args,
-        Err(e) => {
-            eprintln!("{e}");
-            std::process::exit(1);
+    let run_args = if let Some((host, _)) = host_boot.as_ref() {
+        // Story 22-1 — the Host file stands for the manifest; `maos run` reads no Host file.
+        Some(host.run_args())
+    } else {
+        match parse_run_args(std::env::args().skip(1)) {
+            Ok(args) => args,
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
         }
     };
     let cross_wall_traceback = match parse_cross_wall_traceback_args(std::env::args().skip(1)) {
@@ -2135,14 +2151,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err(format!("memory-root create failed: {e}").into());
     }
 
-    let private_store = Arc::new(maos_kernel_core::memory::private::PrivateMemoryStore::new(
-        memory_root,
-        4 * 1024,
-    ));
-    let shared_store = Arc::new(
-        maos_kernel_core::memory::shared::SharedMemoryStore::open(&memory_db_path)
-            .map_err(|e| format!("failed to open shared memory store: {e}"))?,
-    );
+    // FR28: both stores carry the operator-resolved quota.
+    let (private_store, shared_store) =
+        maos_kernel_core::memory::open_stores(memory_root, 4 * 1024, &memory_db_path)
+            .map_err(|e| format!("failed to open shared memory store: {e}"))?;
     let principal_index = Arc::new(
         maos_kernel_core::memory::principal::PrincipalNamespaceIndex::open(&memory_db_path)
             .map_err(|e| format!("failed to open principal index: {e}"))?,
@@ -2362,6 +2374,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })?;
     }
     maos_bin::crypto_provider::journal(&transparency_log, &selected_crypto);
+    // Story 22-6 (ADR-072, D-22-6-08 A) — bound the audit store by policy: one check at boot,
+    // then one every 60 s. Rotation seals a prefix below every registered floor; with no audit
+    // key it is refused with a typed line and the log keeps growing.
+    let _audit_rotation = maos_bin::audit_rotation::spawn_rotation_task(
+        Arc::clone(&transparency_log),
+        tokio_util::sync::CancellationToken::new(),
+    );
 
     // Story 13.5c — single composition root.  A `cohort-a2a-daemon` process
     // already ran this entire root; it must NOT open a second Transparency Log
@@ -2619,10 +2638,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Story 9.4b AC-5 — pin the memory manager to the operator's home region
         // (None = pinning disabled). Routes every store write through the
         // WriteEntryPoint region chokepoint.
-        .with_home_region(
-            maos_kernel_core::security::operator_config::RegionSection::resolve_from_env_and_disk()
-                .home_region,
-        )
+        .with_home_region(maos_bin::host_config::stamped_home_region())
         // Sec-redteam SR-1: enable principal namespace write enforcement.
         // Only spirit pids registered via authorize_principal_writes() may
         // write to Principal namespaces.
@@ -2631,6 +2647,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_collective_port(collective_port.clone())
         .with_capabilities(Some(Arc::clone(&capability))),
     );
+    // 21-12: finish any forget interrupted before the last shutdown, before the door serves.
+    let finished = memory.complete_outstanding_forgets();
+    eprintln!("maos: interrupted-forget completion (done, unfinished): {finished:?}");
 
     // Story 4.3 — SelfTelemetryAggregator (FR56).
     let self_telemetry = Arc::new(
@@ -2763,13 +2782,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "maos: IAC Bus wired (Mailbox + Transparency Log + real I12 digest provider, Story 3.1 / 8.10)"
     );
 
+    // FR13 (D-LRQC-01 A) — the durable quarantine holds, loaded before any Spirit is admitted;
+    // a damaged store refuses the boot rather than dropping holds.
+    let hold_path = maos_bin::quarantine::QuarantineGate::default_path()?;
+    if hold_path.is_none() {
+        eprintln!("maos: quarantine holds are not durable: no home resolved");
+    }
+    let quarantine = Arc::new(maos_bin::quarantine::QuarantineGate::open(
+        hold_path,
+        Arc::clone(&capability),
+        Arc::clone(&iac),
+        Arc::clone(&transparency_log),
+    )?);
+    distillate_writer.set_sender_fence(iac.sender_fence());
+
     // Story 6.4 — install the TransparencyLogAdapter on the Mailbox so the
     // Phase 1.5 consent-rupture quarantine row can be written BEFORE the
-    // ConsentRupture frame is emitted (I2 log-before-deliver). The default
-    // ConsentGate (`None`) preserves existing behavior; operator-supplied
-    // gates can be installed via `mailbox.install_consent_gate(...)`.
+    // ConsentRupture frame is emitted (I2 log-before-deliver).
     let _ = mailbox.install_transparency_log(Arc::clone(&transparency_log));
     eprintln!("maos: Mailbox TL installer wired (Story 6.4)");
+
+    // Story 21-7 — the production consent gate, set-once, over the one policy the session
+    // granter also reads (the admitted Spirits' `[consent.recall]` declarations). A failed
+    // install is a boot error, like the recipient resolver's.
+    mailbox
+        .install_consent_gate(Arc::clone(iac.consent_policy()) as _)
+        .map_err(|()| "consent gate installed twice")?;
+    eprintln!("maos: Mailbox consent gate wired (Story 21-7)");
 
     // j1-crosshost-1a AC2.1-2.3 — the A2A delegation leg, installed HERE (beside
     // the TL installer) and not at the mailbox construction site, because the
@@ -3051,6 +3090,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Arc::clone(&telemetry),
             Arc::clone(&shared_journal),
         )
+        .with_memory(Arc::clone(&memory))
         .with_replica_resolver(Arc::clone(&replica_resolver)),
     );
     let scheduler_mut =
@@ -3371,6 +3411,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         manifest,
                         factory_successor_slot.peek(),
                         factory_successor_slot.peek_origin(),
+                        factory_successor_slot.take_artifact().and_then(|held| {
+                            held.downcast::<maos_bin::spirit_session::LaunchArtifact>()
+                                .ok()
+                                .map(|artifact| *artifact)
+                        }),
                     )
                 })
                 .map_err(|reason| {
@@ -3428,10 +3473,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // iac_bus_intent_lineage.rs) as needed.  Production builds carry
     // ZERO runtime cost (spirit_test feature is dev-time only).
 
-    // Story 3.1 — Approval Manager (v0.3-β auto-allow).
-    let _approval = ApprovalManager::new(Arc::clone(&transparency_log));
-    eprintln!("maos: Approval Manager initialized (v0.3-β auto-allow)");
-
     // Spawn the audit writer task (Story 1b.2). Held by name so the one-shot
     // exit path (Story 1b.5b) can drain the cap-audit channel deterministically
     // before process exit — `drop(audit_tx); drop(...senders); audit_writer.await.ok();`.
@@ -3465,6 +3506,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         || std::env::var("MAOS_ONE_SHOT").as_deref() == Ok("cohort-a2a-daemon");
     let mut operator_http_server: Option<maos_control::OperatorHttpServer> = None;
     let mut operator_door_port: Option<Arc<maos_bin::operator_door::OperatorDoor>> = None;
+    let mut directed_tasks: Option<Arc<maos_bin::directed_task::DirectedTasks>> = None;
     // 20-3c (member 16, D10 A) — held for the root's life; `None` for an
     // env-pair root, which has no home record to lease.
     let mut endpoint_lease: Option<maos_domain::operator_door::EndpointLease> = None;
@@ -3596,6 +3638,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 redistill_sink: hook_pump.redistill_sink(),
             }),
             hooks: Arc::clone(&hook_pump),
+            quarantine: Arc::clone(&quarantine),
             butler_principal: Arc::clone(&butler_principal),
             #[cfg(feature = "wasm-host")]
             swap_slot: swap_slot.clone(),
@@ -3623,6 +3666,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             successor_manifest_slot,
         ));
         door.set_forget_pump(&hook_pump);
+        door.set_quarantine(Arc::clone(&quarantine));
+        door.set_audit_store_path(audit_db_path.clone());
         operator_door_port = Some(door);
         if let Some(config) = operator_http_config {
             let bind_door = |bind: std::net::SocketAddr| {
@@ -3976,7 +4021,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
     }
-
+    // Live workflow comparison fails closed on a pinned provider outside this set; the
+    // `UnconfiguredProvider` placeholder below is not a registered driver.
+    let workflow_providers: Vec<String> = providers_map.keys().cloned().collect();
     if providers_map.is_empty() {
         providers_map.insert("anthropic".into(), Arc::new(UnconfiguredProvider));
         let _ = default_id.insert("anthropic".into());
@@ -4010,27 +4057,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         live_provider_available,
     )
     .map_err(|error| error.to_string())?;
+    let workflow_replay = workflow.is_some()
+        && matches!(
+            inference_mode,
+            ResolvedInferenceMode::Replay {
+                strict: true,
+                explicit: true,
+                ..
+            }
+        );
+    // Only `workflow compare` may use explicit live inference: no cassette, providers untouched.
+    let workflow_live = workflow.is_some()
+        && matches!(
+            inference_mode,
+            ResolvedInferenceMode::Live { explicit: true }
+        );
+    if workflow_live
+        && !workflow
+            .as_ref()
+            .is_some_and(maos_bin::workflow::Pending::is_compare)
+    {
+        return Err(
+            "workflow: MAOS_INFERENCE_MODE=live is supported only by `workflow compare`".into(),
+        );
+    }
 
     // The router's default remains unchanged, and so does its key set except
     // that explicit replay also answers the interned ids (18-1, below). Each
     // key's driver is replaced/wrapped, so capability scopes, fallback, IAC,
     // attribution, and Transparency Log behavior stay in the kernel adapter.
     let mut cassette_recorder: Option<Arc<cassette_replay::CassetteRecorder>> = None;
+    let mut workflow_cassette_digest = None;
     match &inference_mode {
         ResolvedInferenceMode::Replay {
             cassette,
             strict,
             explicit: true,
         } => {
-            let replay: Arc<dyn maos_providers::Provider> = Arc::new(
-                cassette_replay::CassetteReplayProvider::from_file(cassette, *strict).map_err(
-                    |error| {
-                        format!(
-                            "MAOS_INFERENCE_MODE=replay cassette initialization failed: {error}"
-                        )
+            let replay = if workflow_replay {
+                cassette_replay::CassetteReplayProvider::for_workflow(cassette).map(
+                    |(replay, digest)| {
+                        workflow_cassette_digest = Some(digest);
+                        replay
                     },
-                )?,
-            );
+                )
+            } else {
+                cassette_replay::CassetteReplayProvider::from_file(cassette, *strict)
+            }
+            .map_err(|error| {
+                format!("MAOS_INFERENCE_MODE=replay cassette initialization failed: {error}")
+            })?;
+            let replay: Arc<dyn maos_providers::Provider> = Arc::new(replay);
             for provider in providers_map.values_mut() {
                 *provider = Arc::clone(&replay);
             }
@@ -4404,13 +4481,74 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 _ => None,
             },
         });
-    // 20-1a: only serving/shell roots enumerate installs, never diagnostic one-shots.
-    let installed_manifests =
-        if shell_mode || (run_args.is_none() && std::env::var_os("MAOS_ONE_SHOT").is_none()) {
-            maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
-        } else {
-            Vec::new()
+    if let Some(workflow) = workflow {
+        let workflow_mode = match workflow_cassette_digest {
+            Some(cassette_digest) => {
+                Some(maos_bin::workflow::InferenceMode::Replay { cassette_digest })
+            }
+            None if workflow_live => Some(maos_bin::workflow::InferenceMode::Live {
+                max_calls: maos_bin::workflow::live_call_limit()?,
+                providers: workflow_providers,
+            }),
+            None => None,
         };
+        maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+        let result = workflow
+            .execute(
+                &maos_bin::admission::AdmissionDeps {
+                    providers: provider_catalog.get(),
+                    iac: Some(&iac),
+                    scheduler: &scheduler,
+                    security: &security,
+                    transparency_log: &transparency_log,
+                    journal: &shared_journal,
+                    memory: &memory,
+                    pid_by_spirit_id: &pid_by_spirit_id,
+                    hooks: None,
+                    quarantine: Some(&*quarantine),
+                },
+                if let Some(mode) = workflow_mode {
+                    Some(Arc::new(maos_bin::workflow::GovernedInference {
+                        port: port_builder().ok_or("workflow: inference port unavailable")?,
+                        mode,
+                        capability: Arc::clone(&capability),
+                        enterprise: enterprise_runtime.clone(),
+                        pdp: enterprise_pdp_runtime.clone(),
+                        principal: session_principal.clone(),
+                        meter: Default::default(),
+                    }))
+                } else {
+                    None
+                },
+                boot_nonce,
+            )
+            .await;
+        // A call that never settled still holds a blocking thread; dropping the runtime would wait on it.
+        if let Err(error) = &result {
+            if error.to_string().contains("did not settle") {
+                eprintln!("maos: {error}");
+                std::process::exit(1);
+            }
+        }
+        hook_pump.shutdown().await;
+        return result;
+    }
+    // 20-1a: only serving/shell roots enumerate installs, never diagnostic one-shots.
+    let installed_manifests = if let Some((_, installed)) = host_boot.as_ref() {
+        // Story 22-1 (D-22-1-03 A) — under `serve` the boot set is exactly the file's list.
+        installed.clone()
+    } else if shell_mode || (run_args.is_none() && std::env::var_os("MAOS_ONE_SHOT").is_none()) {
+        maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()?
+    } else {
+        Vec::new()
+    };
+    if let Some((host, _)) = host_boot.as_ref() {
+        maos_bin::admission::declare_manifest_ids(
+            host.manifest_entries()
+                .into_iter()
+                .map(|entry| std::path::PathBuf::from(entry.manifest)),
+        );
+    }
     // Story 20-9 — builds what a spawned session's dependencies hang on, for every root that
     // arms swap handles. It only borrows: the handles that keep the result are owned by the
     // supervisor, so no composition-root local outlives the audit drain through it.
@@ -4474,6 +4612,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &swap_slot,
         );
     }
+    // Story 22-4 — a door root with an installed cast serves directed tasks (`ask`,
+    // `GET /v1/tasks/{id}`) over it. Other roots build none, so none retains the kernel
+    // handles the audit drain waits on.
+    if let (Some(door), false) = (operator_door_port.as_ref(), installed_manifests.is_empty()) {
+        let tasks = maos_bin::directed_task::DirectedTasks::new(
+            maos_bin::directed_task::KernelTaskHost::new(
+                Arc::clone(&scheduler),
+                Arc::clone(&capability),
+                Arc::clone(&halt_registry),
+                Arc::clone(&transparency_log),
+            ),
+            maos_bin::directed_task::TaskLimits::default(),
+        );
+        door.set_directed_tasks(Arc::clone(&tasks));
+        directed_tasks = Some(tasks);
+    }
     let installed_spirits = Arc::new(
         maos_bin::installed_spirits::InstalledSpirits::boot(
             installed_manifests,
@@ -4487,9 +4641,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 memory: &memory,
                 pid_by_spirit_id: &pid_by_spirit_id,
                 hooks: Some(&*hook_pump),
+                quarantine: Some(&*quarantine),
             },
             &selected_crypto,
             boot_nonce,
+            shell_mode,
+            directed_tasks.as_ref(),
             #[cfg(feature = "wasm-host")]
             spirit_host.as_deref(),
             #[cfg(feature = "wasm-host")]
@@ -4511,15 +4668,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await,
     );
+    if let Some((host, _)) = host_boot.as_ref() {
+        if let Err(error) = host.installed_refusal(&|name| installed_spirits.refusal_code(name)) {
+            eprintln!("maos serve: {error}");
+            std::process::exit(78);
+        }
+    }
     let mut yank_poller_task = {
-        let observer = Arc::new(maos_bin::yank_policy::YankRuntime::new(
-            capability.clone(),
-            transparency_log.clone(),
-            scheduler.clone(),
-            revocation_applier.clone(),
-            yank_policy,
-            registry_cfg.uri.clone(),
-        ));
+        let observer = Arc::new(
+            maos_bin::yank_policy::YankRuntime::new(
+                capability.clone(),
+                transparency_log.clone(),
+                scheduler.clone(),
+                revocation_applier.clone(),
+                yank_policy,
+                registry_cfg.uri.clone(),
+            )
+            .with_quarantine(Arc::clone(&quarantine)),
+        );
         eprintln!(
             "maos: yank cadence={}s policy={} registry-fetch={}",
             interval.as_secs(),
@@ -4615,6 +4781,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await
                 .map_err(|e| format!("shell: scheduler.load failed: {e}"))?;
+            maos_bin::operator_door::record_form(hello_pid, "in-process");
             // 2. Admit at the real pid through the canonical path. The
             //    journal is the daemon's `shared_journal` — the block's own
             //    `JournalAdapter::open` is deleted (one journal handle per
@@ -4741,6 +4908,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // races the drain) → port drop → audit-writer drain → locks. The
         // body above is one async block, so no `?` between the bind and here
         // can bypass this.
+        if let Some(tasks) = directed_tasks.as_ref() {
+            tasks.quiesce();
+        }
         if let Some(server) = operator_http_server.as_mut() {
             server.shutdown();
         }
@@ -4752,6 +4922,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         yank_poller_task.shutdown().await;
         if let Some(root) = installed_supervision.take() {
             root.stop_and_join().await;
+        }
+        if let Some(tasks) = directed_tasks.take() {
+            tasks.stop().await;
         }
         Arc::try_unwrap(installed_spirits)
             .ok()
@@ -5040,12 +5213,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 1. Read + parse the manifest.
         let manifest_path = std::path::PathBuf::from(&run.manifest_path);
-        let manifest_toml = std::fs::read_to_string(&manifest_path).map_err(|e| {
-            format!(
-                "maos run: failed to read manifest {}: {e}",
-                manifest_path.display()
-            )
-        })?;
+        let manifest_toml = match host_boot.as_ref() {
+            Some((host, _)) => host.topology_toml(),
+            None => std::fs::read_to_string(&manifest_path).map_err(|e| {
+                format!(
+                    "maos run: failed to read manifest {}: {e}",
+                    manifest_path.display()
+                )
+            })?,
+        };
         let manifest_root: toml::Value = toml::from_str(&manifest_toml)
             .map_err(|e| format!("maos run: manifest TOML parse error: {e}"))?;
         // Story 18-4 (CR-2) — the compressed scene drives Butler only.
@@ -5073,12 +5249,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .into());
         }
-        if let Some(topology_entries) =
-            maos_bin::topology::topology_manifest_entries(&manifest_root)?
-        {
+        let topology_entries = match host_boot.as_ref() {
+            Some((host, _)) => Some(host.manifest_entries()),
+            None => maos_bin::topology::topology_manifest_entries(&manifest_root)?,
+        };
+        if let Some(topology_entries) = topology_entries {
             let topology_base = manifest_path
                 .parent()
                 .unwrap_or_else(|| std::path::Path::new("."));
+            maos_bin::admission::declare_manifest_ids(
+                topology_entries
+                    .iter()
+                    .map(|entry| topology_base.join(&entry.manifest)),
+            );
             let mut loaded_pids: Vec<(String, u32)> = Vec::with_capacity(topology_entries.len());
             // T1 — host-authorized CliWrapper Developer-Workers admitted as
             // topology members (not scheduler class Spirits). Tracked separately
@@ -5092,6 +5275,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // signal must exit NON-ZERO: the `--once` pass never completed, and
             // an exit 0 there is the 2a AC1.5 false-success shape.
             let mut topology_interrupted = false;
+            // Story 22-8 (D-22-8-07 A) — the Host's in-process A2A router, when the topology
+            // declares `[[topology.a2a_peers]]`. Held here, beyond the load block, for the
+            // root's life: Nash's intake consumer lives in it.
+            let mut a2a_cast: Option<Arc<maos_bin::loopback_cast::LoopbackCast>> = None;
             // Story 17-10 review D2 — the whole load runs in ONE async block
             // whose result the teardown below takes (the 16-3 funnel of the
             // standalone arm): a Worker that did not complete, a refused
@@ -5155,6 +5342,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut section_instruction: Option<
                     maos_domain::orchestrator::OrchestratorInstruction,
                 > = None;
+                let a2a_peers = maos_bin::topology::topology_a2a_peers(&manifest_root)?;
+                if !a2a_peers.is_empty() {
+                    a2a_cast = Some(
+                        maos_bin::loopback_cast::LoopbackCast::build(
+                            a2a_peers,
+                            Arc::clone(&transparency_log),
+                        )
+                        .await?,
+                    );
+                }
                 let mut entries = topology_entries.into_iter().enumerate();
                 // Story 16-3 (D-16-3-E) — the entry INDEX is the task id of a
                 // topology Worker with no `host`; `TopologyEntry` carries only
@@ -5877,6 +6074,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     let needs_port = requires_epistemic_halt_port(epistemic_policy.as_ref());
                     let strip_port = std::env::var_os("MAOS_TEST_ONLY_STRIP_SCALAR_PORT").is_some();
+                    // Story 22-8 — Mira's door-task runner, registered once she is admitted.
+                    let mut native_runner: Option<maos_bin::native_task::MiraRunner> = None;
                     let mut pid_fixups: Vec<Box<dyn FnMut(u32) + Send>> = Vec::new();
                     let spirit_obj: Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> =
                         match kind {
@@ -5979,15 +6178,76 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 pid_fixups.push(Box::new(move |pid| {
                                     pid_binding.store(pid, std::sync::atomic::Ordering::Release);
                                 }));
-                                maos_kernel_core::scheduler::make_spirit_obj(
-                                    mira::Mira::default()
-                                        .with_id(&spirit_id)
-                                        .with_scalar_port(adapter),
+                                // Story 22-8 (D-22-8-02/04/06/07 A) — the native directed
+                                // leg: her task handler's ports are the host's (the minted
+                                // Inference Port under an explicit mode, her pid-bound
+                                // memory, the cast's advisory route).
+                                let pid_of = maos_bin::native_task::scheduler_pid_source(
+                                    &scheduler, &spirit_id,
+                                );
+                                let seam = butler_seam
+                                    .lock()
+                                    .unwrap_or_else(|error| error.into_inner())
+                                    .clone()
+                                    .ok_or("maos run: butler seam not ready")?;
+                                let inference = maos_bin::native_task::bind_inference(
+                                    &seam,
+                                    &maos_bin::admission::declared_pins(&gated),
+                                    pid_of.clone(),
                                 )
+                                .map_err(|error| format!("maos run: {error}"))?;
+                                let mira_obj = mira::Mira::default()
+                                    .with_id(&spirit_id)
+                                    .with_scalar_port(adapter);
+                                native_runner = Some(maos_bin::native_task::MiraRunner::new(
+                                    mira_obj.clone(),
+                                    inference,
+                                    maos_bin::native_task::PidBoundDiagnosisMemory::new(
+                                        Arc::downgrade(&memory),
+                                        pid_of.clone(),
+                                    ),
+                                    a2a_cast
+                                        .as_ref()
+                                        .and_then(|cast| cast.route_for(&spirit_id)),
+                                    Arc::clone(&transparency_log),
+                                    pid_of,
+                                ));
+                                maos_kernel_core::scheduler::make_spirit_obj(mira_obj)
                             }
-                            LoadedSpiritKind::Nash => maos_kernel_core::scheduler::make_spirit_obj(
-                                nash::Nash::default().with_id(&spirit_id),
-                            ),
+                            LoadedSpiritKind::Nash => {
+                                // Story 22-8 (D-22-8-04/07 A) — Nash's phrasing seam and his
+                                // intake consumer (journal the admitted advisory, architect,
+                                // journal the proposal). He is not directable (D-22-8-03 A).
+                                let pid_of = maos_bin::native_task::scheduler_pid_source(
+                                    &scheduler, &spirit_id,
+                                );
+                                let seam = butler_seam
+                                    .lock()
+                                    .unwrap_or_else(|error| error.into_inner())
+                                    .clone()
+                                    .ok_or("maos run: butler seam not ready")?;
+                                let mut nash_obj = nash::Nash::default().with_id(&spirit_id);
+                                if let Some(port) = maos_bin::native_task::bind_inference(
+                                    &seam,
+                                    &maos_bin::admission::declared_pins(&gated),
+                                    pid_of.clone(),
+                                )
+                                .map_err(|error| format!("maos run: {error}"))?
+                                {
+                                    nash_obj = nash_obj.with_inference_port(port);
+                                }
+                                if let Some(cast) = a2a_cast.as_ref() {
+                                    cast.attach_consumer(
+                                        &spirit_id,
+                                        maos_bin::loopback_cast::architect_handler(
+                                            nash_obj.clone(),
+                                            Arc::clone(&transparency_log),
+                                            pid_of,
+                                        ),
+                                    );
+                                }
+                                maos_kernel_core::scheduler::make_spirit_obj(nash_obj)
+                            }
                             LoadedSpiritKind::Digest => maos_kernel_core::scheduler::make_spirit_obj(
                                 maos_digest::DigestSpirit::default(),
                             ),
@@ -6014,6 +6274,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             memory: &memory,
                             pid_by_spirit_id: &pid_by_spirit_id,
                             hooks: Some(&hook_pump),
+                            quarantine: Some(&*quarantine),
                         },
                         &gated,
                         spirit_obj,
@@ -6034,6 +6295,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .map_err(|refusal| format!("maos run: topology entry '{spirit_id}': {refusal}"))?;
                     let pid = admitted.pid;
+                    if let (Some(runner), Some(door)) =
+                        (native_runner.take(), operator_door_port.as_ref())
+                    {
+                        // Story 22-8 (D-22-8-02 A) — a door root directs Mira whether or not it
+                        // serves installed members: the registry exists as soon as one native
+                        // runner needs it.
+                        let tasks = directed_tasks.get_or_insert_with(|| {
+                            let tasks = maos_bin::directed_task::DirectedTasks::new(
+                                maos_bin::directed_task::KernelTaskHost::new(
+                                    Arc::clone(&scheduler),
+                                    Arc::clone(&capability),
+                                    Arc::clone(&halt_registry),
+                                    Arc::clone(&transparency_log),
+                                ),
+                                maos_bin::directed_task::TaskLimits::default(),
+                            );
+                            door.set_directed_tasks(Arc::clone(&tasks));
+                            tasks
+                        });
+                        tasks.register(&spirit_id, Arc::new(runner));
+                    }
                     println!(
                         "{}",
                         serde_json::json!({
@@ -6045,6 +6327,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         })
                     );
                     loaded_pids.push((spirit_id, pid));
+                }
+                if let Some(cast) = a2a_cast.as_ref() {
+                    if let Some(name) = cast
+                        .peer_names()
+                        .find(|name| !loaded_pids.iter().any(|(id, _)| id == name))
+                    {
+                        return Err(format!(
+                            "maos run: [[topology.a2a_peers]] names '{name}', which is not a \
+                             loaded cast member"
+                        )
+                        .into());
+                    }
+                }
+                // Story 22-8 (D-22-8-05 A) — a serving root re-admits the halts its cast left
+                // unresolved; a `--once` pass restarts nothing and carries nothing.
+                if !run.once {
+                    let report = maos_bin::halt_carry::carry_over(
+                        &audit_db_path,
+                        &transparency_log,
+                        &halt_registry,
+                        &loaded_pids,
+                        boot_nonce,
+                    )
+                    .map_err(|error| format!("maos run: halt carry-over: {error}"))?;
+                    for carried in &report.carried {
+                        println!(
+                            "{}",
+                            serde_json::json!({
+                                "event": "halt_carried",
+                                "halt_id": carried.halt_id,
+                                "spirit_id": carried.spirit_id,
+                                "from_boot": carried.from_boot,
+                                "from_pid": carried.from_pid,
+                                "to_pid": carried.to_pid,
+                            })
+                        );
+                    }
+                    for gap in &report.gaps {
+                        eprintln!("maos run: halt carry-over: {gap}");
+                    }
                 }
                 Ok(())
             }
@@ -6171,6 +6493,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await;
                 unload_report.render(&mut std::io::stderr());
+                // Story 22-8 — a door root that directed Mira: the pump leaves before the audit
+                // drain, so none holds a sender open.
+                if let Some(tasks) = directed_tasks.take() {
+                    tasks.stop().await;
+                }
                 drop(audit_tx);
                 drop(inference);
                 drop(capability);
@@ -6404,6 +6731,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 classify_spirit(name).is_some()
             })
             .map_err(|refusal| format!("maos run: {refusal}"))?;
+            #[cfg(feature = "wasm-host")]
+            let mut held_component = maos_bin::spirit_session::bind_registry_launch(
+                &mut gated,
+                std::path::Path::new(&run.manifest_path),
+            )?;
+            #[cfg(not(feature = "wasm-host"))]
             gated.bind_registry_package_at(std::path::Path::new(&run.manifest_path))?;
             maos_bin::admission::check_gated_pins(&gated, provider_catalog.get())
                 .map_err(|refusal| refusal.to_string())?;
@@ -6417,11 +6750,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             });
             #[cfg(feature = "wasm-host")]
             let mut spawned_launch = if wasm {
-                Some(maos_bin::spirit_session::manifest_launch(
+                Some(maos_bin::spirit_session::manifest_launch_for(
                     spirit_host.as_deref().ok_or("WASM host is unavailable")?,
                     &gated,
                     std::path::Path::new(&run.manifest_path),
                     run.once,
+                    held_component.take(),
                 )?)
             } else {
                 None
@@ -6912,6 +7246,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // Story 20-9 — a spawned form registers too (consolidate; telemetry only
                     // when its manifest lists it).
                     hooks: Some(&*hook_pump),
+                    quarantine: Some(&*quarantine),
                 },
                 &gated,
                 spirit_obj,
@@ -9650,11 +9985,6 @@ description = "smoke test spirit successor"
             return smoke_spirit_author_7_1().await;
         }
 
-        // Story 7.1.5 AC5 — smoke-discipline-7-1-5: run all four §A2-family gates
-        if mode == "smoke-discipline-7-1-5" {
-            return smoke_discipline_7_1_5().await;
-        }
-
         // Story 7.2 AC6 — end-to-end registry round-trip smoke arms.
         if mode == "smoke-registry-7-2" {
             // D4 remediation: fast path (in-process, <100ms) by default;
@@ -10002,6 +10332,11 @@ description = "smoke test spirit successor"
     // that mutation or its completion row. The shared store-lock set remains
     // held through audit-writer drain so no offline child can enter while any
     // daemon-owned store writer is still alive.
+    // Story 22-4 — the Host is stopping: nothing more is accepted or delivered, and a turn the
+    // unload below cuts short is left to read `interrupted`, never journaled as a failure.
+    if let Some(tasks) = directed_tasks.as_ref() {
+        tasks.quiesce();
+    }
     if let Some(server) = operator_http_server.as_mut() {
         server.shutdown();
     }
@@ -10060,6 +10395,11 @@ description = "smoke test spirit successor"
         post_unload_stop.as_deref(),
     )
     .await;
+    // Story 22-4 — every unload has ended its Spirit's turn; the task pumps leave before the
+    // audit drain, so none holds a sender open.
+    if let Some(tasks) = directed_tasks.take() {
+        tasks.stop().await;
+    }
     Arc::try_unwrap(installed_spirits)
         .ok()
         .expect("serving root released installs")
@@ -10288,6 +10628,8 @@ struct BinPrivateOpsImpl {
     /// Story 17-4 — a door-loaded compiled-in Spirit registers with the
     /// root's hook pump like any other admission.
     hooks: Arc<maos_bin::hook_pump::HookPump>,
+    /// FR13 — a door-loaded Spirit re-applies an active quarantine hold like every admission.
+    quarantine: Arc<maos_bin::quarantine::QuarantineGate>,
     /// Story 19-2 (D-19-2-08 A) — the boot-bound Butler principal.
     butler_principal: Arc<std::sync::OnceLock<String>>,
     /// Story 20-9 — the root's spawned-form handles, filled once its supervision is armed.
@@ -10297,11 +10639,68 @@ struct BinPrivateOpsImpl {
     schedule_watchdog: Arc<maos_kernel_core::scheduler::ScheduleWatchdog>,
 }
 
+/// Acquire, once, the component the WASM manifest `text` declares. `source` is the original
+/// path the manifest was read from (never a private snapshot): a signed package there is
+/// verified and the component that verification acquired is handed over directly, matched to
+/// the gated manifest, id and version; a source that carries a package never falls back to a
+/// local open. An unsigned source is opened locally under `origin`. `pin` is a digest the
+/// bytes must have.
+#[cfg(feature = "wasm-host")]
+fn acquire_source_launch(
+    text: &str,
+    source: Option<&std::path::Path>,
+    origin: &std::path::Path,
+    pin: Option<[u8; 32]>,
+) -> Result<maos_bin::spirit_session::LaunchArtifact, maos_bin::admission::AdmissionRefusal> {
+    use maos_bin::admission::AdmissionRefusal;
+    use maos_bin::spirit_session::LaunchArtifact;
+    let class_build = |detail: String| AdmissionRefusal::ClassBuild {
+        detail: format!("under {}: {detail}", origin.display()),
+    };
+    let gated = maos_bin::admission::gate_manifest(text, &|_| false)?;
+    let signed = source
+        .map(|source| maos_registry::install::signed_package_at_launch(&gated.spirit_id, source))
+        .transpose()
+        .map_err(|error| AdmissionRefusal::from_registry_error(&*error))?
+        .flatten();
+    if let Some((package, component)) = signed {
+        if package.manifest_toml != text.as_bytes()
+            || package.version != gated.class_section.version
+        {
+            return Err(AdmissionRefusal::Admission {
+                detail: "registry manifest differs from its signed package".into(),
+            });
+        }
+        let component = component
+            .ok_or_else(|| class_build("the signed package carries no component".into()))?;
+        if pin.is_some_and(|pin| pin != component.artifact_sha256()) {
+            return Err(class_build(
+                "the signed component differs from the digest it was pinned to".into(),
+            ));
+        }
+        return Ok(LaunchArtifact::from_verified(component, &gated)?);
+    }
+    let name = gated
+        .class_section
+        .artifact
+        .as_deref()
+        .ok_or_else(|| class_build("WASM manifest has no artifact".into()))?;
+    Ok(LaunchArtifact::acquire_local(origin, name, pin)?)
+}
+
+#[cfg(feature = "wasm-host")]
+fn swap_context_of(
+    slot: &maos_bin::spawned_lifecycle::SwapSlot,
+    spirit_id: &str,
+) -> Option<maos_bin::spawned_lifecycle::SwapContext> {
+    slot.get()?.target(spirit_id)?.lifecycle().swap_context()
+}
+
 #[cfg(feature = "network")]
 #[async_trait::async_trait]
 impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
-    fn forget_promotion_set(&self, spirit_id: &str) {
-        self.iac.unregister_promotion_set(spirit_id);
+    fn forget_promotion_set(&self, spirit_id: &str, pid: u32) {
+        self.iac.withdraw_spirit(spirit_id, pid);
     }
 
     async fn append_lifecycle_journal(
@@ -10405,14 +10804,14 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
             original_target,
             policy,
             |path, source| {
-                enforce_vetted_upgrade_precondition(spirit_id, path, evidence).map_err(
-                    |detail| maos_bin::operator_door::UpgradeFailure {
-                        code: "vetting_precondition_failed",
-                        detail,
-                        invalid: true,
-                        conflict: false,
-                    },
-                )?;
+                let refused = |code, detail| maos_bin::operator_door::UpgradeFailure {
+                    code,
+                    detail,
+                    invalid: true,
+                    conflict: false,
+                };
+                enforce_vetted_upgrade_precondition(spirit_id, path, evidence)
+                    .map_err(|detail| refused("vetting_precondition_failed", detail))?;
                 // The final hop is the door's private snapshot; its `artifact` stays where the
                 // operator named the target. An intermediate hop is the plan's own file.
                 let origin = if source == target_manifest {
@@ -10425,8 +10824,67 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                     || std::path::PathBuf::from("."),
                     std::path::Path::to_path_buf,
                 );
+                // The component this exact hop launches is acquired here, once, and carried
+                // to the successor factory. A signed source (the final hop's original target,
+                // or an intermediate hop's own file) hands over the component its own
+                // verification acquired; only an unsigned source is opened locally.
+                #[cfg(feature = "wasm-host")]
+                let held: Option<maos_bin::operator_door::HeldLaunch> = {
+                    let text = maos_bin::admission::read_manifest(path)
+                        .map_err(|error| refused("component_artifact_refused", error.to_string()))?;
+                    // The hop's declared form is compared with the live Spirit's form before
+                    // any component is opened: a form change at a pid is a typed mismatch that
+                    // preserves the predecessor, never an artifact-access refusal. The live
+                    // form is read from the coordinator's current session handles, per hop.
+                    if let Ok(class) = maos_bin::admission::manifest_identity(&text) {
+                        let hop_spawned = !class.forms.iter().any(|form| form == "rust-inproc");
+                        let live_spawned = self
+                            .swap_slot
+                            .get()
+                            .is_some_and(|handles| handles.target(spirit_id).is_some());
+                        if hop_spawned != live_spawned {
+                            let form = |spawned: bool| if spawned { "spawned" } else { "in-process" };
+                            return Err(maos_bin::operator_door::UpgradeFailure {
+                                code: "swap_form_mismatch",
+                                detail: format!(
+                                    "swap_form_mismatch: '{spirit_id}' is {} and the successor is {}",
+                                    form(live_spawned),
+                                    form(hop_spawned)
+                                ),
+                                invalid: false,
+                                conflict: true,
+                            });
+                        }
+                    }
+                    if maos_bin::admission::is_spawned_form(&text) {
+                        let (signed_source, pin) = if source == target_manifest {
+                            (
+                                original_target,
+                                evidence.package.map(|package| {
+                                    <[u8; 32]>::from(<sha2::Sha256 as sha2::Digest>::digest(
+                                        &package.artifact_bytes,
+                                    ))
+                                }),
+                            )
+                        } else {
+                            (source, None)
+                        };
+                        let launch = acquire_source_launch(&text, Some(signed_source), &origin, pin)
+                            .map_err(|refusal| match refusal.code() {
+                                code @ "wasm_transport_unsupported" => {
+                                    refused(code, refusal.to_string())
+                                }
+                                _ => refused("component_artifact_refused", refusal.to_string()),
+                            })?;
+                        Some(Box::new(launch) as maos_bin::operator_door::HeldLaunch)
+                    } else {
+                        None
+                    }
+                };
+                #[cfg(not(feature = "wasm-host"))]
+                let held: Option<maos_bin::operator_door::HeldLaunch> = None;
                 self.successor_manifest_slot
-                    .stage_at(path.to_path_buf(), origin);
+                    .stage_at(path.to_path_buf(), origin, held);
                 Ok(())
             },
             |text| self.record_upgraded_manifest(spirit_id, text),
@@ -10532,6 +10990,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 memory: &self.memory,
                 pid_by_spirit_id: &self.pid_by_spirit_id,
                 hooks: Some(&self.hooks),
+                quarantine: Some(&*self.quarantine),
             },
             &gated,
             spirit_obj,
@@ -10555,9 +11014,20 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         &self,
         manifest: &std::path::Path,
         origin: &std::path::Path,
+        held: maos_bin::operator_door::HeldLaunch,
     ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
+        let artifact = *held
+            .downcast::<maos_bin::spirit_session::LaunchArtifact>()
+            .map_err(|_| maos_bin::admission::AdmissionRefusal::ClassBuild {
+                detail: "held_component_refused: not a launch artifact".into(),
+            })?;
         let text = maos_bin::admission::read_manifest(manifest)?;
-        let gated = self.prepare_spawned_restore(manifest, &text, origin)?;
+        let mut gated = self.prepare_spawned_restore(manifest, &text, origin)?;
+        // The publisher the held component was verified (or restored) under binds the
+        // snapshot: it has no package beside it, so it is never looked up there.
+        if let Some(publisher) = artifact.publisher() {
+            gated.bind_registry_publisher(&publisher);
+        }
         let handles = self.swap_slot.get().ok_or(
             maos_bin::admission::AdmissionRefusal::SpawnedSurfaceUnsupported {
                 surface: "operator door",
@@ -10575,11 +11045,13 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                     memory: &self.memory,
                     pid_by_spirit_id: &self.pid_by_spirit_id,
                     hooks: Some(&self.hooks),
+                    quarantine: Some(&*self.quarantine),
                 },
                 self.spirit_build.boot_nonce,
                 &gated,
                 manifest,
                 origin,
+                artifact,
             )
             .await
             .map_err(|refusal| {
@@ -10603,7 +11075,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         &self,
         manifest: &std::path::Path,
         manifest_toml: &str,
-        origin: &std::path::Path,
+        _origin: &std::path::Path,
     ) -> Result<maos_bin::admission::GatedManifest, maos_bin::admission::AdmissionRefusal> {
         let mut gated = maos_bin::admission::gate_manifest(manifest_toml, &|_| false)?;
         gated.bind_registry_package_at(manifest)?;
@@ -10615,25 +11087,63 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
                 },
             );
         }
-        // The artifact must still be where the Spirit was launched from (and stay inside that
-        // directory), or the restore of a refused cold swap would leave the Spirit absent.
-        let artifact = gated.class_section.artifact.as_deref().unwrap_or_default();
-        maos_bin::spirit_session::resolve_artifact(origin, artifact).map_err(|error| {
-            maos_bin::admission::AdmissionRefusal::ClassBuild {
-                detail: format!("under {}: {error}", origin.display()),
-            }
-        })?;
         Ok(gated)
+    }
+
+    /// The component a cold swap (or its restore) launches, acquired once under `origin` before
+    /// any unload and carried through the launch. An artifact that is absent, escapes `origin`,
+    /// or differs from `pin` is refused typed here.
+    #[cfg(feature = "wasm-host")]
+    fn acquire_spawned_artifact(
+        &self,
+        _manifest: &std::path::Path,
+        manifest_toml: &str,
+        origin: &std::path::Path,
+        source: Option<&std::path::Path>,
+        pin: Option<[u8; 32]>,
+    ) -> Result<maos_bin::operator_door::HeldLaunch, maos_bin::admission::AdmissionRefusal> {
+        use maos_bin::operator_door::BinPrivateOps as _;
+        let artifact = acquire_source_launch(manifest_toml, source, origin, pin)?;
+        let id = maos_bin::admission::peek_spirit_id_from_str(manifest_toml);
+        if artifact.publisher() != id.and_then(|id| self.spawned_publisher(&id)) {
+            return Err(maos_bin::admission::AdmissionRefusal::ClassBuild {
+                detail: maos_bin::spirit_session::SWAP_PUBLISHER_CHANGED.into(),
+            });
+        }
+        Ok(Box::new(artifact))
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn spawned_artifact_sha256(&self, spirit_id: &str) -> Option<[u8; 32]> {
+        swap_context_of(&self.swap_slot, spirit_id)?.artifact_sha256
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn spawned_publisher(&self, spirit_id: &str) -> Option<[u8; 32]> {
+        swap_context_of(&self.swap_slot, spirit_id)?.verified_publisher
+    }
+
+    #[cfg(feature = "wasm-host")]
+    fn acquire_spawned_restore(
+        &self,
+        _manifest: &std::path::Path,
+        manifest_toml: &str,
+        origin: &std::path::Path,
+        pin: [u8; 32],
+        publisher: Option<[u8; 32]>,
+    ) -> Result<maos_bin::operator_door::HeldLaunch, maos_bin::admission::AdmissionRefusal> {
+        // The exact recorded bytes (digest-pinned, opened locally: the staged name is never
+        // consulted for provenance) re-enter with the publisher verified at first launch.
+        let mut artifact = acquire_source_launch(manifest_toml, None, origin, Some(pin))?;
+        if let Some(publisher) = publisher {
+            artifact = artifact.restored_under(publisher, pin)?;
+        }
+        Ok(Box::new(artifact))
     }
 
     #[cfg(feature = "wasm-host")]
     fn spawned_origin(&self, spirit_id: &str) -> Option<std::path::PathBuf> {
-        self.swap_slot
-            .get()?
-            .target(spirit_id)?
-            .lifecycle()
-            .swap_context()
-            .map(|context| context.origin)
+        swap_context_of(&self.swap_slot, spirit_id).map(|context| context.origin)
     }
 
     #[cfg(feature = "wasm-host")]
@@ -10668,6 +11178,20 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
 
     fn migration_plan_pending(&self, spirit_id: &str) -> bool {
         migration_plan::plan_pending(spirit_id)
+    }
+
+    fn widens_promotion(&self, spirit_id: &str, text: &str) -> bool {
+        let fr8 = maos_bin::admission::manifest_identity(text).is_ok_and(|class| {
+            class.manifest_schema_version >= maos_manifest::FR8_DECLARATIONS_SINCE_SCHEMA
+        });
+        let section = toml::from_str::<toml::Value>(text)
+            .ok()
+            .filter(|_| fr8)
+            .and_then(|root| toml::to_string(root.get("intent_promotion_set")?).ok())
+            .and_then(|body| maos_manifest::IntentPromotionSetSection::from_toml_str(&body).ok());
+        self.iac.promotion_set_of(spirit_id).is_some_and(|held| {
+            !section.is_some_and(|section| section.to_allowed_set().is_subset_of(&held))
+        })
     }
 
     fn butler_principal(&self) -> Option<String> {
@@ -12351,6 +12875,8 @@ struct CohortDaemonBootstrap {
     /// j1-crosshost-2b — the operator-configured `[cli_wrapper]` manifest host B
     /// runs for an inbound delegation. `None` ⇒ no intake sink, no J1 consumer.
     worker_manifest: Option<std::path::PathBuf>,
+    /// Story 21-3 — the durable pin file; set only by `run_cohort_a2a_daemon`.
+    pin_persistence: Option<Arc<dyn maos_a2a_core::tofu::PinPersistence>>,
 }
 
 // Story 13.5c — read MAOS_COHORT_DAEMON_CONFIG (if set) and load the verified
@@ -12418,6 +12944,7 @@ fn load_cohort_daemon_bootstrap(
         control_spirit: maos_spirit_abi::identity::SpiritId::from(file.control_spirit),
         digest_summary: file.digest_summary,
         worker_manifest: file.worker_manifest,
+        pin_persistence: None,
     })
 }
 
@@ -12893,7 +13420,18 @@ async fn run_cohort_a2a_daemon(
     // The state is loaded at the composition root when the config is present;
     // its absence here means MAOS_COHORT_DAEMON_CONFIG was unset — the pre-13.5c
     // typed error, preserved.
-    let bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
+    let mut bootstrap = bootstrap.ok_or("MAOS_COHORT_DAEMON_CONFIG must name the daemon TOML")?;
+    // Story 21-3 — only this root opens the durable pin file (one writer per file).
+    // One file per local host identity: several daemons may share a `MAOS_HOME` (the
+    // multi-team scene), but each pin file keeps its single writer. Hex keeps the config
+    // string out of the path grammar.
+    let pin_file = maos_domain::operator_door::maos_home()?
+        .ok_or("cohort daemon: neither MAOS_HOME nor HOME is set; no home for the pin file")?
+        .join(format!(
+            "a2a-pins-{}.json",
+            hex::encode(bootstrap.local_host.as_str())
+        ));
+    bootstrap.pin_persistence = Some(Arc::new(maos_persistence::FilePinStore::open(&pin_file)?));
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     // Story 13.5a — the SIEM export consumer previously never ran in daemon
     // mode (the dispatch returns above its spawn). It shares the posture's
@@ -13316,7 +13854,68 @@ fn reconcile_transport_identity_with_manifest(
             &env_team,
         )?;
     }
+    // (e) Story 22-1 / AC4 (21-3 AC6, D4a) — THE REGION AXIS: the value that stamps rows
+    // (the one `.with_home_region` receives) against the signed `TeamEntry.region` of this
+    // host's team. Same doctrine, same hermetic home in `cross_team_crossing`.
+    maos_bin::cross_team_crossing::reconcile_home_region_with_manifest(
+        &manifest,
+        state.local_host().as_str(),
+        maos_bin::host_config::stamped_home_region()
+            .as_ref()
+            .map(|region| region.as_str()),
+    )?;
     Ok(())
+}
+
+/// Story 22-1 — read, validate and apply the Host file for `maos serve`. Every failure is a
+/// typed refusal (exit 78, like a bad crypto selection) before any store or Spirit opens.
+/// Returns the file and the installed members of its cast.
+#[cfg(feature = "network")]
+fn boot_host_config(
+    args: &[String],
+) -> (
+    maos_bin::host_config::HostConfig,
+    Vec<(String, std::path::PathBuf)>,
+) {
+    use maos_bin::host_config::{HostConfig, HostConfigError};
+    fn refuse(error: HostConfigError) -> ! {
+        eprintln!("maos serve: {error}");
+        std::process::exit(78)
+    }
+    let path = maos_bin::host_config::parse_serve_args(args).unwrap_or_else(|usage| {
+        eprintln!("{usage}");
+        std::process::exit(2)
+    });
+    let config = HostConfig::load(&path).unwrap_or_else(|error| refuse(error));
+    // The environment overrides a key for this process; a key fills only an unset name.
+    // Done before any worker task reads the environment, while the runtime is idle.
+    for (name, value) in config.env_overlay(&|name| std::env::var_os(name).is_some()) {
+        std::env::set_var(name, value);
+    }
+    let operator_toml = std::env::var_os("HOME").and_then(|home| {
+        std::fs::read_to_string(std::path::PathBuf::from(home).join(".config/maos/operator.toml"))
+            .ok()
+    });
+    let config_toml = match maos_domain::operator_door::maos_home() {
+        Ok(Some(home)) => std::fs::read_to_string(home.join("config.toml")).ok(),
+        _ => None,
+    };
+    config
+        .reconcile_older_files(
+            &|name| std::env::var(name).ok(),
+            operator_toml.as_deref(),
+            config_toml.as_deref(),
+        )
+        .unwrap_or_else(|error| refuse(error));
+    let inventory = maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()
+        .unwrap_or_else(|error| {
+            eprintln!("maos serve: cannot read the installed inventory: {error}");
+            std::process::exit(78)
+        });
+    let installed = config
+        .select_installed(inventory)
+        .unwrap_or_else(|error| refuse(error));
+    (config, installed)
 }
 
 #[cfg(feature = "network")]
@@ -13365,6 +13964,7 @@ async fn build_cohort_a2a_daemon_runtime(
         control_spirit,
         digest_summary,
         worker_manifest: _,
+        pin_persistence,
     } = bootstrap;
     let pull_peers: Vec<maos_spirit_abi::identity::HostId> = peer_configs
         .iter()
@@ -13409,6 +14009,7 @@ async fn build_cohort_a2a_daemon_runtime(
             Some(rupture_sink),
             crossing_port,
             intake_sink,
+            pin_persistence,
         )
         .await
         .map_err(|error| format!("cohort a2a-tcp daemon bind failed: {error}"))?,
@@ -14861,6 +15462,7 @@ async fn smoke_schedule_6_4() -> Result<(), Box<dyn std::error::Error>> {
     let manifest = SpiritManifestBundle {
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_schedule".into()],
+            telemetry: None,
         },
         schedules: SchedulesSection {
             entries: vec![entry],
@@ -15031,57 +15633,6 @@ async fn smoke_spirit_author_7_1() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "{{\"smoke\":\"7-1\",\"status\":\"ok\",\"steps\":[\"scaffold-rust\",\"test-rust\",\"scaffold-ts\",\"test-ts\",\"coverage-3-spirits\"]}}"
-    );
-    Ok(())
-}
-
-#[cfg(feature = "network")]
-/// Story 7.1.5 AC5 — `smoke-discipline-7-1-5` runs the two surviving §A2-family gates (20-3b).
-async fn smoke_discipline_7_1_5() -> Result<(), Box<dyn std::error::Error>> {
-    use std::process::Command;
-    use std::time::Duration;
-    let workspace_root = std::env::current_dir()?;
-
-    let gates = [
-        "check-review-findings-resolved",
-        "check-dev-record-completeness",
-    ];
-
-    // Pre-build xtask once so each gate subprocess hits a warm cache. The
-    // per-gate 30s timeout below is a hang-detector, NOT a compile budget — a
-    // cold `cargo run -p xtask` can take >30s to compile on CI, which would
-    // spuriously trip the timeout after the gate has already printed its result.
-    let build_status = Command::new("cargo")
-        .args(["build", "-q", "-p", "xtask"])
-        .current_dir(&workspace_root)
-        .status()
-        .map_err(|e| format!("xtask pre-build spawn failed: {e}"))?;
-    if !build_status.success() {
-        return Err("xtask pre-build failed".into());
-    }
-    for gate in &gates {
-        eprintln!("[smoke-7.1.5] Running gate: {}", gate);
-        let gate_owned = gate.to_string();
-        let dir = workspace_root.clone();
-        let status = tokio::time::timeout(
-            Duration::from_secs(30),
-            tokio::task::spawn_blocking(move || {
-                Command::new("cargo")
-                    .args(["run", "-q", "-p", "xtask", "--", &gate_owned, "--json"])
-                    .current_dir(&dir)
-                    .status()
-            }),
-        )
-        .await
-        .map_err(|_| format!("gate {} TIMED OUT after 30s", gate))??
-        .map_err(|e| format!("gate {} spawn failed: {}", gate, e))?;
-        if !status.success() {
-            return Err(format!("gate {} FAILED", gate).into());
-        }
-    }
-
-    println!(
-        r#"{{"smoke":"7-1-5","status":"ok","gates":["check-review-findings-resolved","check-dev-record-completeness"]}}"#
     );
     Ok(())
 }

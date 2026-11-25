@@ -271,6 +271,8 @@ coverage:
       Story 1a.1 freezes the InvariantI1 marker type. Story 1b.2 lands the runtime
       enforcement: CapabilityRegistryAdapter composite with cap_tokens (issue/verify),
       cap_policy (evaluate), cap_audit (MPSC writer), cap_quota (budget tracker).
+      Story 21-10: the invariant-ledger-proofs job runs the I1-I14 property tests and
+      adversarial corpora (`docs/invariants/I*.md` ledger).
   I10:
     gates:
       - journal_survives_cold_restart
@@ -2354,10 +2356,10 @@ coverage:
       v2_5_external_n12_owner: Epic-14
     notes: |
       PRD delivery phase remains v2.0; canonical matrix phase bucket v2.0+ (20-3b row 03 B).
-      Third-party trial N=12 gate. Wilson CI advisory, raw count + stratification
-      + per-participant conjunction BLOCKING when results are present
-      (derive-from-detail, with successes and strata reconciled against
-      participant records). Absent = advisory in v1.0/v1.5; at v2.0
+      Third-party trial gate, simplified by Story 22-7: no human-author denominator (no N=12 floor, no
+      >=10 successes floor, no strata, no Wilson CI). The per-participant conjunction BLOCKS when results
+      are present (derive-from-detail, with successes reconciled against participant
+      records); a green gate does not claim the N=12 human cohort. Absent = advisory in v1.0/v1.5; at v2.0
       `check-third-party-trial` default-denies present non-provenanced records
       and `check-trial-attestation` derives clean-reload/SBOM/signing/halt facts.
       Genuine external N=12 execution remains v2.5/Epic-14.

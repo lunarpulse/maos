@@ -1,4 +1,7 @@
 #![cfg(feature = "network")]
+// Story 21-9: the typed boot refusal below is the explicit engine-free witness
+// (`--no-default-features --features network`); the default signed artifact's
+// installed-Spirit reply is the `epic-20-exit` CI job, not this file.
 #[path = "../../../tests/harness/registry_20_1.rs"]
 mod support;
 use support::*;
@@ -79,16 +82,32 @@ fn installed_component_dispatch_reports_typed_boot_refusal() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(
-        output.status.success(),
-        "{}",
+        output.status.code().is_some_and(|code| code != 0),
+        "engine-off shell dispatch must exit normally with a nonzero code: {:?} {}",
+        output.status,
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("registry-fetch=disabled"), "{stderr}");
     assert!(!stderr.contains("audit_drain_timeout"), "{stderr}");
-    assert!(stdout.lines().any(|line| line == "maos: spirit 'example-spirit-ts' refused at boot: wasm_engine_off"), "{stdout}");
-    assert!(!stdout.contains("unknown spirit 'example-spirit-ts'"));
+    let refusal = "maos: spirit 'example-spirit-ts' refused at boot: wasm_engine_off";
+    assert_eq!(terminal_refusal_lines(&stderr, refusal), 1, "{stderr}");
+    assert!(
+        !stdout
+            .lines()
+            .any(|line| line.starts_with("example-spirit-ts:")),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("wasm_engine_off"), "{stdout}");
+    assert!(
+        !stdout.contains("unknown spirit 'example-spirit-ts'"),
+        "{stdout}"
+    );
+    assert!(
+        !stderr.contains("unknown spirit 'example-spirit-ts'"),
+        "{stderr}"
+    );
 }
 
 #[test]
@@ -173,12 +192,42 @@ fn boot_rechecks_manifest_component_publisher_and_claim() {
             .write_all(b"@example-spirit-ts hello\n")
             .unwrap();
         let output = child.wait_with_output().unwrap();
-        assert!(output.status.success());
-        let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
-            stdout.contains("maos: spirit 'example-spirit-ts' refused at boot: admission_refused"),
+            !output.status.success() && output.status.code().is_some_and(|code| code != 0),
+            "{tamper}: {:?}",
+            output.status
+        );
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert_eq!(
+            terminal_refusal_lines(
+                &stderr,
+                "maos: spirit 'example-spirit-ts' refused at boot: admission_refused"
+            ),
+            1,
+            "{tamper}: {stderr}"
+        );
+        assert!(
+            !stdout
+                .lines()
+                .any(|line| line.starts_with("example-spirit-ts:")),
             "{tamper}: {stdout}"
         );
-        assert!(!stdout.contains("message delivered"));
+        assert!(!stdout.contains("admission_refused"), "{tamper}: {stdout}");
+        assert!(!stdout.contains("message delivered"), "{tamper}: {stdout}");
+        assert!(!stderr.contains("message delivered"), "{tamper}: {stderr}");
     }
+}
+
+/// Counts stderr lines that are exactly the typed terminal error, allowing only
+/// the std `main` wrapper (`Error: ` with the message bare or Debug-quoted).
+fn terminal_refusal_lines(stderr: &str, message: &str) -> usize {
+    let quoted = format!("\"{message}\"");
+    stderr
+        .lines()
+        .filter(|line| {
+            line.strip_prefix("Error: ")
+                .is_some_and(|rest| rest == message || rest == quoted)
+        })
+        .count()
 }

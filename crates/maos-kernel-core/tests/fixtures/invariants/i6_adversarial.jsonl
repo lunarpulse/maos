@@ -1,0 +1,5 @@
+{"swaps":[{"tokens_held":2,"tokens_kept":1,"frames_held":0,"frames_kept":0,"schema_before":65536,"schema_after":65537,"migrator_declared":false,"accepted":true}]}
+{"swaps":[{"tokens_held":1,"tokens_kept":0,"frames_held":0,"frames_kept":0,"schema_before":65536,"schema_after":131073,"migrator_declared":true,"accepted":false}]}
+{"swaps":[{"tokens_held":0,"tokens_kept":0,"frames_held":3,"frames_kept":2,"schema_before":65536,"schema_after":65537,"migrator_declared":false,"accepted":true}]}
+{"swaps":[{"tokens_held":0,"tokens_kept":0,"frames_held":1,"frames_kept":0,"schema_before":65536,"schema_after":131073,"migrator_declared":true,"accepted":false}]}
+{"swaps":[{"tokens_held":1,"tokens_kept":1,"frames_held":1,"frames_kept":1,"schema_before":65536,"schema_after":131073,"migrator_declared":false,"accepted":true}]}

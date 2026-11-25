@@ -2,10 +2,12 @@
 
 //! Story 16-4 — authoritative enumeration of state MAOS writes.
 //!
-//! Paths come from their production resolvers. The only explicit legacy leg is
-//! `$HOME/.local/share/maos`: `maos-registry` and `maos-skill` still write there
-//! even when `XDG_DATA_HOME` points elsewhere. That leg is permanent until those
-//! crates ship a data migration; it is not a transitional compatibility alias.
+//! Paths come from their production resolvers. The explicit legacy leg is
+//! `$HOME/.local/share/maos`: `maos-skill` still writes there even when
+//! `XDG_DATA_HOME` points elsewhere, and the memory, registry, yank-cursor and
+//! migration-plan stores resolve over the ranked data roots of
+//! `maos_domain::data_root` (22-1), so data may still sit under it. That leg is
+//! permanent; it is not a transitional compatibility alias.
 
 use std::path::{Path, PathBuf};
 
@@ -110,6 +112,13 @@ pub fn maos_roots() -> Vec<MaosRoot> {
         ("private memory", memory.clone(), RootKind::Directory),
         ("erasure proofs", proofs.clone(), RootKind::Directory),
         ("Spirit archives", archives.clone(), RootKind::Directory),
+        // Story 22-6 (ADR-072): sealed audit segments sit beside their log.
+        ("audit segments", segments_dir(&audit), RootKind::Directory),
+        (
+            "default audit segments",
+            segments_dir(&default_audit),
+            RootKind::Directory,
+        ),
         (
             "certificate revocation lists",
             maos_domain::revocation::default_crl_dir(),
@@ -159,6 +168,15 @@ pub fn maos_roots() -> Vec<MaosRoot> {
             );
         }
     }
+    if let Some(path) = std::env::var_os("MAOS_AUDIT_DB").filter(|value| !value.is_empty()) {
+        push(
+            &mut roots,
+            "audit segments override",
+            segments_dir(Path::new(&path)),
+            RootKind::Directory,
+            WrittenBy::Maos,
+        );
+    }
 
     // Aggregate only the canonical XDG/HOME data tree. Explicit MAOS_* store
     // overrides remain scoped to the exact resolver outputs above: an override
@@ -191,6 +209,24 @@ pub fn maos_roots() -> Vec<MaosRoot> {
         RootKind::Directory,
         WrittenBy::Maos,
     );
+    // 22-1 AC6 (D-22-1-10 A): the memory root, registry store (its yank cursor sits
+    // inside) and migration plans resolve over ranked data roots, so a store can sit
+    // under any of them. Enumerate every location a resolver can now return.
+    for (label, rel) in [
+        ("private memory", "memory"),
+        ("registry store", "registry"),
+        ("migration plans", "upgrade-plans"),
+    ] {
+        for path in maos_domain::data_root::locations(rel) {
+            push(
+                &mut roots,
+                label,
+                path,
+                RootKind::Directory,
+                WrittenBy::Maos,
+            );
+        }
+    }
     // Registry import-bundle scratch (`maos-registry/src/import.rs`): written
     // under `$HOME/.cache/maos/import` with the same HOME semantics, or under
     // MAOS_IMPORT_SCRATCH_ROOT when set.
@@ -212,6 +248,17 @@ pub fn maos_roots() -> Vec<MaosRoot> {
             &mut roots,
             "registry yank cursor",
             PathBuf::from(cursor),
+            RootKind::File,
+            WrittenBy::Maos,
+        );
+    }
+    if let Some(holds) =
+        std::env::var_os("MAOS_QUARANTINE_STORE_PATH").filter(|value| !value.is_empty())
+    {
+        push(
+            &mut roots,
+            "quarantine holds",
+            PathBuf::from(holds),
             RootKind::File,
             WrittenBy::Maos,
         );
@@ -977,6 +1024,7 @@ pub fn run(args: &[String]) -> Result<(), PurgeError> {
             written_by: WrittenBy::Maos,
             disposition: "kept".to_string(),
         }));
+        receipt_roots.extend(segment_disclosure(options.keep_log, &audit_path));
         receipt_roots.extend(secret_receipt_roots("pending"));
         // Secrets trail BOTH the filesystem rows and the kept sibling-log
         // rows; indexing them at filesystem_root_count would overwrite the
@@ -1261,6 +1309,8 @@ fn protected_paths(keep_log: bool, audit_path: &Path, planned: &[PlannedRoot]) -
             default.clone(),
             maos_audit::transparency_log_team_binding_path(&default),
         ]);
+        // The sealed segments are part of the log "as a unit".
+        protected.extend([segments_dir(audit_path), segments_dir(&default)]);
         // `--keep-log` retains the Transparency Log as a unit — and the
         // retention contract does not stop at the team the caller happened
         // to resolve as. Sibling teams' logs are Art.17-relevant audit
@@ -1276,6 +1326,54 @@ fn protected_paths(keep_log: bool, audit_path: &Path, planned: &[PlannedRoot]) -
     protected.sort();
     protected.dedup();
     protected
+}
+
+/// Where a Transparency Log keeps its sealed segments (ADR-072).
+fn segments_dir(database: &Path) -> PathBuf {
+    database
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join(maos_iac::adapter::transparency_log::SEGMENTS_DIR_NAME)
+}
+
+/// The databases `--keep-log` retains, deduplicated.
+fn retained_databases(audit_path: &Path) -> Vec<PathBuf> {
+    let mut databases = vec![
+        audit_path.to_path_buf(),
+        maos_audit::default_transparency_log_path(),
+    ];
+    databases.sort();
+    databases.dedup();
+    databases
+}
+
+/// `(segment count, bytes)` of every sealed segment `--keep-log` retains.
+fn retained_segment_footprint(audit_path: &Path) -> (u64, u64) {
+    retained_databases(audit_path)
+        .iter()
+        .map(|database| maos_audit::segment::segment_footprint(database))
+        .fold((0, 0), |(count, bytes), (c, b)| (count + c, bytes + b))
+}
+
+/// The receipt rows that disclose the segments `--keep-log` retains (count and bytes).
+fn segment_disclosure(keep_log: bool, audit_path: &Path) -> Vec<ReceiptRoot> {
+    if !keep_log {
+        return Vec::new();
+    }
+    retained_databases(audit_path)
+        .iter()
+        .filter_map(|database| {
+            let (count, bytes) = maos_audit::segment::segment_footprint(database);
+            (count > 0).then(|| ReceiptRoot {
+                path: format!(
+                    "{} (segments={count}, bytes={bytes})",
+                    segments_dir(database).display()
+                ),
+                written_by: WrittenBy::Maos,
+                disposition: "kept".to_string(),
+            })
+        })
+        .collect()
 }
 
 fn print_dry_run(
@@ -1323,6 +1421,11 @@ fn print_dry_run(
         println!(
             "maos purge: --keep-log retains audit_rows={audit_rows} \
              capability_token_rows={capability_tokens} shell_turn_rows={shell_turns}"
+        );
+        let (segments, segment_bytes) = retained_segment_footprint(audit_path);
+        println!(
+            "maos purge: --keep-log retains audit_segments={segments} \
+             audit_segment_bytes={segment_bytes}"
         );
         for log in sibling_logs {
             let entries = maos_audit::query(log, maos_audit::AuditFilter::default())

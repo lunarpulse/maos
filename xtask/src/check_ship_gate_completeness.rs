@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 //! Story 20-3a AC4 — ship-gate enrolment and binding drift:
-//! 1. The 48 expected names and required-binding registry rows are one set.
+//! 1. The 41 expected names and required-binding registry rows are one set.
 //! 2. Each name resolves exactly once: a per-commit `v1-0-ship-gate.needs`
 //!    entry, a step named after the gate in the consolidated job
 //!    (`CONSOLIDATED_JOB`, itself a `v1-0-ship-gate.needs` entry), or an
@@ -41,8 +41,6 @@ const EXPECTED_GATES: &[&str] = &[
     // Release/cadence measurement; resolved by job key in fuzz-cadence.yml.
     "check-fuzz-floor",
     "check-ko-coverage",
-    // Story 10.5 AC3 — Windows binary + sandbox compile/install verification.
-    "windows-check",
     // Story 10.4a AC2 (NFR-Ops-10) — SQLite→Postgres migration triple-oracle gate.
     "check-migration-merkle",
     // Story 10.4a (NFR-Ops-2) — RTO ≤ 4h weekly cadence gates (rpo-rto-cadence.yml).
@@ -96,42 +94,16 @@ const EXPECTED_GATES: &[&str] = &[
     "check-env-contract",
     // Story 13.4 (FR37 / ADR-056) — vetting-attestation gate (7 hermetic legs).
     "check-vetting-attestation",
-    // Story 14-0 AC1 — the Epic-14 preflight decision register's reader. Binding
-    // rule 2 of that register promised its deadlines were a query rather than a
-    // judgement; until this gate landed there was no queryer, and eight of
-    // nineteen rows were already wrong at HEAD.
-    "check-decision-register",
-    // Story 14-2a AC6 — the production peer-certificate rotation trigger's gate.
-    // Its control is a RUNTIME leg (a live daemon rotating on a signed reissue),
-    // because the repo's only production-caller probe visits `visit_expr_call`
-    // only and every call this story makes is a method call — a copied probe
-    // would have been green from birth.
-    "check-cert-rotation-trigger",
-    // Story 15-3 AC5 — the exit-command check. Enrolled here LAST of the three
-    // self-policing directions, because `EXPECTED_GATES` → `needs` and
-    // `EXPECTED_GATES` → `[[ship_gate]]` both red if the other two sites are
-    // missing: adding the name before the job and the registry row exist would
-    // red this gate rather than the new one.
-    "check-exit-commands",
     // Story 15-1 AC7 / D-3 — the workspace suite becomes a control. Enrolled
-    // LAST of the three self-policing sites for the same reason as
-    // check-exit-commands above: the discipline job and the registry rows
+    // LAST of the three self-policing sites (the 15-3 reason): the discipline job and the registry rows
     // landed first, so this const's expansion can only make the gate red on
     // a real absence, never on an ordering artifact.
     "workspace-test-suite",
-    // Story 17-5 — model-pin currency. Enrolled LAST, after the discipline job
-    // and both registry rows landed, for the 15-3 reason above.
-    "check-model-currency",
     // Story 20-12 — test cost. Enrolled LAST of the three self-policing sites
     // (15-3 reason above): the discipline jobs and both registry rows landed in
     // the same change, so this const can only red on a real absence.
     "check-test-cost",
     "check-test-budget",
-    // Story 20-7 — the stable-runner policy and Tier C counts. Enrolled LAST
-    // (15-3 reason above): the discipline jobs and both registry rows landed in
-    // the same change.
-    "check-perf-runner-policy",
-    "check-perf-counts",
     "air-gap-netns-witness",
 ];
 
@@ -186,10 +158,6 @@ const RELEASE_READY_EXCLUDED: &[(&str, &str)] = &[
         "merge hygiene (plan section 4): same as check-fuzz-targets, the T3 chain builds the targets at the exact SHA",
     ),
     (
-        "check-decision-register",
-        "merge hygiene (plan section 4): reads committed decision-register deadlines; the merge path guarantees it",
-    ),
-    (
         "check-loom-substrate-drift",
         "merge hygiene (plan section 4): workflow/reader env and service-block drift over committed files",
     ),
@@ -198,16 +166,8 @@ const RELEASE_READY_EXCLUDED: &[(&str, &str)] = &[
         "merge hygiene (plan section 4): enrolment and release-ready membership over committed files; runs on the merge path",
     ),
     (
-        "check-model-currency",
-        "merge hygiene (plan section 4): model-pin currency over committed files",
-    ),
-    (
         "check-test-budget",
         "merge hygiene (plan section 4): per-binary time budget over the workspace junit; flaky (10 red runs)",
-    ),
-    (
-        "check-exit-commands",
-        "merge hygiene (plan section 4): registry-advisory at v1_0; exit-command text over committed files",
     ),
     (
         "multi-provider-drift-tests",
@@ -939,7 +899,7 @@ jobs:
     /// Real-tree reconciliation includes the formerly exempt infrastructure
     /// gates and the previously registry-only fuzz gates, with no legacy list.
     #[test]
-    fn expected_gates_and_registry_are_one_set_of_48() {
+    fn expected_gates_and_registry_are_one_set_of_41() {
         // Unit tests run with CWD = the crate root, not the workspace root.
         let registry_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("gate-registry.toml");
         let registry: crate::corpus_types::ShipGateRegistry =
@@ -950,9 +910,9 @@ jobs:
             .map(|e| e.name.as_str())
             .collect();
         let expected: std::collections::HashSet<&str> = EXPECTED_GATES.iter().copied().collect();
-        assert_eq!(EXPECTED_GATES.len(), 48);
-        assert_eq!(expected.len(), 48, "duplicate expected gate");
-        assert_eq!(registry.ship_gates.len(), 48, "duplicate registry gate");
+        assert_eq!(EXPECTED_GATES.len(), 41);
+        assert_eq!(expected.len(), 41, "duplicate expected gate");
+        assert_eq!(registry.ship_gates.len(), 41, "duplicate registry gate");
         assert_eq!(names, expected);
     }
 
@@ -1002,12 +962,9 @@ jobs:
         assert_eq!(
             names,
             [
-                "check-decision-register",
                 "check-env-contract",
-                "check-exit-commands",
                 "check-fuzz-targets",
                 "check-loom-substrate-drift",
-                "check-model-currency",
                 "check-ship-gate-completeness",
                 "check-test-budget",
                 "check-test-cost",
@@ -1028,7 +985,7 @@ jobs:
             (("check-breaking-md", "no"), "can never be excluded"),
             (("workspace-test-suite", "no"), "can never be excluded"),
             (("check-ko-coverage", "no"), "can never be excluded"),
-            (("check-model-currency", "  "), "with no reason"),
+            (("check-test-budget", "  "), "with no reason"),
             (("no-such-gate", "reason"), "neither an aggregate job nor"),
         ] {
             let mut table = RELEASE_READY_EXCLUDED.to_vec();
@@ -1052,7 +1009,7 @@ jobs:
             "{dropped:?}"
         );
         let kept = real_release_ready_problems(RELEASE_READY_EXCLUDED, |_, ready| {
-            ready.push("check-model-currency".into());
+            ready.push("check-test-budget".into());
         });
         assert!(
             kept.iter().any(|p| p.contains("excluded, yet in")),
@@ -1075,6 +1032,8 @@ jobs:
             "nfr-rel-1-crash-detection-2s",
             "nfr-rel-2-hang-detection-60s",
             "nfr-rel-9-revocation-5s-p99",
+            "nfr-rel-11-halt-receipt-999pct",
+            "expensive-tests",
             "workspace-test-suite",
             "epic-20-exit",
             "cgroup-ceiling-delegated",

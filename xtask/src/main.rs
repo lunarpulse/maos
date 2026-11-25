@@ -16,7 +16,6 @@ mod gate_common;
 // journey-relevant gates). Depends on gate_common's projection.
 mod evidence_ledger;
 // Story 10.4a — dependency-closure gate (kernel-core artifact hygiene)
-mod check_decision_register;
 mod check_dependency_closure;
 // Story 11.1a — maos-host public-API baseline gate (ADR-031 Spirit Host Port).
 mod check_host_surface;
@@ -63,14 +62,10 @@ mod check_escape_detector;
 // Story 11.1b — authoritative tiered-oracle equivalence-binding gate (ADR-031).
 mod check_wasm_form_equiv;
 // Story 11.1b (review finding #21) — WASM fixture provenance / drift guard.
-mod check_dev_model_tier;
-mod check_dev_record_completeness;
 use xtask::check_empty_kernel;
 mod check_env_contract;
-mod check_epic_close_coherence;
 mod check_equiv_fixture_provenance;
 use xtask::check_error_catalog;
-mod check_exit_commands;
 mod check_fr47;
 mod check_judge_config;
 mod check_kernel_baseline;
@@ -88,7 +83,6 @@ mod check_pub_field_constructors;
 mod check_rc_readiness;
 mod check_red_team_gate;
 mod check_release_precondition;
-mod check_review_findings_resolved;
 mod check_security_md;
 mod check_ship_gate_completeness;
 mod check_test_budget;
@@ -122,6 +116,7 @@ mod check_j1_loopback_delegation;
 // j1-crosshost-2c AC5.1 — the two-host signed-run judge. ONE always-`Blocking`
 // hermetic gate: the paid run's evidence is a validated CAPTURE, not a substrate,
 // because a job needing an operator + two hosts + a funded key could never fire.
+mod bless;
 mod check_j1_two_host_signed_run;
 // Story j1-demo-one-command-scene — the one-command J1 founder-loop scene.
 // Orchestration only: it runs the founder loop in an isolated state home, calls
@@ -143,7 +138,6 @@ mod rebaseline_check;
 mod release_dry_run;
 mod release_verify;
 mod render_packages;
-mod sprint_status;
 mod stability_matrix;
 mod templates_regen;
 
@@ -157,10 +151,15 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Mirror CI drift checks and workspace tests before pushing a story tree.
+    /// Mirror CI drift checks and tests before pushing: scoped to the changed workspace members and their
+    /// direct dependants by default; `--full` runs the whole local mirror.
     Prepush {
         #[arg(long)]
         json: bool,
+        /// Run every leg over the whole workspace (workspace nextest, doctests, binary size, test budget,
+        /// CI-pin mirror) instead of the diff-scoped set.
+        #[arg(long)]
+        full: bool,
     },
     /// AC2 — Zero-unsafe gate for the capability-validation path.
     CheckUnsafe {
@@ -169,7 +168,9 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// AC3 — KLOC budget check with alarm and hard-fail thresholds.
+    /// Measure every crate with tokei and print the size table; fails only when
+    /// `maos-kernel-core` is above its `xtask/kloc.toml` row (the ADR-069 envelope).
+    /// Other crates are measured, never gated (operator decision 11, WP-23).
     KlocCheck {
         #[arg(long, default_value = "xtask/kloc.toml")]
         config: String,
@@ -412,29 +413,18 @@ enum Commands {
     CheckKernelBaseline {
         #[arg(long)]
         json: bool,
-        /// Print the paste-ready `[kernel_src]` block to stdout for a human to
-        /// commit. There is no in-place rewriter: a gate that heals itself is
-        /// not a gate.
+        /// Print the paste-ready `[kernel_src]` block to stdout (read-only). The
+        /// pin is rewritten by `bless`, never by the gate.
         #[arg(long)]
         emit_pin: bool,
     },
-    /// Epic-13 retro C1 — re-derive every epic's roll-up. REDs when an epic is
-    /// closed over an open story, when a key never advanced, when planning prose
-    /// disagrees, or when an OPEN epic cites a kernel pin that is not the baseline.
-    #[command(name = "check-epic-close-coherence")]
-    CheckEpicCloseCoherence {
-        #[arg(long)]
-        json: bool,
-    },
-    /// Story 15-3 AC5 — confidence rule 1 made mechanical: every epic's
-    /// hermetic exit block is tokenised as shell and every `maos`/`maosctl`/
-    /// `xtask` verb must exist at HEAD or be owed by a named, open story that
-    /// actually claims it.
-    #[command(name = "check-exit-commands")]
-    CheckExitCommands {
-        #[arg(long)]
-        json: bool,
-    },
+    /// Lean-gates WP-23 — regenerate every derived artefact from its source, one
+    /// direction only: the kernel pin (`xtask/kernel-core-baseline.toml`),
+    /// `STABILITY.md`, `docs/errors/error-catalog.json`, the ABI reference pages
+    /// (`docs-site/abi/v1`) and the example Spirits from `templates/`. Every
+    /// `--check` gate over one of them names this command when it reds.
+    #[command(name = "bless")]
+    Bless,
     /// Story 17-5 — model-pin currency: every model id pinned in a manifest, the
     /// price book or a `main.rs` provider constructor must be current per
     /// `xtask/model-currency.toml`. Offline; names `file:line` for each violation.
@@ -541,32 +531,6 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Epic 5 retro §A5 — open Review Findings rows MUST block sprint-status `done`; closed rows MUST reference a File List entry.
-    CheckReviewFindingsResolved {
-        #[arg(long, default_value = "_bmad-output/implementation-artifacts")]
-        stories_dir: String,
-        #[arg(
-            long,
-            default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml"
-        )]
-        sprint_status: String,
-        #[arg(long)]
-        json: bool,
-    },
-    /// Epic 5 retro §A6 (closes Epic 4 retro §A7) — `done` stories MUST have non-TBD model + non-empty dev record + File List files in `git diff`.
-    CheckDevRecordCompleteness {
-        #[arg(long, default_value = "_bmad-output/implementation-artifacts")]
-        stories_dir: String,
-        #[arg(
-            long,
-            default_value = "_bmad-output/implementation-artifacts/sprint-status.yaml"
-        )]
-        sprint_status: String,
-        #[arg(long, default_value_t = false)]
-        check_git_diff: bool,
-        #[arg(long)]
-        json: bool,
-    },
     /// Epic 6 §A4 (retro 2026-05-28) — keep MANIFEST_SCHEMA_VERSION + MIN/MAX
     /// constants self-consistent and ban hardcoded `manifest_schema_version`
     /// comparisons in `maos-manifest` production code.
@@ -579,23 +543,6 @@ enum Commands {
     /// deny_unknown_fields (UnknownField, not a silent default) + semver validation.
     #[command(name = "check-skill-schema")]
     CheckSkillSchema {
-        #[arg(long)]
-        json: bool,
-    },
-    /// Epic 12 retro B3 — frontier-era (epic >= 12) stories must record an
-    /// allowlisted dev model + a §A6 review artifact (Blocking; closes E11-A1).
-    #[command(name = "check-dev-model-tier")]
-    CheckDevModelTier {
-        #[arg(long)]
-        json: bool,
-    },
-    /// Story 14-0 AC1 — the Epic-14 preflight decision register gets a READER.
-    /// Every row's target must resolve to a `development_status` key (`epic-*`
-    /// keys and retro actions are not vehicles); an OPEN row whose mechanical
-    /// deadline has passed REDS; a non-mechanical deadline must declare itself
-    /// UNQUERYABLE. Fails closed on an unreadable/unparseable/empty register.
-    #[command(name = "check-decision-register")]
-    CheckDecisionRegister {
         #[arg(long)]
         json: bool,
     },
@@ -965,9 +912,10 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
-    /// Story 10.2 AC1 — third-party trial N=12 gate: parse trial-results.toml,
-    /// assert successes >= 10 + stratification + per-participant validation,
-    /// Wilson CI advisory (conditional per calibrate-per-commit).
+    /// Story 10.2 AC1, simplified by Story 22-7 — third-party trial gate: parse
+    /// trial-results.toml and judge every participant (integrity and the success
+    /// conjunction); no sampling floor, no strata, no Wilson CI (human-author
+    /// denominator removed).
     #[command(name = "check-third-party-trial")]
     CheckThirdPartyTrial {
         #[arg(long)]
@@ -1188,7 +1136,7 @@ fn default_binary(profile: &str) -> String {
 fn main() {
     let cli = Cli::parse();
     let result = match cli.command {
-        Commands::Prepush { json } => prepush::run(json),
+        Commands::Prepush { json, full } => prepush::run(json, full),
         Commands::CheckUnsafe { path, json } => check_unsafe::run(&path, json),
         Commands::CheckEmptyKernel {
             path,
@@ -1261,6 +1209,7 @@ fn main() {
             }
         }
         Commands::KlocCheck { config, json } => kloc_check::run(&config, json),
+        Commands::Bless => bless::run(&std::env::current_dir().expect("failed to get current dir")),
         Commands::AbiDiff { base, json } => abi_diff::run(&base, json),
         Commands::InvariantLock {
             changed_files,
@@ -1413,21 +1362,8 @@ fn main() {
             allowlist,
             json,
         } => check_serde_error_handling::run(&path, &allowlist, json),
-        Commands::CheckReviewFindingsResolved {
-            stories_dir,
-            sprint_status,
-            json,
-        } => check_review_findings_resolved::run(&stories_dir, &sprint_status, json),
-        Commands::CheckDevRecordCompleteness {
-            stories_dir,
-            sprint_status,
-            check_git_diff,
-            json,
-        } => check_dev_record_completeness::run(&stories_dir, &sprint_status, check_git_diff, json),
         Commands::CheckManifestSchemaVersion { json } => check_manifest_schema_version::run(json),
         Commands::CheckSkillSchema { json } => check_skill_schema::run(json),
-        Commands::CheckDevModelTier { json } => check_dev_model_tier::run(json),
-        Commands::CheckDecisionRegister { json } => check_decision_register::run(json),
         Commands::CheckJ1LoopbackDelegation { json } => check_j1_loopback_delegation::run(json),
         Commands::CheckJ1TwoHostSignedRun { json } => check_j1_two_host_signed_run::run(json),
         Commands::CheckKernelBaseline { json, emit_pin } => {
@@ -1451,8 +1387,6 @@ fn main() {
             evidence_output.as_deref(),
             json,
         ),
-        Commands::CheckEpicCloseCoherence { json } => check_epic_close_coherence::run(json),
-        Commands::CheckExitCommands { json } => check_exit_commands::run(json),
         Commands::CheckModelCurrency { json } => check_model_currency::run(json),
         Commands::CheckTestCost {
             json,

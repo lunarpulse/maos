@@ -27,8 +27,8 @@ use maos_spirit_abi::{
 };
 
 #[test]
-fn schema_seven_is_supported_for_fr8_declarations() {
-    assert!(MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION >= 7);
+fn schema_eight_is_supported_for_telemetry_subscription() {
+    assert!(MAX_SUPPORTED_MANIFEST_SCHEMA_VERSION >= 8);
 }
 
 #[test]
@@ -105,11 +105,15 @@ fn manifest_schema_version_pinned_at_epic_6_addition_count() {
     //   4 → 5  Story 17-3b: wasm-component form + [class].artifact.
     //   5 → 6  Story 18-7: [capabilities.required.skill].author_self (D-02 A).
     //   6 → 7  Story 20-8: FR8 contract declarations.
+    //   7 → 8  Story 21-9 (D-21-9-02 A): [lifecycle.telemetry] subscription;
+    //          ratification entry is `proposed` until the operator ratifies.
+    //   8 → 9  Story 22-9 (D-22-9-04 A): [consent] schema floor + recipient roster;
+    //          ratification entry `22-9-manifest-schema-9` is `proposed`.
     //
     // When the next bump lands, update this assertion in the same PR as the new
     // STABILITY.md / ratification entry.
     assert_eq!(
-        MANIFEST_SCHEMA_VERSION, 7,
+        MANIFEST_SCHEMA_VERSION, 9,
         "MANIFEST_SCHEMA_VERSION was changed without updating this guard — \
          add the bump to the ledger above + the governing ratification/retro entry",
     );

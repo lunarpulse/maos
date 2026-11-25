@@ -1,0 +1,6 @@
+{"swaps":[{"halts_before":1,"halts_after":1,"resolution_state_kept":true,"receipted_drains":0,"accepted":true,"predecessor_version":1,"successor_version":null}]}
+{"swaps":[{"halts_before":2,"halts_after":2,"resolution_state_kept":true,"receipted_drains":0,"accepted":true,"predecessor_version":1,"successor_version":2}]}
+{"swaps":[{"halts_before":2,"halts_after":0,"resolution_state_kept":false,"receipted_drains":0,"accepted":true,"predecessor_version":1,"successor_version":1}]}
+{"swaps":[{"halts_before":1,"halts_after":1,"resolution_state_kept":false,"receipted_drains":0,"accepted":true,"predecessor_version":1,"successor_version":1}]}
+{"swaps":[{"halts_before":3,"halts_after":2,"resolution_state_kept":true,"receipted_drains":0,"accepted":false,"predecessor_version":1,"successor_version":2}]}
+{"swaps":[{"halts_before":1,"halts_after":1,"resolution_state_kept":false,"receipted_drains":0,"accepted":false,"predecessor_version":1,"successor_version":null}]}

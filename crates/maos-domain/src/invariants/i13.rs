@@ -80,12 +80,56 @@ impl AllowedPromotionSet {
     pub fn allows(&self, lineage: &IntentLineage) -> bool {
         lineage.as_slice().iter().all(|i| self.intents.contains(i))
     }
+
+    /// Whether every intent in this set is also allowed by `other`.
+    pub fn is_subset_of(&self, other: &Self) -> bool {
+        self.intents.is_subset(&other.intents)
+    }
 }
 
 impl Default for AllowedPromotionSet {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// One digest: the raw intents it summarises, the lineage the kernel stamped, the consumer's
+/// allowed-promotion set and whether the consumer admitted it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Digest {
+    pub source_intents: Vec<String>,
+    pub lineage: Vec<String>,
+    pub consumer_allowed: Vec<String>,
+    pub admitted: bool,
+}
+
+/// I13 observation: digests and their admission verdicts.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub digests: Vec<Digest>,
+}
+
+/// I13 predicate: a digest's lineage is exactly the union of its sources' intents, and a consumer
+/// admits it only when that lineage lies inside its allowed-promotion set.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    use std::collections::BTreeSet;
+    for d in &obs.digests {
+        let sources: BTreeSet<_> = d.source_intents.iter().collect();
+        let lineage: BTreeSet<_> = d.lineage.iter().collect();
+        let allowed: BTreeSet<_> = d.consumer_allowed.iter().collect();
+        ensure(
+            sources == lineage,
+            "I13",
+            "lineage is not the union of the source intents",
+        )?;
+        ensure(
+            !d.admitted || lineage.is_subset(&allowed),
+            "I13",
+            "consumer admitted lineage outside its allowed set",
+        )?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -101,6 +145,18 @@ mod tests {
         assert!(allowed.allows(&lineage));
         let bad = IntentLineage::new(vec![A2AIntent::new("delegate")]);
         assert!(!allowed.allows(&bad));
+    }
+
+    #[test]
+    fn subset_keeps_or_narrows_never_widens() {
+        let mut held = AllowedPromotionSet::new();
+        held.insert(A2AIntent::new("consult"));
+        let mut wider = held.clone();
+        wider.insert(A2AIntent::new("delegate"));
+        assert!(held.is_subset_of(&held));
+        assert!(AllowedPromotionSet::new().is_subset_of(&held));
+        assert!(held.is_subset_of(&wider));
+        assert!(!wider.is_subset_of(&held));
     }
 
     #[test]

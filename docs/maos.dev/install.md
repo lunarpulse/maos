@@ -1,7 +1,10 @@
 # Install and remove MAOS
 
 Choose a release tag from <https://github.com/lunarpulse/maos/releases>.
-The binary set is `maos`, `maosctl`, `maos-spirit`, `maos-registry-server`.
+The binary set for new releases is `maos`, `maosctl`, `maos-spirit`,
+`maos-registry-server`, `maos-wasm-runner` (five executables). Historical rc.2
+artifacts predate the runner and carry the original four entries; verify them
+against their own `SHA256SUMS`, not this five-entry set.
 Linux release binaries require **glibc 2.39 or newer** (Ubuntu 24.04 / Debian 13
 class systems); older distributions need a compatible build or the container.
 Linux amd64/arm64 and macOS arm64 are the release artifact targets. macOS formula
@@ -9,7 +12,7 @@ execution is not part of the Linux discipline matrix.
 
 ## Signed binary
 
-Download all four binaries for one suffix (`linux-amd64`, `linux-arm64`, or
+Download all five binaries for one suffix (`linux-amd64`, `linux-arm64`, or
 `darwin-arm64`), `SHA256SUMS` and `SHA256SUMS.sig`. Obtain the release public key
 through the trusted release-key channel. Bootstrap verification from an
 **already trusted source checkout**, not a verifier downloaded beside the
@@ -17,10 +20,11 @@ untrusted release. With Python 3 and `cryptography` installed:
 
 ```bash
 python3 /path/to/trusted-maos-checkout/packaging/verify-release.py --directory ./dist --pubkey "$RELEASE_PUBKEY" \
-  maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64
+  maos-linux-amd64 maosctl-linux-amd64 maos-spirit-linux-amd64 maos-registry-server-linux-amd64 \
+  maos-wasm-runner-linux-amd64
 chmod +x dist/*-linux-amd64
 ./dist/maosctl-linux-amd64 install --from-local ./dist --verify-only
-for bin in maos maosctl maos-spirit maos-registry-server; do
+for bin in maos maosctl maos-spirit maos-registry-server maos-wasm-runner; do
   install -Dm755 "dist/$bin-linux-amd64" "$HOME/.local/bin/$bin"
 done
 ```
@@ -48,6 +52,10 @@ There are no install-time signature-verifying maintainer scripts; native
 package installation does not independently reverify that original manifest.
 End-user pre-install verification of the signed packaging manifest is required.
 The recipes disable stripping/debug rewriting to preserve signed bytes.
+Both packages install the service unit `/usr/lib/systemd/system/maos.service` and the `maos` system account.
+The unit is **not enabled or started on install**: write `/etc/maos/host.toml` (an example is at
+`/usr/share/doc/maos/examples/host.toml`), then `systemctl enable --now maos`. See
+[Run as a service](./run-maos.md#run-as-a-service). AUR and Homebrew install no unit.
 
 ## Homebrew and AUR
 
@@ -58,12 +66,12 @@ Tap/AUR publication is operator-owned and remains unavailable until
 A local Homebrew tap can place `maos.rb` in `Formula/`, then
 `brew install --build-from-source <owner>/<tap>/maos`; AUR's rendered `PKGBUILD`
 runs with `makepkg -si` as a non-root user. Both verify the signed original
-manifest using Python `cryptography` before installing all four exact binaries.
+manifest using Python `cryptography` before installing all five exact binaries.
 The formula depends on actual `python@3.14` and `cryptography` formulae; the
 PKGBUILD needs `python-cryptography`, not a Rust compiler. Homebrew byte
 preservation is **claimed, not verified**: targeted `skip_clean` is configured,
 but no hosted install/relocation/installed-hash proof has run. The authored
-Linux witness compares all four installed binaries; it remains unverified.
+Linux witness compares all five installed binaries; it remains unverified.
 
 ## Cargo source route
 
@@ -80,21 +88,26 @@ into a temporary root, checks its workspace version and uninstalls it again.
 
 ## Container
 
-The image's verify stage checks the original signed binary. The runtime is
-`gcr.io/distroless/cc-debian13:nonroot`, with `maos` as its entrypoint and the
-source SHA label. Discipline builds and runs `--version`/`--help` without
-registry secrets. Tag builds always run; **all publication and keyless cosign
-signing wait for both Docker Hub credentials**. If absent, the job says
-`SKIPPED: DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)` after build.
-No published image or signing result is claimed until the operator lane runs.
-Publication jobs reference the `release` environment, but a reference does not
-prove protection is configured. An administrator must provision required
+The image's verify stage checks the original signed `maos`, `maosctl` and `maos-wasm-runner`
+before copying them. The runtime is `gcr.io/distroless/cc-debian13:nonroot`, with `maos` as its
+entrypoint, the in-tree Spirit manifests and a default Host file under `/usr/share/maos`, and the
+source SHA label. With no arguments it runs `maos serve --config /usr/share/maos/host.toml`
+(cast: nash and observer; no provider key needed). Discipline builds it and runs the compose file
+and the Helm chart against it on every pull request, without registry secrets.
+
+A `v*` tag publishes `ghcr.io/<owner>/maos:<tag>` (`linux/amd64`, `linux/arm64`), cosign-signed,
+with the workflow's `GITHUB_TOKEN`; it needs no operator secret. **Docker Hub publication and its
+signing still wait for both Docker Hub credentials**; if absent, the job says
+`SKIPPED: Docker Hub publication, DOCKERHUB_* absent (ops-provisioning-secrets-and-accounts)`.
+No published image is claimed until the first post-GA tag has run, and the GHCR package's
+visibility is an operator setting. Publication jobs reference the `release` environment, but a
+reference does not prove protection is configured. An administrator must provision required
 reviewers and tag/deployment protections per the provisioning checklist first.
 After publication, verify its digest with `cosign verify --certificate-identity
 <release-workflow-identity> --certificate-oidc-issuer https://token.actions.githubusercontent.com
-<registry-image>@sha256:<digest>` before running it. Use the real tag workflow
+ghcr.io/<owner>/maos@sha256:<digest>` before running it. Use the real tag workflow
 identity, never a wildcard issuer/identity. Do not infer a registry image from a
-successful local build.
+successful local build. Running it is in [Run in a container](/run-maos/#run-in-a-container).
 
 ## Remove data, then binaries
 
@@ -110,7 +123,7 @@ Then use the installer that owns the binaries:
 | AUR / Arch | `sudo pacman -R maos` |
 | Homebrew | `brew uninstall maos` |
 | Cargo | `cargo uninstall maos-bin maos-cli maos-spirit-cli maos-registry` |
-| Direct binary | remove the four files from the prefix you chose |
+| Direct binary | remove the five files from the prefix you chose |
 | Container | remove the image/container and explicitly manage its MAOS data volume |
 
 `maos purge` never removes package-owned executables. See

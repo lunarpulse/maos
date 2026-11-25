@@ -364,21 +364,15 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             "cli smoke arm",
         ),
         (
-            // D-16-3-J (4) — the tokenless kind-1 FR50 dispositions at pid 0.
+            // D-16-3-J (4) — the tokenless kind-1 FR50 dispositions at pid 0. One table entry
+            // (`emit_task_complete`) covers both subjects; the 1:1 fixture is `task.nacked`
+            // and the `task.escalated` row is pinned after the loop.
             "task.complete",
             None,
             "task.nacked",
             r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","capability_token":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]}"#,
             0,
             "task.nacked (kind 1)",
-        ),
-        (
-            "task.complete",
-            None,
-            "task.escalated",
-            r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","capability_token":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3]}"#,
-            0,
-            "task.escalated (kind 1)",
         ),
         (
             "task.complete",
@@ -419,6 +413,30 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             r#"{"redacted_frame_id":"01ab:01ab:01ab:01ab:01ab:01ab:01ab:01ab","original_kind":11}"#,
             0,
             "atomic unscoped distillate redaction",
+        ),
+        (
+            "task.complete",
+            None,
+            "distillate.redacted",
+            r#"{"principal_id":"operator","redacted_distillate_frame_id":"01ab:01ab:01ab:01ab:01ab:01ab:01ab:01ab"}"#,
+            0,
+            "sealed-segment distillate redaction, one principal (22-6)",
+        ),
+        (
+            "task.complete",
+            None,
+            "frame.redacted",
+            r#"{"redacted_frame_id":"01ab:01ab:01ab:01ab:01ab:01ab:01ab:01ab","original_kind":0}"#,
+            0,
+            "sealed-segment frame redaction (22-6)",
+        ),
+        (
+            "task.complete",
+            None,
+            "distillate.redacted",
+            r#"{"redacted_frame_id":"01ab:01ab:01ab:01ab:01ab:01ab:01ab:01ab","original_kind":11}"#,
+            0,
+            "sealed-segment distillate redaction (22-6)",
         ),
         (
             "task.complete",
@@ -475,6 +493,16 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
             r#"{"ContextLimit":{"spirit_pid":7,"context_used":3892,"context_window_size":4096,"threshold_permille":950}}"#,
             7,
             "context journal limit (kind 33)",
+        ),
+        (
+            // Story 22-8 — Mira's native directed-task reply row (`native_task.rs`), the same
+            // envelope a component's mailbox reply carries; tokenless, at Mira's pid.
+            "task.complete",
+            None,
+            "task.reply",
+            r#"{"TaskComplete":{"result":"{\"subject\":\"payments-api\",\"advisory\":\"delivered\"}"}}"#,
+            7,
+            "native directed-task reply (22-8)",
         ),
     ];
     let noncall_entries: Vec<&maos_audit::fr4_classifier::WriterShapeEntry> =
@@ -550,6 +578,19 @@ fn every_noncall_writer_shape_classifies_from_its_measured_payload() {
     assert!(
         optional_rows.is_empty(),
         "all non-call token columns must be pinned present or absent"
+    );
+    // The same `emit_task_complete` writer's other subject classifies from its measured payload.
+    let escalated = entry(
+        "task.complete",
+        "task.escalated",
+        0,
+        None,
+        r#"{"task_id":"task-worker-1","originator_spirit_id":"butler","capability_token":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3]}"#,
+    );
+    assert_eq!(
+        classify_fr4_row(&escalated),
+        Fr4RowDisposition::NonCallKernelEvent,
+        "task.escalated (kind 1): the measured payload must classify as a non-call"
     );
 }
 

@@ -120,6 +120,7 @@ impl World {
                 hooks: None,
                 providers: None,
                 iac: None,
+                quarantine: None,
             },
             gated,
             maos_kernel_core::scheduler::make_spirit_obj(Spirit),

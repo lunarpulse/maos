@@ -1,0 +1,10 @@
+{"declared":[{"FsRead":{"subtree":"/tmp"}}],"effects":[{"requested":{"FsRead":{"subtree":"/tmp/a"}},"verified":null}]}
+{"declared":[{"FsRead":{"subtree":"/tmp"}}],"effects":[{"requested":{"FsWrite":{"subtree":"/tmp/a"}},"verified":{"FsRead":{"subtree":"/tmp"}}}]}
+{"declared":[{"FsRead":{"subtree":"/tmp"}}],"effects":[{"requested":{"FsRead":{"subtree":"/etc/passwd"}},"verified":{"FsRead":{"subtree":"/tmp"}}}]}
+{"declared":[{"FsRead":{"subtree":"/tmp"}}],"effects":[{"requested":{"FsRead":{"subtree":"/etc/passwd"}},"verified":{"FsRead":{"subtree":"/"}}}]}
+{"declared":[{"FsRead":{"subtree":"/tmp"}}],"effects":[{"requested":{"FsRead":{"subtree":"/tmp/../etc/shadow"}},"verified":{"FsRead":{"subtree":"/tmp"}}}]}
+{"declared":[{"NetHttps":{"domain":"api.example.com"}}],"effects":[{"requested":{"NetHttps":{"domain":"evil.example.com"}},"verified":{"NetHttps":{"domain":"api.example.com"}}}]}
+{"declared":[{"NetHttps":{"domain":"*.example.com"}}],"effects":[{"requested":{"NetHttps":{"domain":"evil.example.com"}},"verified":{"NetHttps":{"domain":"evil.example.com"}}}]}
+{"declared":[{"ProcExec":{"binary":"/bin/ls"}}],"effects":[{"requested":{"ProcExec":{"binary":"/bin/sh"}},"verified":null}]}
+{"declared":[{"SubSpiritSpawn":{"class":"worker"}}],"effects":[{"requested":{"SubSpiritSpawn":{"class":"admin"}},"verified":null}]}
+{"declared":[],"effects":[{"requested":"SelfTelemetryRead","verified":"SelfTelemetryRead"}]}

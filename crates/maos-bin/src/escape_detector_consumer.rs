@@ -15,8 +15,10 @@
 //! Exactly-once within a boot: the cursor starts at `max(rowid)` at spawn,
 //! moves to the batch's `MAX(rowid)` only after the batch's lines are written,
 //! and [`EscapeAnomalyTail::shutdown`] runs a final scan that the root calls
-//! after the audit-writer drain. Precondition: rowids only grow (no production
-//! `DELETE FROM transparency_log`; retention is `VACUUM INTO` a copy). A scan
+//! after the audit-writer drain. Precondition: ids only grow; rotation removes
+//! only a sealed prefix below every registered floor (Story 22-6, ADR-072), and
+//! this tail publishes its committed cursor as such a floor, so a row it has yet
+//! to scan is never sealed away from its read-only connection. A scan
 //! failure — including a scan task that could not be joined — is never "no
 //! anomaly": it is counted, holds the cursor, and prints one typed line on the
 //! first failure of a run, on recovery, and always for the final scan.
@@ -129,6 +131,8 @@ pub struct TailStopReport {
 type Declared = Arc<Mutex<HashMap<i64, u8>>>;
 
 struct TailState {
+    /// Story 22-6 — the committed cursor, published so no rotation seals a row above it.
+    floor: crate::audit_rotation::RotationFloor,
     tl_path: PathBuf,
     boot_nonce: u64,
     out: Box<dyn Write + Send>,
@@ -200,6 +204,7 @@ impl TailState {
         // After the batch's lines, never before: every row up to its
         // `MAX(rowid)` is handled, kill fact or not.
         self.cursor = self.cursor.max(batch.through_rowid);
+        self.floor.publish(self.cursor);
         self.anomalies += written;
         written
     }
@@ -250,6 +255,7 @@ pub fn spawn_escape_anomaly_tail(
     let declared = Declared::default();
     let mut state = TailState {
         cursor: 0,
+        floor: crate::audit_rotation::register_floor(&tl_path, 0),
         tl_path,
         boot_nonce,
         out,
@@ -261,7 +267,10 @@ pub fn spawn_escape_anomaly_tail(
         muted: false,
     };
     match Detector::max_rowid(&state.tl_path) {
-        Ok(max) => state.cursor = max,
+        Ok(max) => {
+            state.cursor = max;
+            state.floor.publish(max);
+        }
         Err(e) => state.fail(&e, false),
     }
     let state = Arc::new(Mutex::new(state));

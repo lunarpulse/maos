@@ -265,7 +265,9 @@ fn maos_command(fixture: &Fixture) -> Command {
     // MAOS_AUDIT_DB below and must not move.
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_maos"));
     cmd.current_dir(workspace_root)
-        .env("HOME", doorless_home::doorless_home())
+        // Story 21-3 — a per-fixture HOME: the daemon's `$HOME/.maos/a2a-pins.json` is
+        // single-writer, and legs in this binary run concurrently.
+        .env("HOME", &fixture.dir)
         .env("XDG_DATA_HOME", doorless_home::doorless_xdg_data_home())
         .env("MAOS_AUDIT_DB", &fixture.audit_db)
         // The daemon runs the full primary root (D24); skip the live LLM probe
@@ -931,8 +933,9 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 20-9 — 39 → 40: `spawned_lifecycle.rs` joins it.
     // Story 20-9 (round 4) — 40 → 41: `invocation.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 41] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 49] = [
         ("main.rs", include_str!("../src/main.rs")),
+        ("workflow.rs", include_str!("../src/workflow.rs")),
         ("invocation.rs", include_str!("../src/invocation.rs")),
         (
             "spawned_lifecycle.rs",
@@ -1098,6 +1101,32 @@ fn composition_root_does_not_seed_manifest_scopes() {
             "replica_resolver.rs",
             include_str!("../src/replica_resolver.rs"),
         ),
+        // Later-registry-quarantine closure — the durable hold store. It reads and writes only
+        // its own hold file and never seeds the manifest-derived policy table.
+        ("quarantine.rs", include_str!("../src/quarantine.rs")),
+        // Story 22-1 — the Host file loader. It reads only its own file and the cast
+        // manifests and never seeds the manifest-derived policy table.
+        ("host_config.rs", include_str!("../src/host_config.rs")),
+        // Story 22-4 — the directed-task registry and its Transparency-Log read-back. It
+        // reads only audit rows and never seeds the manifest-derived policy table.
+        ("directed_task.rs", include_str!("../src/directed_task.rs")),
+        // Story 22-6 — the audit-store rotation task and cursor-floor registry. It reads only the
+        // Transparency Log and the escape tail's cursors and never seeds the manifest-derived
+        // policy table.
+        (
+            "audit_rotation.rs",
+            include_str!("../src/audit_rotation.rs"),
+        ),
+        // Story 22-8 — the native directed leg (Mira's runner, her pid-bound memory, the minted
+        // Inference Port). It reads only its own pid-bound memory and never seeds the
+        // manifest-derived policy table.
+        ("native_task.rs", include_str!("../src/native_task.rs")),
+        // Story 22-8 — the in-process A2A cast. It reads only declared peers and journals only
+        // the advisory rows; it never seeds the manifest-derived policy table.
+        ("loopback_cast.rs", include_str!("../src/loopback_cast.rs")),
+        // Story 22-8 — the boot-time halt carry-over. It reads only audit rows and never seeds
+        // the manifest-derived policy table.
+        ("halt_carry.rs", include_str!("../src/halt_carry.rs")),
     ];
     let source_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let source_file_count = std::fs::read_dir(&source_dir)

@@ -18,9 +18,9 @@ Every MAOS kernel publishes three version numbers that together form the **ABI S
 
 | Leg | Current Value | What It Tracks |
 |---|---|---|
-| `kernel_version` | `1.0.0-rc.2` | Semantic version of the kernel binary (from `Cargo.toml`) |
+| `kernel_version` | `1.0.0` | Semantic version of the kernel binary (from `Cargo.toml`) |
 | `abi_version` | `1` | Wire-format version of the Spirit ABI (`ComplianceClaim` envelope, vtable layout) |
-| `manifest_schema_version` | `7` | Schema version of the Spirit manifest TOML format |
+| `manifest_schema_version` | `8` (ratified) | Schema version of the Spirit manifest TOML format |
 
 These constants live in `maos-spirit-abi/src/lib.rs` and are the single source of truth consumed by admission checks and CI gates.
 
@@ -31,8 +31,8 @@ The kernel enforces a **fail-closed** compatibility window in both directions at
 | Manifest Schema Version | Kernel Behavior |
 |---|---|
 | `= MANIFEST_SCHEMA_VERSION` (current) | ✅ Strict load (`deny_unknown_fields`) |
-| `= N-1` (one below current) | ✅ Supported — loads with WARN-level degradation notes for omitted sections |
-| `< MIN_SUPPORTED` (N-2 and below) | ⛔ Hard refusal — `SecurityError::EAbiTooOld` |
+| `= N-1` (one below current) | ✅ Within the supported window, subject to declaration validation |
+| `< MIN_SUPPORTED` | ⛔ Hard refusal — `SecurityError::EAbiTooOld` |
 | `> MAX_SUPPORTED` (future) | ⛔ Hard refusal — `SecurityError::EAbiTooNew` |
 | `min_substrate_version > kernel_version` | ⛔ Hard refusal — `SecurityError::ESubstrateTooOld` (FR8) |
 
@@ -40,10 +40,16 @@ There is no silent warn-and-ignore window. A manifest is a security artifact; fa
 
 ## N-1 / N-2 Policy
 
-- **N-1 supported**: A manifest one version behind the current kernel still loads. The kernel emits WARN-level notes identifying sections the older manifest omits. The Spirit functions but does not benefit from new manifest features.
-- **N-2 hard refusal**: A manifest two or more versions behind is refused at admission with `SecurityError::EAbiTooOld`. The error message names the declared version and the supported window.
+- **N-1 supported**: The version window includes the preceding schema. The manifest floor remains `1`.
+- **Below the floor**: The kernel refuses a manifest below `MIN_SUPPORTED` with `SecurityError::EAbiTooOld`. Being two versions behind does not by itself trigger refusal.
 
-This gives Spirit authors **one full version cycle** to migrate their manifests after a schema bump.
+Schemas 1–7 remain supported for non-listeners. An explicit `on_telemetry_event`
+listing or `[lifecycle.telemetry]` table below schema 8 is refused rather than
+ignored with a warning. See the [schema 8 contract](../manifest/v8).
+
+Schemas 1–8 remain supported for manifests that declare no `[consent]` table. A
+`[consent]` table below schema 9 is refused rather than ignored with a warning. See
+the [schema 9 contract](../manifest/v9) (proposed, Story 22-9).
 
 ## ABI Version vs. Manifest Schema Version
 
@@ -106,6 +112,7 @@ The `check-breaking-md` CI gate fails when an entry is missing its migration pat
 ### `xtask/abi-ratifications.toml`
 
 Each manifest schema version bump is recorded as a `[[ratification]]` entry, providing an audit trail of when and why the version was bumped.
+`21-9-manifest-schema-8` remains proposed and requires human ratification.
 
 ## Deprecation Timeline
 

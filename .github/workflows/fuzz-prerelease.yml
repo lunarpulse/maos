@@ -1,6 +1,11 @@
 # T3 pre-release: PRD NFR-Sec-5/6, >=24h measured fuzzing per target, zero crashes.
-# Four <=6h links cannot hold 24h plus setup under the hosted 6h job cap.
-# Operator ruling: link COUNT yields to 24h; five 5h soaks leave setup headroom.
+# Five 5h shards per target run IN PARALLEL (no `needs:` between links, no corpus hand-off
+# between them; every shard starts from the same checked-in seed corpus). The evidence is
+# unchanged: five link records per target of one run at the exact commit, >=86,400
+# libFuzzer-measured seconds summed per target, zero crashes (check_release_precondition.rs).
+# Each link hands its corpus to `corpus-merge` as ONE tar.zst archive (an artifact of 600k
+# files exceeds upload-artifact's limits). `corpus-merge` unions the five archives into the
+# next chain's seed; it is NOT a `needs` of `t3-ledger-collect`, so it can never void evidence.
 # The final assertion checks libFuzzer-measured seconds, never configured time.
 # The rc release precondition (`check-release-precondition --fuzz-ledger`, 20-5) reads
 # this chain from the `fuzz-ledger` branch; it never starts it. The operator dispatches
@@ -30,6 +35,15 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
       - name: Install nightly and cargo-fuzz
@@ -47,14 +61,9 @@ jobs:
           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
           RUSTUP_TOOLCHAIN: nightly-2026-09-25
         run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
-      - name: Save corpus for next link
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: t3-corpus-${{ matrix.target }}-1-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
-          if-no-files-found: error
-          retention-days: 90
+      # The measured record is saved BEFORE the corpus hand-off, so a hand-off failure (pack,
+      # upload) can never skip it. It still only runs when the fuzz step AND the minimizer
+      # (which fails on a confirmed crash) succeeded: no `always()`, a crash leaves no record.
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
@@ -62,6 +71,27 @@ jobs:
           name: t3-record-${{ matrix.target }}-1-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
+          retention-days: 90
+      - name: Pack corpus into one archive (one artifact file, never one file per input)
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          corpus='${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}'
+          archive='${{ runner.temp }}/t3-corpus-${{ matrix.target }}-1.tar.zst'
+          count=$(find "$corpus" -type f | wc -l)
+          echo "corpus files to pack: $count"
+          test "$count" -gt 0
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$corpus" -cf - . | zstd -T0 -3 -q -f -o "$archive"
+          zstd -tq "$archive"
+          echo "archive bytes: $(stat -c %s "$archive") sha256: $(sha256sum "$archive" | cut -d' ' -f1) files: $count"
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-corpus-${{ matrix.target }}-1-${{ github.run_id }}
+          path: ${{ runner.temp }}/t3-corpus-${{ matrix.target }}-1.tar.zst
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 90
       - name: Preserve worker logs and crashes
         if: always()
@@ -72,7 +102,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-2:
-    needs: fuzz-link-1
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -88,13 +117,17 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-1-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -110,14 +143,9 @@ jobs:
           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
           RUSTUP_TOOLCHAIN: nightly-2026-09-25
         run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
-      - name: Save corpus for next link
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: t3-corpus-${{ matrix.target }}-2-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
-          if-no-files-found: error
-          retention-days: 90
+      # The measured record is saved BEFORE the corpus hand-off, so a hand-off failure (pack,
+      # upload) can never skip it. It still only runs when the fuzz step AND the minimizer
+      # (which fails on a confirmed crash) succeeded: no `always()`, a crash leaves no record.
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
@@ -125,6 +153,27 @@ jobs:
           name: t3-record-${{ matrix.target }}-2-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
+          retention-days: 90
+      - name: Pack corpus into one archive (one artifact file, never one file per input)
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          corpus='${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}'
+          archive='${{ runner.temp }}/t3-corpus-${{ matrix.target }}-2.tar.zst'
+          count=$(find "$corpus" -type f | wc -l)
+          echo "corpus files to pack: $count"
+          test "$count" -gt 0
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$corpus" -cf - . | zstd -T0 -3 -q -f -o "$archive"
+          zstd -tq "$archive"
+          echo "archive bytes: $(stat -c %s "$archive") sha256: $(sha256sum "$archive" | cut -d' ' -f1) files: $count"
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-corpus-${{ matrix.target }}-2-${{ github.run_id }}
+          path: ${{ runner.temp }}/t3-corpus-${{ matrix.target }}-2.tar.zst
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 90
       - name: Preserve worker logs and crashes
         if: always()
@@ -135,7 +184,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-3:
-    needs: fuzz-link-2
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -151,13 +199,17 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-2-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -173,14 +225,9 @@ jobs:
           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
           RUSTUP_TOOLCHAIN: nightly-2026-09-25
         run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
-      - name: Save corpus for next link
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: t3-corpus-${{ matrix.target }}-3-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
-          if-no-files-found: error
-          retention-days: 90
+      # The measured record is saved BEFORE the corpus hand-off, so a hand-off failure (pack,
+      # upload) can never skip it. It still only runs when the fuzz step AND the minimizer
+      # (which fails on a confirmed crash) succeeded: no `always()`, a crash leaves no record.
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
@@ -188,6 +235,27 @@ jobs:
           name: t3-record-${{ matrix.target }}-3-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
+          retention-days: 90
+      - name: Pack corpus into one archive (one artifact file, never one file per input)
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          corpus='${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}'
+          archive='${{ runner.temp }}/t3-corpus-${{ matrix.target }}-3.tar.zst'
+          count=$(find "$corpus" -type f | wc -l)
+          echo "corpus files to pack: $count"
+          test "$count" -gt 0
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$corpus" -cf - . | zstd -T0 -3 -q -f -o "$archive"
+          zstd -tq "$archive"
+          echo "archive bytes: $(stat -c %s "$archive") sha256: $(sha256sum "$archive" | cut -d' ' -f1) files: $count"
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-corpus-${{ matrix.target }}-3-${{ github.run_id }}
+          path: ${{ runner.temp }}/t3-corpus-${{ matrix.target }}-3.tar.zst
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 90
       - name: Preserve worker logs and crashes
         if: always()
@@ -198,7 +266,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-4:
-    needs: fuzz-link-3
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -214,13 +281,17 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-3-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -236,14 +307,9 @@ jobs:
           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
           RUSTUP_TOOLCHAIN: nightly-2026-09-25
         run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
-      - name: Save corpus for next link
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: t3-corpus-${{ matrix.target }}-4-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
-          if-no-files-found: error
-          retention-days: 90
+      # The measured record is saved BEFORE the corpus hand-off, so a hand-off failure (pack,
+      # upload) can never skip it. It still only runs when the fuzz step AND the minimizer
+      # (which fails on a confirmed crash) succeeded: no `always()`, a crash leaves no record.
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
@@ -251,6 +317,27 @@ jobs:
           name: t3-record-${{ matrix.target }}-4-${{ github.run_id }}
           path: out/record-*.json
           if-no-files-found: error
+          retention-days: 90
+      - name: Pack corpus into one archive (one artifact file, never one file per input)
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          corpus='${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}'
+          archive='${{ runner.temp }}/t3-corpus-${{ matrix.target }}-4.tar.zst'
+          count=$(find "$corpus" -type f | wc -l)
+          echo "corpus files to pack: $count"
+          test "$count" -gt 0
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$corpus" -cf - . | zstd -T0 -3 -q -f -o "$archive"
+          zstd -tq "$archive"
+          echo "archive bytes: $(stat -c %s "$archive") sha256: $(sha256sum "$archive" | cut -d' ' -f1) files: $count"
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-corpus-${{ matrix.target }}-4-${{ github.run_id }}
+          path: ${{ runner.temp }}/t3-corpus-${{ matrix.target }}-4.tar.zst
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 90
       - name: Preserve worker logs and crashes
         if: always()
@@ -261,7 +348,6 @@ jobs:
           path: out/
           retention-days: 90
   fuzz-link-5:
-    needs: fuzz-link-4
     runs-on: ubuntu-24.04
     timeout-minutes: 355
     strategy:
@@ -277,13 +363,17 @@ jobs:
           - target: fuzz_exec_deps_parse_elf
             fuzz_dir: crates/maos-exec-deps/fuzz
             rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
     steps:
       - uses: actions/checkout@v5
-      - name: Resume previous link corpus
-        uses: actions/download-artifact@v4
-        with:
-          name: t3-corpus-${{ matrix.target }}-4-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly-2026-09-25 --component rust-src
@@ -299,14 +389,9 @@ jobs:
           ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
           RUSTUP_TOOLCHAIN: nightly-2026-09-25
         run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}'
-      - name: Save corpus for next link
-        uses: actions/upload-artifact@v4
-        with:
-          overwrite: true
-          name: t3-corpus-${{ matrix.target }}-5-${{ github.run_id }}
-          path: ${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}/
-          if-no-files-found: error
-          retention-days: 90
+      # The measured record is saved BEFORE the corpus hand-off, so a hand-off failure (pack,
+      # upload) can never skip it. It still only runs when the fuzz step AND the minimizer
+      # (which fails on a confirmed crash) succeeded: no `always()`, a crash leaves no record.
       - name: Save one measured record per target and link
         uses: actions/upload-artifact@v4
         with:
@@ -315,6 +400,27 @@ jobs:
           path: out/record-*.json
           if-no-files-found: error
           retention-days: 90
+      - name: Pack corpus into one archive (one artifact file, never one file per input)
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          corpus='${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}'
+          archive='${{ runner.temp }}/t3-corpus-${{ matrix.target }}-5.tar.zst'
+          count=$(find "$corpus" -type f | wc -l)
+          echo "corpus files to pack: $count"
+          test "$count" -gt 0
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$corpus" -cf - . | zstd -T0 -3 -q -f -o "$archive"
+          zstd -tq "$archive"
+          echo "archive bytes: $(stat -c %s "$archive") sha256: $(sha256sum "$archive" | cut -d' ' -f1) files: $count"
+      - name: Save corpus for next link
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-corpus-${{ matrix.target }}-5-${{ github.run_id }}
+          path: ${{ runner.temp }}/t3-corpus-${{ matrix.target }}-5.tar.zst
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
       - name: Preserve worker logs and crashes
         if: always()
         uses: actions/upload-artifact@v4
@@ -322,6 +428,101 @@ jobs:
           overwrite: true
           name: t3-logs-${{ matrix.target }}-5-${{ github.run_id }}
           path: out/
+          retention-days: 90
+  corpus-merge:
+    needs: [fuzz-link-1, fuzz-link-2, fuzz-link-3, fuzz-link-4, fuzz-link-5]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: manifest_parser
+            fuzz_dir: crates/maos-manifest/fuzz
+            rss_flag: ''
+          - target: frame_deser
+            fuzz_dir: crates/maos-domain/fuzz
+            rss_flag: '-rss_limit_mb=0'
+          - target: fuzz_exec_deps_parse_elf
+            fuzz_dir: crates/maos-exec-deps/fuzz
+            rss_flag: ''
+          - target: cap_token_verify
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i11_digest_chain
+            fuzz_dir: crates/maos-kernel-core/fuzz
+            rss_flag: ''
+          - target: i8_consent_intent
+            fuzz_dir: crates/maos-a2a-core/fuzz
+            rss_flag: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Download the five shard corpus archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: t3-corpus-${{ matrix.target }}-*-${{ github.run_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/corpus-archives
+      - name: Extract and union the five shard corpora
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          corpus='${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}'
+          mkdir -p "$corpus"
+          shopt -s nullglob
+          archives=('${{ runner.temp }}/corpus-archives/t3-corpus-${{ matrix.target }}-'?.tar.zst)
+          echo "shard archives found: ${#archives[@]}"
+          test "${#archives[@]}" -eq 5
+          for archive in "${archives[@]}"; do
+            zstd -tq "$archive"
+            tar --zstd --no-same-owner -xf "$archive" -C "$corpus"
+            rm -f "$archive"
+            echo "after $(basename "$archive"): $(find "$corpus" -type f | wc -l) files in the union"
+          done
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly-2026-09-25 --component rust-src
+          cargo install cargo-fuzz --locked
+      - name: Minimize the union (libFuzzer -merge=1, the repo's guarded corpus minimizer)
+        timeout-minutes: 60
+        env:
+          ASAN_OPTIONS: allocator_may_return_null=1:detect_leaks=0
+          RUSTUP_TOOLCHAIN: nightly-2026-09-25
+        run: bash scripts/minimize-fuzz-corpus.sh '${{ matrix.fuzz_dir }}' '${{ matrix.target }}' '${{ matrix.rss_flag }}' 2400
+      - name: Pack the merged corpus into one archive (one artifact file, never one file per input)
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          corpus='${{ matrix.fuzz_dir }}/corpus/${{ matrix.target }}'
+          archive='${{ runner.temp }}/t3-corpus-merged-${{ matrix.target }}.tar.zst'
+          count=$(find "$corpus" -type f | wc -l)
+          echo "corpus files to pack: $count"
+          test "$count" -gt 0
+          tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C "$corpus" -cf - . | zstd -T0 -3 -q -f -o "$archive"
+          zstd -tq "$archive"
+          echo "archive bytes: $(stat -c %s "$archive") sha256: $(sha256sum "$archive" | cut -d' ' -f1) files: $count"
+      - name: Save merged corpus as the next chain seed
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-corpus-merged-${{ matrix.target }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/t3-corpus-merged-${{ matrix.target }}.tar.zst
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+      - name: Report a failed corpus merge (the T3 ledger evidence does not depend on it)
+        if: failure()
+        run: |
+          echo "::warning::corpus-merge for ${{ matrix.target }} failed; it only feeds a LATER chain's seed and is not a needs of t3-ledger-collect, so the T3 ledger evidence of this run is unaffected"
+          echo "corpus-merge ${{ matrix.target }} FAILED: next-chain seed missing; T3 ledger evidence is unaffected (t3-ledger-collect does not need corpus-merge)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve merge logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: t3-merge-logs-${{ matrix.target }}-${{ github.run_id }}
+          path: out/
+          if-no-files-found: ignore
           retention-days: 90
   t3-ledger-collect:
     needs: [fuzz-link-1, fuzz-link-2, fuzz-link-3, fuzz-link-4, fuzz-link-5]

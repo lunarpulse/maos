@@ -1,0 +1,14 @@
+AC11 plant: crates/maos-bin/src/spawned_lifecycle.rs: 'impl Drop for LifecycleCallers' removed. Command: cargo nextest run --locked -p maos-bin --test wasm_form_residuals_22_9 -E 'test(lifecycle_callers_dropped_on_a_panic_stop_their_watchdogs)'. Result: FAILS (the schedule count keeps moving after the panic). Plant reverted.
+
+        FAIL [   3.549s] (1/1) maos-bin::wasm_form_residuals_22_9 lifecycle_callers_dropped_on_a_panic_stop_their_watchdogs
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 3.54s
+    thread 'lifecycle_callers_dropped_on_a_panic_stop_their_watchdogs' (691159) panicked at crates/maos-bin/tests/wasm_form_residuals_22_9.rs:290:9:
+    the run arm panicked before its callers' shutdown
+    thread 'lifecycle_callers_dropped_on_a_panic_stop_their_watchdogs' (691159) panicked at crates/maos-bin/tests/wasm_form_residuals_22_9.rs:298:5:
+    assertion `left == right` failed: a dropped LifecycleCallers leaves no schedule watchdog running
+      left: 35
+     right: 60
+     Summary [   3.550s] 1 test run: 0 passed, 1 failed, 5 skipped
+        FAIL [   3.549s] (1/1) maos-bin::wasm_form_residuals_22_9 lifecycle_callers_dropped_on_a_panic_stop_their_watchdogs
+error: test run failed
+rc=100

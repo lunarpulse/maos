@@ -29,6 +29,114 @@ pub use private::PrivateMemoryStore;
 pub use self_telemetry::SelfTelemetryAggregator;
 pub use shared::SharedMemoryStore;
 
+/// Per-identity memory-tier quota (Story 21.6, FR28). The kernel only refuses:
+/// it never compacts, evicts or truncates. Usage per Spirit identity is logical
+/// bytes (`key.len()` + `MemoryValue::approximate_len`) and logical entries;
+/// limits are inclusive and come from operator configuration
+/// (`security::operator_config::MemoryQuotaSection`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TierLimit {
+    #[doc = "Maximum key + value bytes."]
+    pub bytes: u64,
+    #[doc = "Maximum logical entries."]
+    pub entries: u64,
+}
+
+/// Operator-policy defaults (not workload measurements) — the single default source.
+pub const DEFAULT_PRIVATE_LIMIT: TierLimit = TierLimit {
+    bytes: 64 << 20,
+    entries: 16_384,
+};
+/// See [`DEFAULT_PRIVATE_LIMIT`].
+pub const DEFAULT_SHARED_LIMIT: TierLimit = TierLimit {
+    bytes: 16 << 20,
+    entries: 4_096,
+};
+
+/// Logical usage of one identity in one tier (visible to the tier stores).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Usage {
+    bytes: u64,
+    entries: u64,
+}
+
+impl Usage {
+    /// Account one committed write: `old` is the prior charge of the same key.
+    fn charge(&mut self, old: Option<u64>, new: u64) {
+        self.bytes = self
+            .bytes
+            .saturating_sub(old.unwrap_or(0))
+            .saturating_add(new);
+        self.entries = self.entries.saturating_add(u64::from(old.is_none()));
+    }
+
+    fn credit(&mut self, bytes: u64, entries: u64) {
+        debug_assert!(
+            bytes <= self.bytes && entries <= self.entries,
+            "credit exceeds charge"
+        );
+        self.bytes = self.bytes.saturating_sub(bytes);
+        self.entries = self.entries.saturating_sub(entries);
+    }
+}
+
+/// Charge for one logical entry.
+fn entry_len(key: &str, value_len: u64) -> u64 {
+    (key.len() as u64).saturating_add(value_len)
+}
+
+/// Refuse a write that grows either resource while a resulting total exceeds
+/// its limit, so an identity pushed over one limit by a kernel-authored write
+/// (the halt context) cannot grow through the other. A replacement that adds
+/// no entry and no bytes always passes. Totals use checked arithmetic.
+fn check(
+    tier: MemoryTier,
+    limit: TierLimit,
+    used: Usage,
+    old: Option<u64>,
+    new: u64,
+) -> Result<(), MemoryError> {
+    let (entry, grow) = (
+        u64::from(old.is_none()),
+        new.saturating_sub(old.unwrap_or(0)),
+    );
+    let refuse = |resource, used, requested, limit| {
+        Err(MemoryError::QuotaExceeded {
+            tier,
+            resource,
+            used,
+            requested,
+            limit,
+        })
+    };
+    if entry == 0 && grow == 0 {
+        return Ok(());
+    }
+    if used
+        .entries
+        .checked_add(entry)
+        .is_none_or(|n| n > limit.entries)
+    {
+        return refuse(QuotaResource::Entries, used.entries, entry, limit.entries);
+    }
+    if used.bytes.checked_add(grow).is_none_or(|n| n > limit.bytes) {
+        return refuse(QuotaResource::Bytes, used.bytes, grow, limit.bytes);
+    }
+    Ok(())
+}
+
+/// Both tier stores carrying the operator-resolved quota (FR28).
+pub fn open_stores(
+    root: std::path::PathBuf,
+    inline_threshold: usize,
+    db: &std::path::Path,
+) -> Result<(Arc<PrivateMemoryStore>, Arc<SharedMemoryStore>), MemoryError> {
+    let quota = crate::security::operator_config::MemoryQuotaSection::resolve_from_env_and_disk();
+    let private = PrivateMemoryStore::new(root, inline_threshold).with_quota(quota.private);
+    let shared = SharedMemoryStore::open(db)?.with_quota(quota.shared);
+    Ok((Arc::new(private), Arc::new(shared)))
+}
+
 /// Decision F — the registered set of storage backends the GDPR forget cascade
 /// must account for.  This is the single source of truth shared with the
 /// multi-backend erasure test: adding a backend here WITHOUT partitioning it
@@ -61,7 +169,9 @@ use maos_domain::invariants::i1::CapabilityToken;
 use maos_domain::memory::{
     CollectiveErrorKind, ExportEntry, ExportPayload, ForgetOutcome, ForgetReceipt, LegalHoldRecord,
     MemoryEntry, MemoryError, MemoryNamespace, MemoryTier, MemoryValue, PrincipalIndexRow,
+    QuotaResource,
 };
+use maos_iac::adapter::transparency_log::AuditError;
 
 // Re-exports above make PrivateMemoryStore, SharedMemoryStore,
 // PrincipalNamespaceIndex available in this module scope.
@@ -72,7 +182,7 @@ use maos_domain::invariants::i5::{MemoryScope, NamespaceKey};
 /// Production Memory Manager adapter — implements `MemoryManagerPort`
 /// with three-tier memory, Principal Namespace index, and I5 enforcement.
 #[maos_attrs::i9_exempt(
-    reason = "memory manager three-tier substrate — bounded by principal forget-cascade + per-Spirit memory budget; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; the forget serializer is bounded synchronization state that makes legal-hold check-and-act atomic, not pattern-learning"
+    reason = "memory manager three-tier substrate — bounded by the per-identity tier quota (bytes + entries, operator [memory_quota], refused with MemoryError::QuotaExceeded; FR28) and the principal forget-cascade; per-Spirit-keyed map / per-Spirit-namespaced filesystem / sqlite table for ADR-026 principal namespace + I5 isolation; the forget serializer is bounded synchronization state that makes legal-hold check-and-act atomic, not pattern-learning"
 )]
 pub struct MemoryManagerAdapter {
     private: Arc<PrivateMemoryStore>,
@@ -181,6 +291,115 @@ impl MemoryManagerAdapter {
     ) -> Self {
         self.capabilities = capabilities;
         self
+    }
+
+    /// The unfenced store write for kernel- and operator-originated callers (the operator's
+    /// halt context). Spirit-facing paths go through [`MemoryManagerPort::write`], which fences.
+    pub(crate) fn write_kernel_origin(
+        &self,
+        spirit_pid: u32,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        enforce: bool,
+    ) -> Result<(), MemoryError> {
+        #[cfg(feature = "spirit_test")]
+        let case_id = format!(
+            "memory.write:{spirit_pid}:{:?}:{key}",
+            namespace.kind_label()
+        );
+        #[cfg(feature = "spirit_test")]
+        self.fire_isolation_hooks(&case_id, true);
+
+        // AC-5/AC-9: every store write routes through the single region
+        // chokepoint.  DirectWrite is home-by-construction (passes when pinning
+        // matches or is disabled); future replay/restore paths MUST construct a
+        // `WriteEntryPoint` carrying source-region provenance and will fail
+        // closed here on a cross-region write.
+        write_entry_point::enforce_region(
+            &write_entry_point::WriteEntryPoint::DirectWrite,
+            self.home_region.as_ref(),
+        )
+        .map_err(|e| MemoryError::Storage(e.to_string()))?;
+
+        // Sec-redteam SR-1: principal namespace writes require explicit
+        // authorization when enforcement is enabled.
+        if let MemoryNamespace::Principal { .. } = namespace {
+            if let Some(ref lock) = self.principal_write_enforcement {
+                let authorized = lock
+                    .read()
+                    .expect("principal_write_enforcement RwLock poisoned");
+                if !authorized.contains(&spirit_pid) {
+                    return Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid });
+                }
+            }
+        }
+
+        Self::reject_principal_outside_private(tier, namespace)?;
+        match tier {
+            MemoryTier::Private => {
+                // Commit discoverable intent before the durable spill.
+                if let MemoryNamespace::Principal {
+                    principal_id,
+                    schema,
+                } = namespace
+                {
+                    return self.principal_index.record_write(
+                        principal_id,
+                        spirit_pid,
+                        &self.private.owner_dirname(spirit_pid),
+                        schema,
+                        key,
+                        Self::now_ns(),
+                        || {
+                            self.private
+                                .write(spirit_pid, namespace, key, value, enforce)
+                        },
+                    );
+                }
+                self.private
+                    .write(spirit_pid, namespace, key, value, enforce)
+            }
+            MemoryTier::Shared => self.shared.write(
+                spirit_pid,
+                &self.private.owner_dirname(spirit_pid),
+                namespace,
+                key,
+                value,
+                enforce,
+            ),
+            MemoryTier::Collective => {
+                // P1 — I1/I2 fail-closed.  The trait path carries NO token /
+                // posture_hash / sandbox (the `MemoryManagerPort` ABI cannot
+                // change), so it CANNOT perform capability mediation.  When
+                // I1/I2 mediation is wired (`self.capabilities` is `Some`, i.e.
+                // the production composition root), the unmediated path is
+                // DENIED — callers MUST use the cap-gated `collective_write`
+                // (which verifies+audits the LoomWrite token before the port
+                // call).  Only the legacy/test path (no capabilities injected)
+                // falls through to the direct port delegation.
+                if self.capabilities.is_some() {
+                    return Err(MemoryError::Collective {
+                        kind: CollectiveErrorKind::CapabilityDenied,
+                        reason:
+                            "unmediated collective write via the trait path denied while I1/I2 \
+                                 capability mediation is wired; use the cap-gated collective_write \
+                                 (carries the LoomWrite token + posture)"
+                                .into(),
+                    });
+                }
+                match &self.collective_port {
+                    Some(port) => port
+                        .write(spirit_pid, namespace, key, value)
+                        .map_err(Self::collective_port_error),
+                    None => Err(MemoryError::CollectiveNotYetAvailable {
+                        ship_target: "v1.5",
+                        landing_story: "E10 Story 10.4",
+                    }),
+                }
+            }
+        }
     }
 
     /// Reject `Principal` namespace outside the private tier (Decision D).
@@ -412,6 +631,18 @@ impl MemoryManagerAdapter {
         }
     }
 
+    /// Withdraw a spirit pid's `Principal` write grant. Called only by the
+    /// terminal release owners (scheduler unload, crash handler) once the
+    /// pid's SCB is gone; never by predecessor child retirement. Idempotent;
+    /// no-op when enforcement is disabled. Does not erase stored data.
+    pub fn deauthorize_principal_writes(&self, pid: u32) {
+        if let Some(ref lock) = self.principal_write_enforcement {
+            lock.write()
+                .expect("principal_write_enforcement RwLock poisoned")
+                .remove(&pid);
+        }
+    }
+
     /// Bind the admitted stable identity before any Spirit memory access (FR31).
     pub fn bind_storage_identity(&self, pid: u32, identity: &str) -> Result<(), MemoryError> {
         self.private.bind_storage_identity(pid, identity)
@@ -465,6 +696,16 @@ impl MemoryManagerAdapter {
                 lower == "legal-hold" || lower.starts_with("legal-hold:")
             })
             .unwrap_or(false);
+        // 21-12: finish interrupted forgets first. A hold request completes its own
+        // principal's earlier erasure (any batch) and records nothing if that fails;
+        // a forget leaves its own open intent to its live run, which reuses it.
+        let (_, unfinished) = self.complete_locked(principal_id, is_legal_hold)?;
+        if is_legal_hold && !unfinished.is_empty() {
+            return Err(MemoryError::Storage(format!(
+                "hold not recorded, erasure unfinished: {}",
+                unfinished.join("; ")
+            )));
+        }
 
         if is_legal_hold {
             // Review 2026-09-17: a hold requested over a principal a
@@ -554,19 +795,57 @@ impl MemoryManagerAdapter {
             hook();
         }
 
+        let open = self
+            .transparency_log
+            .outstanding_forget_intents(Some(principal_id))
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        let (intent, old) = match open.into_iter().next() {
+            Some((id, _, old)) => (id, old),
+            None => {
+                let key = TransparencyLogAdapter::grouped_hex(principal_id.as_bytes());
+                let body = serde_json::json!({ "principal_hex": key, "reason": reason });
+                let id = self.transparency_log.insert_kernel_event_returning_id(
+                    0,
+                    maos_iac::adapter::transparency_log::FrameKind::Decision,
+                    None,
+                    "principal.forget.intent",
+                    body.to_string().as_bytes(),
+                );
+                (id, None)
+            }
+        };
+        self.erase_principal(principal_id, reason.or(old.as_deref()), intent)?
+            .ok_or_else(|| MemoryError::Storage(AuditError::ErasurePending.to_string()))
+    }
+
+    /// Scrub → private delete → index delete → `principal.forget` journal. Every
+    /// step is re-runnable; `intent` names the interrupted forget being completed,
+    /// and the counts are only what this run deleted. `None`: the scrub is still
+    /// `ErasurePending`, nothing was deleted.
+    fn erase_principal(
+        &self,
+        principal_id: &str,
+        reason: Option<&str>,
+        intent: [u8; 16],
+    ) -> Result<Option<ForgetOutcome>, MemoryError> {
         let (
             redacted_distillate_frame_ids,
             redacted_principal_frame_ids,
             redistill,
             held,
             malformed,
-        ) = self
-            .transparency_log
-            .scrub_forget_frames(principal_id)
-            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        ) = match self.transparency_log.scrub_forget_frames(principal_id) {
+            Ok(swept) => swept,
+            Err(AuditError::ErasurePending) => return Ok(None),
+            Err(e) => return Err(MemoryError::Storage(e.to_string())),
+        };
 
         // 3. Delete private-tier entries + principal_index rows (existing cascade).
         let deleted_entries = self.private.forget_principal(principal_id)?;
+        #[cfg(any(test, debug_assertions))]
+        spill_test_faults::fail_if_armed(
+            spill_test_faults::FailurePoint::ForgetAfterPrivateDelete,
+        )?;
         let deleted_index_rows = self.principal_index.forget(principal_id)?;
 
         // 4. Journal the cascade with the redaction set and reason.  P7: the
@@ -578,6 +857,7 @@ impl MemoryManagerAdapter {
             "redacted_distillate_frame_ids": redacted_distillate_frame_ids,
             "redacted_principal_frame_ids": redacted_principal_frame_ids,
             "reason": reason,
+            "completed_from_intent": TransparencyLogAdapter::grouped_hex(&intent),
         });
         let frame_id = self.transparency_log.insert_kernel_event_returning_id(
             0,
@@ -608,12 +888,49 @@ impl MemoryManagerAdapter {
                 break;
             }
         }
-        Ok(ForgetOutcome::Erased {
+        Ok(Some(ForgetOutcome::Erased {
             receipt,
             redacted_distillate_frame_ids,
             redacted_principal_frame_ids,
             redistill,
-        })
+        }))
+    }
+
+    /// 21-12: complete every forget that journaled an intent but no outcome.
+    /// Returns `(completed, unfinished)`; an intent whose scrub is `ErasurePending`, whose
+    /// completion fails, or that is malformed stays open, is described (id and cause
+    /// only) and does not block the others. Not retried within one call.
+    pub fn complete_outstanding_forgets(&self) -> Result<(usize, Vec<String>), MemoryError> {
+        let _forget_guard = self
+            .forget_serialization
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        self.complete_locked("", false)
+    }
+
+    /// `hold`: only `who`'s intents. Otherwise all but `who`'s own (its live run reuses it).
+    fn complete_locked(&self, who: &str, hold: bool) -> Result<(usize, Vec<String>), MemoryError> {
+        let (mut done, mut unfinished) = (0, Vec::new());
+        let open = self
+            .transparency_log
+            .outstanding_forget_intents(hold.then_some(who))
+            .map_err(|e| MemoryError::Storage(e.to_string()))?;
+        for (intent, principal, reason) in open {
+            let Some(p) = principal else {
+                let id = TransparencyLogAdapter::grouped_hex(&intent);
+                unfinished.push(format!("malformed intent {id}"));
+                continue;
+            };
+            if !hold && p == who {
+                continue;
+            }
+            match self.erase_principal(&p, reason.as_deref(), intent) {
+                Ok(Some(_)) => done += 1,
+                Ok(None) => unfinished.push(format!("{p}: erasure pending")),
+                Err(e) => unfinished.push(format!("{p}: {e}")),
+            }
+        }
+        Ok((done, unfinished))
     }
 
     /// Story 9.2 (P29) — release a durable legal hold so the principal may be
@@ -683,6 +1000,31 @@ impl MemoryManagerAdapter {
     }
 }
 
+impl MemoryManagerAdapter {
+    /// The single write path. `enforce = false` charges without refusing: used
+    /// for kernel-authored writes (the operator's halt context, D-21-6-06),
+    /// after which the Spirit's next usage-growing write is refused.
+    pub(crate) fn write_inner(
+        &self,
+        spirit_pid: u32,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+        value: MemoryValue,
+        enforce: bool,
+    ) -> Result<(), MemoryError> {
+        // FR13 (D-LRQC-06 B): a quarantined pid's own write never reaches a tier.
+        if self
+            .capabilities
+            .as_ref()
+            .is_some_and(|caps| caps.is_quarantined(spirit_pid))
+        {
+            return Err(MemoryError::Quarantined { spirit_pid });
+        }
+        self.write_kernel_origin(spirit_pid, tier, namespace, key, value, enforce)
+    }
+}
+
 impl MemoryManagerPort for MemoryManagerAdapter {
     fn validate_namespace_read(&self, key: &NamespaceKey<MemoryScope>) -> bool {
         // v0.3-β: all namespace reads are permitted at the port level;
@@ -704,90 +1046,28 @@ impl MemoryManagerPort for MemoryManagerAdapter {
         key: &str,
         value: MemoryValue,
     ) -> Result<(), MemoryError> {
-        #[cfg(feature = "spirit_test")]
-        let case_id = format!(
-            "memory.write:{spirit_pid}:{:?}:{key}",
-            namespace.kind_label()
-        );
-        #[cfg(feature = "spirit_test")]
-        self.fire_isolation_hooks(&case_id, true);
+        self.write_inner(spirit_pid, tier, namespace, key, value, true)
+    }
 
-        // AC-5/AC-9: every store write routes through the single region
-        // chokepoint.  DirectWrite is home-by-construction (passes when pinning
-        // matches or is disabled); future replay/restore paths MUST construct a
-        // `WriteEntryPoint` carrying source-region provenance and will fail
-        // closed here on a cross-region write.
-        write_entry_point::enforce_region(
-            &write_entry_point::WriteEntryPoint::DirectWrite,
-            self.home_region.as_ref(),
-        )
-        .map_err(|e| MemoryError::Storage(e.to_string()))?;
-
-        // Sec-redteam SR-1: principal namespace writes require explicit
-        // authorization when enforcement is enabled.
-        if let MemoryNamespace::Principal { .. } = namespace {
-            if let Some(ref lock) = self.principal_write_enforcement {
-                let authorized = lock
-                    .read()
-                    .expect("principal_write_enforcement RwLock poisoned");
-                if !authorized.contains(&spirit_pid) {
-                    return Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid });
-                }
-            }
-        }
-
+    fn delete(
+        &self,
+        spirit_pid: u32,
+        tier: MemoryTier,
+        namespace: &MemoryNamespace,
+        key: &str,
+    ) -> Result<bool, MemoryError> {
         Self::reject_principal_outside_private(tier, namespace)?;
         match tier {
-            MemoryTier::Private => {
-                // Commit discoverable intent before the durable spill.
-                if let MemoryNamespace::Principal {
-                    principal_id,
-                    schema,
-                } = namespace
-                {
-                    return self.principal_index.record_write(
-                        principal_id,
-                        spirit_pid,
-                        &self.private.owner_dirname(spirit_pid),
-                        schema,
-                        key,
-                        Self::now_ns(),
-                        || self.private.write(spirit_pid, namespace, key, value),
-                    );
-                }
-                self.private.write(spirit_pid, namespace, key, value)
+            MemoryTier::Private => self.private.delete(spirit_pid, namespace, key),
+            MemoryTier::Shared => {
+                let owner = self.private.owner_dirname(spirit_pid);
+                self.shared.delete(&owner, namespace, key)
             }
-            MemoryTier::Shared => self.shared.write(spirit_pid, namespace, key, value),
-            MemoryTier::Collective => {
-                // P1 — I1/I2 fail-closed.  The trait path carries NO token /
-                // posture_hash / sandbox (the `MemoryManagerPort` ABI cannot
-                // change), so it CANNOT perform capability mediation.  When
-                // I1/I2 mediation is wired (`self.capabilities` is `Some`, i.e.
-                // the production composition root), the unmediated path is
-                // DENIED — callers MUST use the cap-gated `collective_write`
-                // (which verifies+audits the LoomWrite token before the port
-                // call).  Only the legacy/test path (no capabilities injected)
-                // falls through to the direct port delegation.
-                if self.capabilities.is_some() {
-                    return Err(MemoryError::Collective {
-                        kind: CollectiveErrorKind::CapabilityDenied,
-                        reason:
-                            "unmediated collective write via the trait path denied while I1/I2 \
-                                 capability mediation is wired; use the cap-gated collective_write \
-                                 (carries the LoomWrite token + posture)"
-                                .into(),
-                    });
-                }
-                match &self.collective_port {
-                    Some(port) => port
-                        .write(spirit_pid, namespace, key, value)
-                        .map_err(Self::collective_port_error),
-                    None => Err(MemoryError::CollectiveNotYetAvailable {
-                        ship_target: "v1.5",
-                        landing_story: "E10 Story 10.4",
-                    }),
-                }
-            }
+            // The collective port has no delete.
+            MemoryTier::Collective => Err(MemoryError::CollectiveNotYetAvailable {
+                ship_target: "v1.5",
+                landing_story: "E10 Story 10.4",
+            }),
         }
     }
 
@@ -968,6 +1248,44 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    #[test]
+    fn quota_check_evaluates_both_totals_and_refuses_overflow() {
+        let limit = TierLimit {
+            bytes: 100,
+            entries: 2,
+        };
+        let over_entries = Usage {
+            bytes: 10,
+            entries: 3,
+        };
+        let tier = MemoryTier::Private;
+        // Growing bytes while the entry total is over its limit is refused...
+        let grown = check(tier, limit, over_entries, Some(5), 6);
+        assert!(matches!(
+            grown,
+            Err(MemoryError::QuotaExceeded {
+                resource: QuotaResource::Entries,
+                used: 3,
+                requested: 0,
+                limit: 2,
+                ..
+            })
+        ));
+        // ...a replacement that grows nothing is not.
+        assert!(check(tier, limit, over_entries, Some(5), 5).is_ok());
+        assert!(check(tier, limit, over_entries, Some(5), 1).is_ok());
+        // Totals that would overflow u64 are refused, never wrapped or clamped.
+        let max = Usage {
+            bytes: u64::MAX,
+            entries: 0,
+        };
+        let wide = TierLimit {
+            bytes: u64::MAX,
+            entries: 1,
+        };
+        assert!(check(tier, wide, max, Some(0), 1).is_err());
+    }
+
     fn make_adapter_with_hook(
         hook: Option<Arc<dyn Fn() + Send + Sync>>,
     ) -> (Arc<MemoryManagerAdapter>, TempDir) {
@@ -990,6 +1308,42 @@ mod tests {
 
     fn make_adapter() -> (Arc<MemoryManagerAdapter>, TempDir) {
         make_adapter_with_hook(None)
+    }
+
+    #[test]
+    fn deauthorize_principal_writes_is_pid_scoped_and_idempotent() {
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("audit.db");
+        let adapter = MemoryManagerAdapter::new(
+            Arc::new(PrivateMemoryStore::new(tmp.path().join("memory"), 4 * 1024)),
+            Arc::new(SharedMemoryStore::open(&db_path).unwrap()),
+            Arc::new(PrincipalNamespaceIndex::open(&db_path).unwrap()),
+            Arc::new(TransparencyLogAdapter::open_in_memory(1)),
+        )
+        .with_principal_write_enforcement();
+        let ns = MemoryNamespace::Principal {
+            principal_id: "p".into(),
+            schema: "s".into(),
+        };
+        let write = |pid: u32| {
+            adapter.write(
+                pid,
+                MemoryTier::Private,
+                &ns,
+                "k",
+                MemoryValue::Text("v".into()),
+            )
+        };
+        adapter.authorize_principal_writes(1);
+        adapter.authorize_principal_writes(2);
+        write(1).unwrap();
+        adapter.deauthorize_principal_writes(1);
+        adapter.deauthorize_principal_writes(1);
+        assert!(matches!(
+            write(1),
+            Err(MemoryError::PrincipalWriteUnauthorized { spirit_pid: 1 })
+        ));
+        write(2).expect("other pid's grant is untouched");
     }
 
     #[test]

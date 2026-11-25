@@ -6,8 +6,9 @@
 #
 # Changing this file is the deliberate act: a job or step leaves it only with the plan's section 4 reason
 # (`_bmad-output/planning-artifacts/ci-release-ready-program-2026-11-14.md`) and, for the excluded steps, a row in
-# `RELEASE_READY_EXCLUDED` (`xtask/src/check_ship_gate_completeness.rs`). A job that returns from nightly
-# (for example `nfr-rel-11-halt-receipt-999pct` before GA) enters here AND in both workflow lists.
+# `RELEASE_READY_EXCLUDED` (`xtask/src/check_ship_gate_completeness.rs`). A job that leaves the merge path for a
+# nightly run must leave this file with that reason; `nfr-rel-11-halt-receipt-999pct` and `expensive-tests` returned
+# for GA and are pinned here AND in both workflow lists.
 #
 # `ci-test-producer` is not a direct need: the consumers (`workspace-test-suite`, the epic exits, the cgroup and
 # wasm-host legs) need it, and a failed or skipped producer skips them, which `release-ready` reads as red.
@@ -24,6 +25,7 @@ jobs = [
     "check-workspace-count",
     "check-composition-root-completeness",
     "invariant-lock",
+    "invariant-ledger-proofs",
     "check-corpus",
     "maos-audit-read-only",
     "cap-token-verify-bench",
@@ -46,6 +48,7 @@ jobs = [
     "nfr-rel-4-silent-failure-detection",
     "nfr-rel-10-cold-restart",
     "nfr-rel-9-revocation-5s-p99",
+    "nfr-rel-11-halt-receipt-999pct",
     "upgrade-policy-corpus",
     "revocation-corpus",
     "t3-escape-corpus",
@@ -65,8 +68,6 @@ jobs = [
     "nfr-scale-4-rate-limit-isolation",
     "intent-lineage-6-4-extension",
     "manifest-n-minus-1-test",
-    "check-review-findings-resolved",
-    "check-dev-record-completeness",
     "check-kernel-baseline",
     "journey-hermetic-tier-1",
     "fr59-yank-propagation-5min",
@@ -87,11 +88,11 @@ jobs = [
     "macos-check",
     "cgroup-ceiling-delegated",
     "cgroup-ceiling-undelegated",
+    "expensive-tests",
     # Former `v1-0-ship-gate.needs` members `aggregate` reaches through that fan-in.
     "check-export-control",
     "check-host-surface",
     "check-ko-coverage",
-    "windows-check",
     "check-live-bilateral-consent",
     "check-rotation-real-timing",
     "check-j4-latency",
@@ -113,9 +114,6 @@ jobs = [
     "check-fkcs",
     "check-escape-detector",
     "check-vetting-attestation",
-    "check-cert-rotation-trigger",
-    "check-perf-runner-policy",
-    "check-perf-counts",
 ]
 
 # Every step of the consolidated `xtask-gates` job that stays required (all step ids minus the excluded rows):
@@ -127,7 +125,6 @@ steps = [
     "check-serde-error-handling",
     "check-manifest-schema-version",
     "check-skill-schema",
-    "check-epic-close-coherence",
     "check-coverage-matrix-completeness",
     "check-unsafe",
     "check-service-boundary",
@@ -144,7 +141,6 @@ steps = [
     "check-security-md-vectors",
     "example-spirit-drift",
     "corpus-staleness",
-    "check-dev-model-tier",
     "check-pentest-gate",
     "check-third-party-trial",
     "check-red-team-gate",

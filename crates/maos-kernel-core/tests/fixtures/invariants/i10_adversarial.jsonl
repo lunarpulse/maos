@@ -1,0 +1,7 @@
+{"transitions":[{"event":"Halt","journaled":false}],"boots":[],"crash_detect_ms":[],"orphans":[]}
+{"transitions":[],"boots":[{"journaled":5,"rehydrated":3}],"crash_detect_ms":[],"orphans":[]}
+{"transitions":[],"boots":[{"journaled":0,"rehydrated":2}],"crash_detect_ms":[],"orphans":[]}
+{"transitions":[],"boots":[],"crash_detect_ms":[40,2001],"orphans":[]}
+{"transitions":[],"boots":[],"crash_detect_ms":[],"orphans":[{"latency_ms":5001,"cause":"panic"}]}
+{"transitions":[],"boots":[],"crash_detect_ms":[],"orphans":[{"latency_ms":10,"cause":null}]}
+{"transitions":[],"boots":[],"crash_detect_ms":[],"orphans":[{"latency_ms":10,"cause":"  "}]}

@@ -1,7 +1,7 @@
 //! Notification surface types — domain-level per architecture §7.4.
 //!
-//! These types are shared between `maos-kernel-core` (Approval Manager
-//! emits events) and `maos-director-surface` (dispatcher sends them to
+//! These types are shared between `maos-kernel-core` (halt and
+//! supervision paths emit events; the former Approval Manager was removed in 21-10) and `maos-director-surface` (dispatcher sends them to
 //! channels). Putting them in `maos-domain` avoids a circular dependency.
 
 /// The three notification levels from §7.4.

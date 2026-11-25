@@ -203,7 +203,6 @@ mod tests {
     }
 
     /// A CaptureChannel for notification tests in halt_ui context.
-    /// Mirrors the shape from `approval_prompt_e2e.rs:14-36`.
     struct CaptureChannel {
         events: Arc<std::sync::Mutex<Vec<maos_domain::notification::NotificationEvent>>>,
     }

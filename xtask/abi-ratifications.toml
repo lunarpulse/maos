@@ -326,3 +326,33 @@ summary = "maos-spirit-abi CLI_WRAPPER_SCHEMA_VERSION = 1 with MIN/MAX_SUPPORTED
 adr_ref = "ADR-045,ADR-069"
 status = "proposed"
 covered_changes = ["CLI_WRAPPER_SCHEMA_VERSION", "MIN_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "CliWrapperConfig::take_schema_version", "CliWrapperAdmissionError::ECliWrapperSchemaUnsupported"]
+
+# Story 21-9 AC9 — operator ratified this schema contract on 2026-11-21.
+# This decision does not waive the independent D-E20-6 review or authorize release.
+[[ratification]]
+proposal_id = "21-9-manifest-schema-8"
+summary = "MANIFEST_SCHEMA_VERSION 7→8; optional strict [lifecycle.telemetry] {scope = \"scalar.tap.*\", time_cap_seconds = 1..=5} is required for an explicit on_telemetry_event listing; below schema 8 a listing or table is refused (no degradation); effective overall cap defaults to 30 s without [budget]; no new Scope variant, ABI_VERSION and guest wire unchanged"
+adr_ref = "ADR-045,ADR-069"
+status = "ratified"
+covered_changes = ["MANIFEST_SCHEMA_VERSION", "LifecycleSection", "RawLifecycleSection", "TelemetrySubscription", "validate_telemetry_subscription"]
+ratified_at = "2026-11-21"
+
+# later-registry-quarantine-closure D-LRQC-04 A (operator-approved 2026-11-21) — PROPOSED (never
+# self-ratified). `[cli_wrapper]` schema 2 requires the Worker's CRL-addressable identity
+# (`class_name` + `class_version`); schema 1 manifests still load and cannot carry it.
+[[ratification]]
+proposal_id = "later-registry-quarantine-closure-cli-wrapper-schema-2"
+summary = "maos-spirit-abi CLI_WRAPPER_SCHEMA_VERSION = 2 (window 1..=2); [cli_wrapper] schema 2 requires class_name and class_version, schema 1 refuses them; the Worker bind carries them as a ClassSection so a signed CRL entry names the Worker; still no [class] (EManifestSchemaConflict holds)"
+adr_ref = "ADR-045,ADR-069"
+status = "proposed"
+covered_changes = ["CLI_WRAPPER_SCHEMA_VERSION", "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "CliWrapperConfig::take_worker_identity", "ClassSection::for_worker"]
+
+# Story 22-9 D-22-9-04 A (recommended answer; operator not yet confirmed) — PROPOSED (never
+# self-ratified). `[consent]` is refused below schema 9 (no degradation, as 21-9 did for
+# `[lifecycle.telemetry]`); admission refuses a `[consent.recall]` recipient the Host does not know.
+[[ratification]]
+proposal_id = "22-9-manifest-schema-9"
+summary = "MANIFEST_SCHEMA_VERSION 8→9; a [consent] table is refused below schema 9 with a typed manifest-section error (no degradation); admission refuses a [consent.recall] recipient id that is not an installed package, a host-file cast or topology member, or a loaded Spirit, typed consent_recipient_unknown; ABI_VERSION and the guest wire are unchanged"
+adr_ref = "ADR-045,ADR-069"
+status = "proposed"
+covered_changes = ["MANIFEST_SCHEMA_VERSION", "CONSENT_SINCE_SCHEMA", "ConsentSection::from_toml_str_at", "AdmissionRefusal::ConsentRecipientUnknown"]

@@ -39,7 +39,7 @@ pub fn create_plan(
     let chain = resolve_migration_chain(from_version, &to_version, &candidates)
         .map_err(|error| error.to_string())?;
     let plan = MigrationPlan::new(spirit_id, from_version, to_version, paths, chain);
-    let path = required_plan_path(spirit_id)?;
+    let path = plan_path(spirit_id);
     let bytes = serde_json::to_vec_pretty(&plan)
         .map_err(|error| format!("serialize migration plan: {error}"))?;
     maos_skill::store::atomic_write(&path, &bytes)
@@ -247,13 +247,11 @@ async fn upgrade_hop(
 /// hot-swap / migrator hops, so the door refuses a cold swap while one exists;
 /// an unanswerable existence check counts as pending (fail-closed).
 pub fn plan_pending(spirit_id: &str) -> bool {
-    optional_plan_path(spirit_id).is_some_and(|path| path.try_exists().unwrap_or(true))
+    plan_path(spirit_id).try_exists().unwrap_or(true)
 }
 
 fn load_plan(spirit_id: &str) -> Result<Option<(PathBuf, MigrationPlan)>, String> {
-    let Some(path) = optional_plan_path(spirit_id) else {
-        return Ok(None);
-    };
+    let path = plan_path(spirit_id);
     if !path.exists() {
         return Ok(None);
     }
@@ -292,29 +290,32 @@ fn same_manifest_path(a: &str, b: &str) -> bool {
     }
 }
 
-fn required_plan_path(spirit_id: &str) -> Result<PathBuf, String> {
-    optional_plan_path(spirit_id).ok_or_else(|| {
-        "MAOS_HOME is required to persist a migration --plan across maosctl invocations".into()
-    })
+/// 22-1 AC6 — the persisted plan's path on the ranked data roots of
+/// `maos_domain::data_root`: a plan written under any root is still found (and
+/// consumed); a new plan goes under the highest root.
+fn plan_path(spirit_id: &str) -> PathBuf {
+    let mut hasher = Sha256::new();
+    hasher.update(spirit_id.as_bytes());
+    let name = hex::encode(hasher.finalize());
+    maos_domain::data_root::resolve(&format!("upgrade-plans/{name}.json"))
 }
 
-fn optional_plan_path(spirit_id: &str) -> Option<PathBuf> {
-    std::env::var_os("MAOS_HOME").map(|home| {
-        let mut hasher = Sha256::new();
-        hasher.update(spirit_id.as_bytes());
-        let name = hex::encode(hasher.finalize());
-        PathBuf::from(home)
-            .join("upgrade-plans")
-            .join(format!("{name}.json"))
-    })
-}
+/// One lock for EVERY unit-test module of this binary that rewrites
+/// `MAOS_HOME` (or the other `MAOS_*` homes). `tests/support/uninstall_review_20_11.rs`
+/// is compiled into these unit tests via `#[path]` under `all(test, feature = "network")`
+/// and rewrites the same variables from its own long (about 4.5 s) fixtures; two
+/// separate locks over one process-global environment raced on wide runners
+/// (32 threads: 8/8 red; hosted 2-core runners passed by scheduling luck — the
+/// 0.02 s migration tests finished first). Both sides must take THIS lock.
+#[cfg(test)]
+pub(crate) static MAOS_HOME_TEST_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{LazyLock, Mutex};
 
-    static MAOS_HOME_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+    use super::MAOS_HOME_TEST_LOCK as MAOS_HOME_LOCK;
 
     struct RestoreMaosHome(Option<std::ffi::OsString>);
 
@@ -344,7 +345,9 @@ mod tests {
 
     #[test]
     fn plan_is_atomically_persisted_under_maos_home_and_round_trips() {
-        let _guard = MAOS_HOME_LOCK.lock().expect("MAOS_HOME lock");
+        let _guard = MAOS_HOME_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let temporary_home = tempfile::tempdir().expect("temporary MAOS_HOME");
         let restore = RestoreMaosHome(std::env::var_os("MAOS_HOME"));
         std::env::set_var("MAOS_HOME", temporary_home.path());
@@ -380,7 +383,9 @@ mod tests {
     fn persisted_plan_file_drift_is_refused_after_a_candidate_mutates_on_disk() {
         use maos_cohort::CohortError;
 
-        let _guard = MAOS_HOME_LOCK.lock().expect("MAOS_HOME lock");
+        let _guard = MAOS_HOME_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let temporary_home = tempfile::tempdir().expect("temporary MAOS_HOME");
         let restore = RestoreMaosHome(std::env::var_os("MAOS_HOME"));
         std::env::set_var("MAOS_HOME", temporary_home.path());
@@ -422,5 +427,53 @@ mod tests {
             "expected EMigrationPlanDrift from the persisted-file re-derive path, got {error:?}"
         );
         drop(restore);
+    }
+
+    // Story 22-1 AC6 — a plan written under a lower data root is still consumed, and a new
+    // plan goes under the highest root.
+    #[test]
+    fn a_plan_under_the_legacy_root_is_still_consumed_with_maos_home_set_elsewhere() {
+        let _guard = MAOS_HOME_LOCK
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let saved: Vec<_> = ["MAOS_HOME", "HOME", "XDG_DATA_HOME"]
+            .iter()
+            .map(|name| (*name, std::env::var_os(name)))
+            .collect();
+        let scratch = tempfile::tempdir().expect("scratch");
+        let (home, explicit) = (scratch.path().join("home"), scratch.path().join("explicit"));
+        let legacy = home.join(".local/share/maos");
+        std::env::set_var("HOME", &home);
+        std::env::remove_var("XDG_DATA_HOME");
+        std::env::set_var("MAOS_HOME", &legacy);
+
+        let v2 = scratch.path().join("v2.toml");
+        write_candidate(&v2, "2.0", &["1.0"]);
+        let paths = vec![v2.display().to_string()];
+        let (written, plan) = create_plan("marcus-agent", "1.0", &v2, &paths).expect("persists");
+        assert!(written.starts_with(&legacy), "{}", written.display());
+
+        std::env::set_var("MAOS_HOME", &explicit);
+        assert!(
+            plan_pending("marcus-agent"),
+            "the legacy plan must still be pending"
+        );
+        let (found, loaded) = load_plan("marcus-agent")
+            .unwrap()
+            .expect("legacy plan is read");
+        assert_eq!((found, loaded), (written.clone(), plan));
+
+        std::fs::remove_file(&written).unwrap();
+        let (fresh, _) = create_plan("marcus-agent", "1.0", &v2, &paths).expect("persists");
+        assert!(
+            fresh.starts_with(&explicit),
+            "a new plan goes under the highest root"
+        );
+        for (name, value) in saved {
+            match value {
+                Some(value) => std::env::set_var(name, value),
+                None => std::env::remove_var(name),
+            }
+        }
     }
 }

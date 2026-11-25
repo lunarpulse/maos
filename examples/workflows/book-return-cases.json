@@ -1,0 +1,12 @@
+[
+  {
+    "id": "damaged-binding",
+    "input": {"barcode":"LIB-830","condition":"torn_binding"},
+    "expect": {"outcome":"send_to_repair","path":["inspect"]}
+  },
+  {
+    "id": "shelf-ready",
+    "input": {"barcode":"LIB-831","condition":"intact"},
+    "expect": {"outcome":"reshelve","path":["inspect"]}
+  }
+]

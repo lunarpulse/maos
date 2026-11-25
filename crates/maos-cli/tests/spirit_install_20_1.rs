@@ -93,7 +93,7 @@ fn install_refuses_registry_rust_inproc_before_persisting() {
     );
     assert!(!scratch
         .0
-        .join("home/.local/share/maos/registry/installed/researcher")
+        .join("home/.maos/registry/installed/researcher")
         .exists());
 }
 
@@ -129,7 +129,7 @@ fn wrong_publisher_key_and_claim_signature_are_refused() {
     );
     assert!(!scratch
         .0
-        .join("home/.local/share/maos/registry/installed/example-spirit-ts")
+        .join("home/.maos/registry/installed/example-spirit-ts")
         .exists());
 }
 
@@ -214,7 +214,7 @@ fn materialization_failure_never_activates_a_partial_install() {
         "file/parent conflict must fail materialization"
     );
     let storage = maos_registry::storage::LocalFsRegistryStorage::at_path(
-        scratch.0.join("home/.local/share/maos/registry"),
+        scratch.0.join("home/.maos/registry"),
     )
     .unwrap();
     assert!(
@@ -259,7 +259,7 @@ fn independently_keyed_server_is_verified_and_wrong_key_never_persists() {
             String::from_utf8_lossy(&output.stderr)
         );
         let storage = maos_registry::storage::LocalFsRegistryStorage::at_path(
-            scratch.0.join("home/.local/share/maos/registry"),
+            scratch.0.join("home/.maos/registry"),
         )
         .unwrap();
         assert_eq!(
@@ -315,9 +315,7 @@ fn installed_version_is_immutable_ac14() {
     );
     assert!(install(&scratch, &first.addr).status.success());
     let installed = installed_version(&scratch);
-    let index = scratch
-        .0
-        .join("home/.local/share/maos/registry/installed-index.json");
+    let index = scratch.0.join("home/.maos/registry/installed-index.json");
     let original_index = std::fs::read(&index).unwrap();
     let original_package = std::fs::read(installed.join("signed_package.json")).unwrap();
     let original_origin = std::fs::read(installed.join("origin.json")).unwrap();
@@ -437,12 +435,9 @@ fn yanked_install_is_refused_before_persistence_ac16() {
     let result = install(&scratch, &server.addr);
     assert!(!result.status.success(), "yanked version must not install");
     assert!(String::from_utf8_lossy(&result.stderr).contains("yanked"));
+    assert!(!scratch.0.join("home/.maos/registry/installed").exists());
     assert!(!scratch
         .0
-        .join("home/.local/share/maos/registry/installed")
-        .exists());
-    assert!(!scratch
-        .0
-        .join("home/.local/share/maos/registry/installed-index.json")
+        .join("home/.maos/registry/installed-index.json")
         .exists());
 }

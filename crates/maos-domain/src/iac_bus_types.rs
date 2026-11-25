@@ -21,6 +21,10 @@ pub enum IacBusError {
     PromotionDistillateStorage(String),
     #[error("spirit {0} is not registered — call register_spirit first")]
     UnknownSpirit(String),
+    /// Story 21-7 (D-21-7-04 C) — the unbound port journals at pid 0 and carries only the
+    /// kernel's frames; a Spirit's frame is never attributed to the root.
+    #[error("sender {0} cannot send through the unbound IAC port")]
+    UnattributedSender(String),
     #[error(
         "epistemic halt queue overflow for spirit {0} — kernel MUST raise watchdog (Story 3.3)"
     )]
@@ -74,6 +78,9 @@ pub enum IacBusError {
     CrossHostPeerIntakeTimeout { peer: String, message: String },
     #[error("cross-host configuration invalid: {detail}")]
     CrossHostConfigInvalid { detail: String },
+    /// FR13 (KQ2) — a quarantined sender's frame is refused before the log append.
+    #[error("sender spirit_pid {spirit_pid} is quarantined; frame refused")]
+    SenderQuarantined { spirit_pid: u32 },
     #[error(
         "spirit restart detected on peer {peer}: prior={prior_boot_nonce} observed={observed_boot_nonce}"
     )]

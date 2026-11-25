@@ -20,28 +20,35 @@ promise (see `SecurityManagerAdapter::admit_spirit`).
 
 | Leg | Live value |
 |---|---|
-| `kernel_version` | `1.0.0-rc.2` |
-| release channel | release candidate — pre-release; LTS clock not started |
+| `kernel_version` | `1.0.0` |
+| release channel | GA |
 | `abi_version` | `1` |
-| `manifest_schema_version` (current) | `7` |
-| supported schema window | `1..=7` |
-| `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `1` |
-| supported `[cli_wrapper]` window | `1..=1` |
-| workspace crates | `59` |
+| `manifest_schema_version` (current) | `9` |
+| supported schema window | `1..=9` |
+| `[cli_wrapper]` `manifest_schema_version` (current; absent means 1) | `2` |
+| supported `[cli_wrapper]` window | `1..=2` |
+| workspace crates | `60` |
 
 | Manifest schema | Kernel behavior |
 |---|---|
-| `manifest_schema_version = 7` (current) | ✅ strict load (`deny_unknown_fields`) |
-| `manifest_schema_version = 6` (N-1) | ✅ supported (loads with WARN-level degradation notes) |
-| `manifest_schema_version < 1` (N-2) | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
-| `manifest_schema_version > 7` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
+| `manifest_schema_version = 9` (current) | ✅ strict load (`deny_unknown_fields`) |
+| `manifest_schema_version = 8` (N-1) | ✅ within the supported version window (subject to declaration validation) |
+| `manifest_schema_version < 1` | ⛔ hard refusal — typed `SecurityError::EAbiTooOld` at admit |
+| `manifest_schema_version > 9` (future) | ⛔ hard refusal — typed `SecurityError::EAbiTooNew` (fail-closed; the operator is told a newer kernel is required) |
 | `min_substrate_version` > running `kernel_version` | ⛔ hard refusal — typed `SecurityError::ESubstrateTooOld` (FR8) |
-| `[cli_wrapper]` `manifest_schema_version` outside `1..=1` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
+| `[cli_wrapper]` `manifest_schema_version` outside `1..=2` | ⛔ hard refusal before the strict parse — typed `CliWrapperAdmissionError::ECliWrapperSchemaUnsupported` |
 
 The version gate is **fail-closed in both directions**: an out-of-window
 manifest is refused with an actionable typed error, never silently
 warned-and-admitted (a manifest is a security artifact; a silent ignore would be
 fail-open).
+
+Schema 8 was ratified for Story 21-9 as `21-9-manifest-schema-8`.
+The `abi_version` and supported manifest floor remain `1`. Schemas 1–7 still
+support non-listeners, but an explicit `on_telemetry_event` listing or a
+`[lifecycle.telemetry]` table below schema 8 is refused, not degraded away.
+Schema 8 requires both declarations together for a listener.
+This change does not alter the guest wire contract.
 
 ## Deprecations
 
@@ -63,7 +70,7 @@ is a v1.5 decision, taken once support load is known. A release candidate
 ([`docs/release/lts-policy.md`](docs/release/lts-policy.md)).
 
 <!-- lts-clock-start: read from the committed `xtask/release-channel.toml`, which `ops-ga-tag-after-holds` writes when it cuts `v1.0.0`; placeholder until then — do NOT fabricate a SHA/tag. -->
-- **LTS clock-start:** pending — `v1.0.0` is cut by `ops-ga-tag-after-holds` (RELEASE-HOLDS Holds 1–2 are explicit claim boundaries, not preconditions), which writes `xtask/release-channel.toml`; no clock runs before then.
+- **LTS clock-start:** `518435c3e1f0f5da13cd9fd10232d2e0073c647a` (tag `v1.0.0`)
 
 ## Substrate-Self Compliance Scope
 
@@ -94,42 +101,44 @@ rejected).
 ## Export
 
 <!-- PRESERVED:export -->
-The MAOS substrate's cryptographic surface is classified **EAR99** under the
-U.S. Export Administration Regulations (EAR). Cryptography is **ancillary** to
-the primary AI-agent-orchestration function, so the surface falls **outside**
-ECCN 5D002 ("Information Security") per the "ancillary cryptography" Note to
-**5D002.c.1** — items whose cryptographic functionality is ancillary are not
-5D002-controlled (and thus EAR99). The open-source-software aspect is
-separately eligible under License Exception TSU, 15 CFR §740.13(e). Every
-primitive is provided by already-classified, mass-market open-source libraries
-(ring, ed25519-dalek, rustls).
+No ECCN determination was made; the surface is not classified.
+
+The sections below are the MAOS authors' unreviewed engineering notes, not a
+classification: no export-compliance counsel reviewed them, and no ECCN or
+EAR99 determination was made. The engineering analysis argues that
+cryptography is **ancillary** to the primary AI-agent-orchestration function
+(the "ancillary cryptography" Note to **5D002.c.1**) and that the
+open-source-software aspect may be eligible under License Exception TSU,
+15 CFR §740.13(e); neither argument is a determination. Every primitive is
+provided by already-classified, mass-market open-source libraries (ring,
+ed25519-dalek, rustls).
 
 Enumerated cryptographic surface (Story 10.3 AC-1): **HKDF-SHA256** key
 derivation, **Ed25519** signing, **AES-256-GCM** AEAD sealed-export (via
 `ring`), **TLS 1.3** cross-host transport, **SHA-256** content-addressing, and
 **SHA-256** digests canonically encoded in **CBOR (RFC 8949)** for
 ComplianceClaim fingerprinting (CBOR is the deterministic encoding, not a
-cryptographic primitive). The full determination, dual-use review, and BIS
-advisory citation are on file at `docs/compliance/eccn-classification.md`
-(NFR-Comp-1).
+cryptographic primitive). The enumeration and engineering notes are on file at
+`docs/compliance/eccn-classification.md` (NFR-Comp-1 is not claimed as met).
 
-This is an engineering classification, not legal export advice; **no
-export-compliance counsel review was performed and no ECCN determination was made
-(operator ruling 2026-11-12: claim boundary; NFR-Comp-1 is not claimed as met)**.
+This is an engineering note, not legal export advice; **no export-compliance
+counsel review was performed and no ECCN determination was made (operator
+ruling 2026-11-12: claim boundary; NFR-Comp-1 is not claimed as met)**.
 Operators and distributors must confirm applicability with their own counsel
 and the jurisdiction of distribution.
 
-The WASM host remains outside the shipped default closure; no ECCN determination
-was made (operator ruling 2026-11-12: claim boundary, not a GA precondition; NFR-Comp-1 not claimed as met). A default binary validates a WASM-component manifest and reports
-`wasm_engine_off`; it does not instantiate an engine. `crates/maos-bin/Cargo.toml`
-defines `default = ["network"]`; the `wasm-host` feature is opt-in and is the
-engineering precondition for the unresolved **5D002.c.1** classification.
-Measured with `cargo tree -p maos-bin --edges all`, the default closure contains
-zero `wasmtime` packages; `--features wasm-host` opts into the engine family
-(wasmtime/cranelift/pulley/wiggle), whose coordinated 46.0.2 → 46.0.3 security
-upgrade moved 39 lockfile entries. Consequently, the wasmtime 46.0.2 RustSec
-advisories addressed by Story 15-5 did not reach a published default binary.
-Self-builders who opt in must follow
-`docs/compliance/export-counsel-precondition.md`; this is not a legal
-classification or permission to distribute the WASM-enabled artifact.
+The default `maos` build includes the Wasmtime engine (the `wasm-host` feature
+is part of the default feature set; operator ruling 2026-11-12, `wasm` = on).
+An explicit engine-free build remains supported:
+`cargo build -p maos-bin --release --no-default-features --features network`
+contains no `wasmtime` packages and reports `wasm_engine_off` for a
+WASM-component manifest. Whether the engine, or only the user-supplied WASM
+Spirit it runs, engages **5D002.c.1** is an unresolved question that was
+never put to counsel; the shipped default artifact therefore carries no
+classification, no counsel clearance and no permission to distribute in any
+jurisdiction. The earlier counsel merge precondition was superseded by the
+operator ruling and is now a release claim boundary
+(`docs/compliance/export-counsel-precondition.md`; `RELEASE-HOLDS.md`
+Boundary 2). The wasmtime 46.0.2 RustSec advisories addressed by Story 15-5
+did not reach a published default binary at that time.
 <!-- END PRESERVED:export -->

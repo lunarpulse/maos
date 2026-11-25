@@ -17,6 +17,7 @@ pub use invariants::*;
 
 pub mod cli_wrapper; // NEW — Story 6.2 AC5 CliWrapperSpirit admission errors
 pub mod cost; // NEW — Story 9.3b FR64 cost attribution (ADR-046)
+pub mod data_root;
 pub mod distillation; // NEW — Story 4.4 distillation domain types
 pub mod frame;
 pub mod governance; // NEW — Story 9.3b FR62 governance audit artifacts (ADR-045)
@@ -34,6 +35,7 @@ pub mod notification;
 /// and one custody rule, and this is the only crate all three depend on.
 pub mod operator_door;
 pub mod orchestrator;
+pub mod outbound; // NEW — Story 23-0 shared outbound-endpoint policy (D-23-0-02 A)
 pub mod ports;
 pub mod provenance; // NEW — Story 9.4b AC-6 model-provenance admission error taxonomy (D5/D6)
 pub mod region; // NEW — Story 9.4b AC-5/AC-12 region-pinning jurisdiction label

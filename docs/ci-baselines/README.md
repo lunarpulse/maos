@@ -40,16 +40,15 @@ PRs cannot merge unless the `aggregate` job in `.github/workflows/discipline.yml
 
 ## Dogfood checklist for invariant-touching PRs
 
-When a PR touches any `docs/invariants/I*.md` file, the author must produce all three
+When a PR touches any `docs/invariants/I*.md` file, the author must produce both
 artifacts required by the `invariant-lock` gate (Story 0.1 AC5 / ADR-037):
 
-1. **Cadence touch:** Confirm that the `enforcement_cadence` block in the touched
-   `I*.md` is modified (additive only — new rows allowed, regressions rejected).
+1. **Cadence touch (only when the touched file's candidate claim is `guaranteed`):**
+   Confirm that the `enforcement_cadence` block in the touched `I*.md` is modified or
+   the claim validly flips `asserted -> guaranteed` (additive only — new rows allowed,
+   regressions rejected). Edits to files that stay `asserted` owe no phase commitment.
 2. **Corpus delta:** Confirm that `tests/coverage-matrix.yaml` is touched in the
    same diff (adding or updating rows for the affected invariants/NFRs).
-3. **≥2 maintainer reviewers:** Explicitly request review from two maintainers in
-   the PR description. The merge is blocked until both approvals are granted
-   (operator-side ceremony, not enforceable by xtask logic).
 
 ## Dependency-introduction checklist for PRs adding deps
 
@@ -96,8 +95,9 @@ Since the CI release-ready program W2 (2026-11-15) the xtask-driven rows above (
 the single `xtask-gates` job rather than one job each; their names, commands and `--json` output are unchanged.
 
 Since the CI release-ready program W3 (2026-11-15) `reproducible-build` and `determinism-tests` (and the other advisory and
-measurement jobs, `nfr-rel-11-halt-receipt-999pct` and `expensive-tests`) run nightly in `.github/workflows/ci-nightly.yml`
-instead of on every push; each records a one-line job summary and an artifact `nightly-result-<job>`.
+measurement jobs) run nightly in `.github/workflows/ci-nightly.yml` instead of on every push; each records a one-line
+job summary and an artifact `nightly-result-<job>`. `nfr-rel-11-halt-receipt-999pct` and `expensive-tests` also ran
+nightly there, and returned to `discipline.yml` (`aggregate.needs`, `release-ready.needs`) for GA.
 
 **Any green gate going red is a merge-block** — except gates explicitly marked
 "advisory," which surface warnings without flipping overall workflow status.

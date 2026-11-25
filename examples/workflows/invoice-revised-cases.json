@@ -1,0 +1,29 @@
+[
+  {
+    "id": "duplicate",
+    "input": {"number":"INV-204","docs_complete":true,"duplicate":true},
+    "expect": {
+      "outcome":"held",
+      "path":["intake","duplicate-check"],
+      "step_outcomes":["ready","suspect"]
+    }
+  },
+  {
+    "id": "missing-documents",
+    "input": {"number":"INV-205","docs_complete":false,"duplicate":false},
+    "expect": {
+      "outcome":"needs_evidence",
+      "path":["intake","duplicate-check","review"],
+      "step_outcomes":["ready","clear","incomplete"]
+    }
+  },
+  {
+    "id": "complete",
+    "input": {"number":"INV-206","docs_complete":true,"duplicate":false},
+    "expect": {
+      "outcome":"approval_recommended",
+      "path":["intake","duplicate-check","review"],
+      "step_outcomes":["ready","clear","complete"]
+    }
+  }
+]

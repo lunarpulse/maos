@@ -52,6 +52,12 @@ use super::redaction::{CorpusBackedRedactionPolicy, RedactionPolicy};
 
 mod erasure_sweep;
 pub use erasure_sweep::{ErasureSweep, SweepCompletion};
+mod rotation;
+pub use rotation::{
+    group_hex, RotationError, RotationOutcome, SealedSegment, SealerAlreadyInstalled, SegmentRef,
+    SegmentSealRequest, SegmentSealer, KEEP_FLOOR_DAYS, SEGMENTS_DIR_NAME, SEGMENT_EXPIRED_INTENT,
+    SEGMENT_RESEALED_INTENT,
+};
 /// Frame-kind discriminator for the Transparency Log row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i64)]
@@ -395,6 +401,8 @@ enum SideRows<'a> {
     Routed {
         recipients: &'a [FrameRecipient],
         consent: Option<&'a ConsentEnvelope>,
+        /// A kernel Retract's original frame: its retraction marker commits with the row.
+        retracts: Option<[u8; 16]>,
     },
     /// AC3.5 — a rupture of `envelope`'s grant naming each rejected recipient.
     Rupture {
@@ -404,14 +412,32 @@ enum SideRows<'a> {
 }
 
 impl SideRows<'_> {
-    fn write(self, conn: &Connection, frame_id: &[u8; 16]) -> rusqlite::Result<()> {
+    fn write(self, conn: &Connection, frame_id: &[u8; 16]) -> rusqlite::Result<FrameRowWrite> {
         let role =
             |role: Option<maos_spirit_abi::identity::SpiritRole>| role.map(|r| format!("{r:?}"));
         match self {
             Self::Routed {
                 recipients,
                 consent,
+                retracts,
             } => {
+                // An already-marked original: nothing of this retraction commits (`Duplicate`).
+                if let Some(original) = retracts {
+                    let marked =
+                        conn.execute(
+                            "INSERT OR IGNORE INTO transparency_log_retractions
+                         (original_frame_id, retract_frame_id, retracted_at_ns)
+                         VALUES (?1, ?2, ?3)",
+                            rusqlite::params![
+                                &original[..],
+                                &frame_id[..],
+                                wall_clock_now_ns() as i64,
+                            ],
+                        )?;
+                    if marked == 0 {
+                        return Ok(FrameRowWrite::Duplicate);
+                    }
+                }
                 for recipient in recipients {
                     conn.execute(
                         "INSERT INTO transparency_log_recipients
@@ -426,7 +452,7 @@ impl SideRows<'_> {
                     )?;
                 }
                 let Some(envelope) = consent else {
-                    return Ok(());
+                    return Ok(FrameRowWrite::Written);
                 };
                 let policy: i64 = match envelope.recall {
                     ConsentRecall::Full => 0,
@@ -450,7 +476,7 @@ impl SideRows<'_> {
                         policy,
                     ],
                 )?;
-                Ok(())
+                Ok(FrameRowWrite::Written)
             }
             Self::Rupture {
                 envelope,
@@ -471,7 +497,7 @@ impl SideRows<'_> {
                         ],
                     )?;
                 }
-                Ok(())
+                Ok(FrameRowWrite::Written)
             }
         }
     }
@@ -573,6 +599,11 @@ CREATE INDEX IF NOT EXISTS idx_tlog_redistill_outcome
         THEN json_extract(CAST(payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id')
         ELSE X'' END)
     WHERE intent IN ('distillate.redistilled','distillate.redistill.pending');
+-- 21-12: an erasure intent is open until a later principal.forget names it in completed_from_intent.
+CREATE INDEX IF NOT EXISTS idx_tlog_forget_intent
+    ON transparency_log(intent) WHERE intent = 'principal.forget.intent';
+CREATE INDEX IF NOT EXISTS idx_tlog_forget_done
+    ON transparency_log(intent) WHERE intent = 'principal.forget';
 CREATE INDEX IF NOT EXISTS idx_tlog_boot_pid_ts
     ON transparency_log(boot_nonce, spirit_pid, timestamp_ns, frame_id);
 
@@ -653,6 +684,28 @@ CREATE INDEX IF NOT EXISTS idx_slr_version
     ON schema_lifecycle_registry(version);
 CREATE INDEX IF NOT EXISTS idx_slr_recorded_at
     ON schema_lifecycle_registry(recorded_at_ns);
+
+-- Story 22-6 (ADR-072) — the sealed-segment registry. A row exists from the transaction that
+-- deletes the segment's prefix from the live log; an expired segment keeps its row (the chain
+-- and the id floor survive) and loses only its sealed ids.
+CREATE TABLE IF NOT EXISTS transparency_log_segments (
+    seq                  INTEGER PRIMARY KEY,
+    after_rowid          INTEGER NOT NULL,
+    first_rowid          INTEGER NOT NULL,
+    last_rowid           INTEGER NOT NULL,
+    row_count            INTEGER NOT NULL,
+    min_timestamp_ns     INTEGER NOT NULL,
+    max_timestamp_ns     INTEGER NOT NULL,
+    manifest_sha256      TEXT    NOT NULL,
+    prev_manifest_sha256 TEXT,
+    sealed_at_ns         INTEGER NOT NULL,
+    expired_at_ns        INTEGER
+);
+-- D-22-6-09 A: a peer-supplied frame_id that names a sealed frame is a replay (Duplicate).
+CREATE TABLE IF NOT EXISTS transparency_log_sealed_ids (
+    frame_id    BLOB    NOT NULL PRIMARY KEY,
+    segment_seq INTEGER NOT NULL
+) WITHOUT ROWID;
 ";
 
 const LEGAL_HOLDS_TABLE_SQL: &str = "\
@@ -682,6 +735,14 @@ pub struct TransparencyLogAdapter {
     /// Story 17-8 AC2.3 — set-once; every routed and rupture writer resolves
     /// recipients through it. Absent ⇒ no recipient rows (fail-closed).
     recipient_resolver: std::sync::OnceLock<std::sync::Arc<dyn RecipientResolver>>,
+    /// Story 22-6 — `<audit dir>/segments`; `None` for an in-memory log.
+    segments_dir: Option<std::path::PathBuf>,
+    /// Story 22-6 — signs a finished segment; absent ⇒ rotation is refused (logging never is).
+    sealer: std::sync::OnceLock<std::sync::Arc<dyn SegmentSealer>>,
+    /// Story 22-6 — serializes rotation, expiry and the sealed-segment forget pass.
+    rotation_gate: Mutex<()>,
+    /// Story 22-6 — live erasure sweeps; rotation defers while any exists.
+    active_erasures: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -767,7 +828,9 @@ impl TransparencyLogAdapter {
                 | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX
                 | rusqlite::OpenFlags::SQLITE_OPEN_NOFOLLOW,
         )?;
-        Ok(Self::from_read_only_connection(conn))
+        let mut adapter = Self::from_read_only_connection(conn);
+        adapter.segments_dir = rotation::segments_dir_for(path);
+        Ok(adapter)
     }
 
     /// Wrap an externally-opened **read-only** SQLite connection for query-only
@@ -780,6 +843,13 @@ impl TransparencyLogAdapter {
     /// Redaction is the same stateless `CorpusBackedRedactionPolicy` the local
     /// read uses, so a foreign shard is redacted identically.
     pub fn from_read_only_connection(conn: Connection) -> Self {
+        // Story 22-6: a rotated shard keeps its sealed segments beside the file this connection
+        // reads; without the directory a registered segment fails the read loudly.
+        let segments_dir = conn
+            .path()
+            .filter(|path| !path.is_empty())
+            .map(Path::new)
+            .and_then(rotation::segments_dir_for);
         Self {
             erasure_holds: Mutex::new(()),
             inner: parking_lot::FairMutex::new(TransparencyLogInner {
@@ -792,6 +862,10 @@ impl TransparencyLogAdapter {
             redaction: Box::new(CorpusBackedRedactionPolicy::new()),
             mailbox: MailboxStub::new(),
             recipient_resolver: Default::default(),
+            segments_dir,
+            sealer: Default::default(),
+            rotation_gate: Mutex::new(()),
+            active_erasures: Default::default(),
         }
     }
 
@@ -922,6 +996,10 @@ impl TransparencyLogAdapter {
             redaction,
             mailbox: MailboxStub::new(),
             recipient_resolver: Default::default(),
+            segments_dir: rotation::segments_dir_for(path),
+            sealer: Default::default(),
+            rotation_gate: Mutex::new(()),
+            active_erasures: Default::default(),
         })
     }
 
@@ -974,6 +1052,10 @@ impl TransparencyLogAdapter {
             redaction,
             mailbox: MailboxStub::new(),
             recipient_resolver: Default::default(),
+            segments_dir: None,
+            sealer: Default::default(),
+            rotation_gate: Mutex::new(()),
+            active_erasures: Default::default(),
         }
     }
 
@@ -1300,6 +1382,32 @@ impl TransparencyLogAdapter {
         payload: &[u8],
         recipients: &[FrameRecipient],
     ) -> LogBeforeDeliver<FrameRowWrite> {
+        self.insert_routed_frame_correlated(
+            frame,
+            kind,
+            spirit_pid,
+            capability_token,
+            intent,
+            payload,
+            recipients,
+            None,
+        )
+    }
+
+    /// [`Self::insert_routed_frame`] that also records the host-derived
+    /// `correlation_id` on the base row (scoped shell replies only).
+    #[allow(clippy::too_many_arguments)]
+    pub fn insert_routed_frame_correlated(
+        &self,
+        frame: &maos_domain::frame::IacFrame,
+        kind: FrameKind,
+        spirit_pid: u32,
+        capability_token: Option<&[u8; 32]>,
+        intent: &str,
+        payload: &[u8],
+        recipients: &[FrameRecipient],
+        correlation_id: Option<&str>,
+    ) -> LogBeforeDeliver<FrameRowWrite> {
         assert!(
             kind != FrameKind::Distillate,
             "MAOS I11 enforcement (Story 8.10 AC2): FrameKind::Distillate rows may only be \
@@ -1312,13 +1420,21 @@ impl TransparencyLogAdapter {
             frame.from.spirit_id.as_str(),
             frame.to.first().map_or("", |a| a.spirit_id.as_str()),
             capability_token,
-            None,
+            correlation_id,
             intent,
             payload,
             frame.auto_marker,
             Some(SideRows::Routed {
                 recipients,
                 consent: frame.consent_envelope.as_ref(),
+                retracts: match &frame.payload {
+                    maos_domain::frame::FramePayload::Retract(retract)
+                        if frame.auto_marker == FrameOrigin::Kernel =>
+                    {
+                        Some(retract.original_frame_id)
+                    }
+                    _ => None,
+                },
             }),
         ))
     }
@@ -1378,8 +1494,25 @@ impl TransparencyLogAdapter {
     ) -> FrameRowWrite {
         let redacted = self.redaction.redact(payload);
         let mut inner = self.inner.lock();
+        let supplied = frame_id.is_some();
         let frame_id =
             frame_id.unwrap_or_else(|| Self::next_frame_id(&mut inner.next_frame_id_counter));
+        // Story 22-6 (D-22-6-09 A): the live primary key no longer sees a sealed frame, so a
+        // peer-supplied id is also checked against the sealed-id table. Kernel-minted ids skip it.
+        if supplied {
+            match Self::is_sealed_id(&inner.conn, &frame_id) {
+                Ok(false) => {}
+                Ok(true) => {
+                    inner.last_frame_id = frame_id;
+                    return FrameRowWrite::Duplicate;
+                }
+                Err(error) => panic!(
+                    "MAOS kernel panic — Transparency Log write failed: {error}. \
+                     Architecture §7.3 I2: log-before-deliver guarantee broken; \
+                     kernel halts. Audit the SQLite file for corruption."
+                ),
+            }
+        }
         let timestamp_ns = wall_clock_now_ns();
         let boot_nonce = inner.boot_nonce;
         let transactional = sides.is_some();
@@ -1402,9 +1535,9 @@ impl TransparencyLogAdapter {
                         origin as i64,
                     ])
                 }) {
-                Ok(_) => sides
-                    .map_or(Ok(()), |sides| sides.write(conn, &frame_id))
-                    .map(|()| FrameRowWrite::Written),
+                Ok(_) => sides.map_or(Ok(FrameRowWrite::Written), |sides| {
+                    sides.write(conn, &frame_id)
+                }),
                 // Only the base row's primary key can mean already journaled.
                 Err(error) if Self::is_duplicate_primary_key(&error) => {
                     Ok(FrameRowWrite::Duplicate)
@@ -1714,37 +1847,13 @@ impl TransparencyLogAdapter {
     /// Story 9.2 — return every frame_id in the Transparency Log, sorted.
     pub fn all_frame_ids(&self) -> Result<Vec<[u8; 16]>, AuditError> {
         let inner = self.inner.lock();
-        let mut stmt = inner
-            .conn
-            .prepare(
-                "SELECT frame_id FROM transparency_log ORDER BY timestamp_ns ASC, frame_id ASC",
-            )
-            .map_err(AuditError::SqliteRead)?;
-        let rows = stmt
-            .query_map([], |row| {
-                let bytes: Vec<u8> = row.get(0)?;
-                // P8: a corrupt/non-16-byte row must not panic the cascade.
-                if bytes.len() != 16 {
-                    return Err(rusqlite::Error::FromSqlConversionFailure(
-                        16,
-                        rusqlite::types::Type::Blob,
-                        format!(
-                            "transparency_log frame_id is {} bytes, expected 16",
-                            bytes.len()
-                        )
-                        .into(),
-                    ));
-                }
-                let mut arr = [0u8; 16];
-                arr.copy_from_slice(&bytes);
-                Ok(arr)
-            })
-            .map_err(AuditError::SqliteRead)?;
-        let mut out = Vec::new();
-        for row in rows {
-            out.push(row.map_err(AuditError::SqliteRead)?);
+        let mut all = Self::all_ids_on(&inner.conn)?;
+        // Story 22-6: the uninstall proof inventory spans every sealed segment.
+        for sealed in self.sealed_connections(&inner.conn)? {
+            all.extend(Self::all_ids_on(&sealed)?);
         }
-        Ok(out)
+        all.sort();
+        Ok(all.into_iter().map(|(_, id)| id).collect())
     }
 
     /// Story 9.2 — list distinct principal_ids written by a given spirit pid.
@@ -1999,7 +2108,7 @@ impl TransparencyLogAdapter {
             "SELECT frame_id,kind,spirit_pid,boot_nonce,payload_redacted,timestamp_ns \
              FROM transparency_log NOT INDEXED WHERE rowid>?2 AND rowid<=?3 \
              AND (kind IN (28,29) OR instr(payload_redacted,CAST(?1 AS BLOB))>0) \
-             AND intent NOT IN ('principal.forget','principal.forget.held','distillate.redacted') \
+             AND intent NOT IN ('principal.forget','principal.forget.held','principal.forget.intent','distillate.redacted') \
              AND intent NOT LIKE 'principal.uninstall.%'"
         };
         self.scan_rowid_range(sql, principal, range, |row| {
@@ -2095,39 +2204,87 @@ impl TransparencyLogAdapter {
     /// Durable requests lacking any recorded outcome, for restart recovery.
     pub fn outstanding_redistill_requests(&self) -> Result<Vec<RedistillRequest>, AuditError> {
         let mut found = Vec::new();
-        self.scan_rowid_windows(
-            "SELECT r.payload_redacted, r.timestamp_ns, r.frame_id \
-             FROM transparency_log r INDEXED BY idx_tlog_redistill_request_rowid \
-             WHERE r.rowid > ?2 AND r.rowid <= ?3 AND ?1 IS ?1 \
-             AND r.intent = 'distillate.redistill.requested' \
-             AND NOT EXISTS (SELECT 1 FROM transparency_log o INDEXED BY idx_tlog_redistill_outcome \
-               WHERE o.intent IN ('distillate.redistilled','distillate.redistill.pending') \
-               AND CASE WHEN json_valid(CAST(o.payload_redacted AS TEXT),2) \
-                 THEN json_extract(CAST(o.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') \
-                 ELSE X'' END = json_extract(CAST(r.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') \
-               UNION ALL SELECT 1 FROM transparency_log bad INDEXED BY idx_tlog_redistill_outcome \
-               WHERE bad.intent IN ('distillate.redistilled','distillate.redistill.pending') \
-               AND CASE WHEN json_valid(CAST(bad.payload_redacted AS TEXT),2) \
-                 THEN json_extract(CAST(bad.payload_redacted AS TEXT),'$.request.redacted_distillate_frame_id') \
-                 ELSE X'' END = X'' \
-               AND json_extract(CAST(bad.payload_redacted AS TEXT),'$') IS NULL)",
-            None,
-            |row| {
-                let body: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
-                let mut value: serde_json::Value = serde_json::from_slice(&body)
-                    .map_err(|e| AuditError::Serialization(e.to_string()))?;
-                Self::redistill_metadata_ids(&mut value, false);
-                let request: RedistillRequest = serde_json::from_value(value["request"].take())
-                    .map_err(|e| AuditError::Serialization(e.to_string()))?;
-                let bytes: Vec<u8> = row.get(2).map_err(AuditError::SqliteRead)?;
-                let id: [u8; 16] = bytes.try_into()
-                    .map_err(|bytes: Vec<u8>| AuditError::MalformedFrameId(bytes.len()))?;
-                found.push((row.get::<_, i64>(1).map_err(AuditError::SqliteRead)?, id, request));
-                Ok(())
-            },
-        )?;
+        self.scan_rowid_windows(rotation::OUTSTANDING_REDISTILL_SQL, None, |row| {
+            let body: Vec<u8> = row.get(0).map_err(AuditError::SqliteRead)?;
+            let mut value: serde_json::Value = serde_json::from_slice(&body)
+                .map_err(|e| AuditError::Serialization(e.to_string()))?;
+            Self::redistill_metadata_ids(&mut value, false);
+            let request: RedistillRequest = serde_json::from_value(value["request"].take())
+                .map_err(|e| AuditError::Serialization(e.to_string()))?;
+            let bytes: Vec<u8> = row.get(2).map_err(AuditError::SqliteRead)?;
+            let id: [u8; 16] = bytes
+                .try_into()
+                .map_err(|bytes: Vec<u8>| AuditError::MalformedFrameId(bytes.len()))?;
+            found.push((
+                row.get::<_, i64>(1).map_err(AuditError::SqliteRead)?,
+                id,
+                request,
+            ));
+            Ok(())
+        })?;
         found.sort_by_key(|(timestamp, id, _)| (*timestamp, *id));
         Ok(found.into_iter().map(|(_, _, request)| request).collect())
+    }
+
+    /// Colon-grouped hex (16 digits per group): the journal redacts plain 32+ hex runs.
+    pub fn grouped_hex(bytes: &[u8]) -> String {
+        let group = |c: &[u8]| c.iter().map(|b| format!("{b:02x}")).collect::<String>();
+        bytes.chunks(8).map(group).collect::<Vec<_>>().join(":")
+    }
+
+    fn from_grouped_hex(text: &str) -> Option<Vec<u8>> {
+        let digits = text.replace(':', "");
+        (digits.len() % 2 == 0 && digits.bytes().all(|b| b.is_ascii_hexdigit())).then(|| {
+            (0..digits.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&digits[i..i + 2], 16).unwrap_or_default())
+                .collect()
+        })
+    }
+
+    /// 21-12: kernel `principal.forget.intent` frames no kernel `principal.forget` frame
+    /// references via `completed_from_intent`, oldest first (bounded), optionally only
+    /// `only`'s. Each is `(frame id, principal, reason)`; a malformed row has no
+    /// principal and never hides the valid ones.
+    #[allow(clippy::type_complexity)]
+    pub fn outstanding_forget_intents(
+        &self,
+        only: Option<&str>,
+    ) -> Result<Vec<([u8; 16], Option<String>, Option<String>)>, AuditError> {
+        let key = only.map(|p| Self::grouped_hex(p.as_bytes()));
+        let inner = self.inner.lock();
+        let mut stmt = inner
+            .conn
+            .prepare_cached(
+                "SELECT i.frame_id, i.payload_redacted \
+                 FROM transparency_log i INDEXED BY idx_tlog_forget_intent \
+                 WHERE i.intent = 'principal.forget.intent' AND i.origin = ?1 \
+                 AND (?2 IS NULL OR CASE WHEN json_valid(CAST(i.payload_redacted AS TEXT),2) \
+                   THEN json_extract(CAST(i.payload_redacted AS TEXT),'$.principal_hex') END = ?2) \
+                 AND NOT EXISTS (SELECT 1 FROM transparency_log f INDEXED BY idx_tlog_forget_done \
+                   WHERE f.intent = 'principal.forget' AND f.origin = ?1 AND f.rowid > i.rowid \
+                   AND CASE WHEN json_valid(CAST(f.payload_redacted AS TEXT),2) \
+                     THEN json_extract(CAST(f.payload_redacted AS TEXT),'$.completed_from_intent') END \
+                     = substr(lower(hex(i.frame_id)),1,16)||':'||substr(lower(hex(i.frame_id)),17)) \
+                 ORDER BY i.rowid LIMIT 4096",
+            )
+            .map_err(AuditError::SqliteRead)?;
+        let rows = stmt
+            .query_map(rusqlite::params![FrameOrigin::Kernel as i64, key], |row| {
+                Ok((row.get::<_, Vec<u8>>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })
+            .map_err(AuditError::SqliteRead)?;
+        let mut found = Vec::new();
+        for row in rows {
+            let (id, body) = row.map_err(AuditError::SqliteRead)?;
+            let body = serde_json::from_slice::<serde_json::Value>(&body).ok();
+            let text = |k: &str| body.as_ref()?[k].as_str().map(str::to_owned);
+            let principal = text("principal_hex")
+                .and_then(|h| Self::from_grouped_hex(&h))
+                .and_then(|b| String::from_utf8(b).ok());
+            found.push((id.try_into().unwrap_or([0; 16]), principal, text("reason")));
+        }
+        Ok(found)
     }
 
     /// Only the exact kernel full-body replacement is an erased source.
@@ -2600,9 +2757,20 @@ impl TransparencyLogAdapter {
     /// schema. The independence is verified by the
     /// `approval_log_is_distinct_table` unit test.
     ///
-    /// At v0.1-β the Approval Manager does not yet emit approval-decision
-    /// events; the runtime body ships in Story 1b.3.
+    /// Every producer writes through here, so a row missing its actor, target,
+    /// capability or intent is refused rather than journaled (I4).
     pub fn insert_approval_decision(&self, decision: ApprovalDecision) -> Result<(), AuditError> {
+        let fields = [
+            &decision.actor,
+            &decision.target,
+            &decision.capability,
+            &decision.intent,
+        ];
+        if fields.iter().any(|f| f.trim().is_empty()) {
+            return Err(AuditError::Serialization(
+                "approval row missing actor, target, capability or intent".into(),
+            ));
+        }
         let inner = self.inner.lock();
         let timestamp_ns = wall_clock_now_ns();
         inner
@@ -2633,13 +2801,22 @@ impl TransparencyLogAdapter {
         filter: FrameFilter,
     ) -> Result<Vec<TransparencyLogEntry>, AuditError> {
         let inner = self.inner.lock();
+        self.merge_sources(&inner.conn, filter, Self::query_frames_on, |entry| {
+            (entry.timestamp_ns, entry.frame_id)
+        })
+    }
+
+    fn query_frames_on(
+        conn: &Connection,
+        filter: FrameFilter,
+    ) -> Result<Vec<TransparencyLogEntry>, AuditError> {
         let (sql, params) = Self::frame_query(
             filter,
             "t.rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
              boot_nonce, capability_token, kind, intent, correlation_id, payload_redacted, origin",
         );
 
-        let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
+        let mut stmt = conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
         let params_refs: Vec<&dyn rusqlite::types::ToSql> =
             params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt
@@ -2703,6 +2880,15 @@ impl TransparencyLogAdapter {
         filter: FrameFilter,
     ) -> Result<Vec<TransparencyLogMetadata>, AuditError> {
         let inner = self.inner.lock();
+        self.merge_sources(&inner.conn, filter, Self::query_frame_metadata_on, |m| {
+            (m.timestamp_ns, m.frame_id)
+        })
+    }
+
+    fn query_frame_metadata_on(
+        conn: &Connection,
+        filter: FrameFilter,
+    ) -> Result<Vec<TransparencyLogMetadata>, AuditError> {
         // Story 17-8 AC3.3 — a header-only row the caller only RECEIVED lists
         // with stored length 0 (`payload_available = false`); no blob is read.
         let projection = match filter.participant {
@@ -2714,7 +2900,7 @@ impl TransparencyLogAdapter {
             None => FRAME_METADATA_PROJECTION.to_string(),
         };
         let (sql, params) = Self::frame_query(filter, &projection);
-        let mut stmt = inner.conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
+        let mut stmt = conn.prepare(&sql).map_err(AuditError::SqliteRead)?;
         let params_refs: Vec<&dyn rusqlite::types::ToSql> =
             params.iter().map(|p| p.as_ref()).collect();
         let rows = stmt
@@ -2777,9 +2963,9 @@ impl TransparencyLogAdapter {
             kinds = disclosable_kinds_sql("t.kind"),
             participant = participant_predicate(),
         );
-        inner
-            .conn
-            .query_row(
+        // Story 22-6: a sealed frame carries its recipient and consent rows into its segment.
+        self.first_source(&inner.conn, |conn| {
+            conn.query_row(
                 &sql,
                 rusqlite::params![
                     scope.pid as i64,
@@ -2802,6 +2988,7 @@ impl TransparencyLogAdapter {
             )
             .optional()
             .map_err(AuditError::SqliteRead)
+        })
     }
 
     fn frame_query(
@@ -2904,8 +3091,16 @@ impl TransparencyLogAdapter {
         frame_id: [u8; 16],
     ) -> Result<Option<TransparencyLogEntry>, AuditError> {
         let inner = self.inner.lock();
-        let mut stmt = inner
-            .conn
+        self.first_source(&inner.conn, |conn| {
+            Self::query_frame_by_id_on(conn, frame_id)
+        })
+    }
+
+    fn query_frame_by_id_on(
+        conn: &Connection,
+        frame_id: [u8; 16],
+    ) -> Result<Option<TransparencyLogEntry>, AuditError> {
+        let mut stmt = conn
             .prepare(
                 "SELECT rowid, frame_id, timestamp_ns, spirit_pid, from_spirit_id, to_spirit_id,
                         boot_nonce, capability_token, kind, intent, correlation_id,
@@ -3033,53 +3228,6 @@ impl TransparencyLogAdapter {
         Ok(rows > 0)
     }
 
-    /// Story 6.1 — atomically check-and-mark retraction.
-    ///
-    /// Holds the inner lock across both operations to prevent TOCTOU races.
-    /// Returns `Ok(retract_frame_id)` if already retracted, `Ok(None)` if
-    /// not yet retracted (caller should proceed with retraction).
-    pub fn check_and_mark_retracted(
-        &self,
-        original_frame_id: [u8; 16],
-        retract_frame_id: [u8; 16],
-    ) -> Result<Option<[u8; 16]>, AuditError> {
-        let inner = self.inner.lock();
-        // Check if already retracted
-        let row: Option<Vec<u8>> = inner
-            .conn
-            .query_row(
-                "SELECT retract_frame_id FROM transparency_log_retractions
-                 WHERE original_frame_id = ?1 LIMIT 1",
-                rusqlite::params![&original_frame_id[..]],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(AuditError::SqliteRead)?;
-        if let Some(blob) = row {
-            let mut arr = [0u8; 16];
-            if blob.len() == 16 {
-                arr.copy_from_slice(&blob);
-            }
-            return Ok(Some(arr));
-        }
-        // Not yet retracted — mark it atomically
-        let timestamp_ns = wall_clock_now_ns();
-        inner
-            .conn
-            .execute(
-                "INSERT OR IGNORE INTO transparency_log_retractions
-                 (original_frame_id, retract_frame_id, retracted_at_ns)
-                 VALUES (?1, ?2, ?3)",
-                rusqlite::params![
-                    &original_frame_id[..],
-                    &retract_frame_id[..],
-                    timestamp_ns as i64,
-                ],
-            )
-            .map_err(AuditError::SqliteWriteFatal)?;
-        Ok(None)
-    }
-
     /// Story 6.1 — check whether a frame has been retracted.
     ///
     /// Returns `Some(retract_frame_id)` if retracted, `None` otherwise.
@@ -3088,16 +3236,16 @@ impl TransparencyLogAdapter {
         original_frame_id: [u8; 16],
     ) -> Result<Option<[u8; 16]>, AuditError> {
         let inner = self.inner.lock();
-        let row: Option<Vec<u8>> = inner
-            .conn
-            .query_row(
+        let row: Option<Vec<u8>> = self.first_source(&inner.conn, |conn| {
+            conn.query_row(
                 "SELECT retract_frame_id FROM transparency_log_retractions
                  WHERE original_frame_id = ?1 LIMIT 1",
                 rusqlite::params![&original_frame_id[..]],
                 |row| row.get(0),
             )
             .optional()
-            .map_err(AuditError::SqliteRead)?;
+            .map_err(AuditError::SqliteRead)
+        })?;
         Ok(row.map(|blob| {
             let mut arr = [0u8; 16];
             if blob.len() == 16 {
@@ -3105,6 +3253,37 @@ impl TransparencyLogAdapter {
             }
             arr
         }))
+    }
+
+    /// Story 21-7 (D-21-7-03 A) — the local incarnations recorded as having received `frame_id`
+    /// (the routed writer's side table), by pid. Empty for a frame nobody local received.
+    pub fn recorded_recipients(
+        &self,
+        frame_id: [u8; 16],
+    ) -> Result<Vec<FrameRecipient>, AuditError> {
+        let inner = self.inner.lock();
+        let recorded = self.first_source(&inner.conn, |conn| {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT recipient_pid, recipient_spirit_id FROM transparency_log_recipients
+                     WHERE frame_id = ?1 ORDER BY recipient_pid",
+                )
+                .map_err(AuditError::SqliteRead)?;
+            let rows = stmt
+                .query_map(rusqlite::params![&frame_id[..]], |row| {
+                    Ok(FrameRecipient {
+                        pid: row.get::<_, i64>(0)? as u32,
+                        spirit_id: row.get(1)?,
+                        role: None,
+                    })
+                })
+                .map_err(AuditError::SqliteRead)?;
+            let recorded = rows
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(AuditError::SqliteRead)?;
+            Ok((!recorded.is_empty()).then_some(recorded))
+        })?;
+        Ok(recorded.unwrap_or_default())
     }
 
     /// Get a reference to the mailbox stub (for testing).

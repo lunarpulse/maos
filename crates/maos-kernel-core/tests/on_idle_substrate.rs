@@ -42,7 +42,10 @@ fn make_scb(enabled_hooks: Vec<String>, idle_window_ms: u32) -> Arc<SpiritContro
             yield_every_polls: 64,
             idle_window_ms,
         },
-        lifecycle: LifecycleSection { enabled_hooks },
+        lifecycle: LifecycleSection {
+            enabled_hooks,
+            telemetry: None,
+        },
         ..Default::default()
     };
     let scb = SpiritControlBlock::new(
@@ -119,6 +122,49 @@ async fn idle_watchdog_fires_on_idle_after_quiescence() {
     assert!(
         scb.last_idle_fire_ns.load(Ordering::Relaxed) > 0,
         "on_idle must have fired (last_idle_fire_ns updated)"
+    );
+}
+
+/// Run one fresh watchdog for `ms` (its first tick is immediate, so one poll is judged).
+async fn one_poll(scbs: &Arc<RwLock<BTreeMap<u32, Arc<SpiritControlBlock>>>>, ms: u64) {
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let watchdog = Arc::new(IdleWatchdog::new(Arc::clone(scbs), make_dispatcher()));
+    let handle = watchdog.spawn(cancel.child_token());
+    tokio::time::sleep(tokio::time::Duration::from_millis(ms)).await;
+    cancel.cancel();
+    let _ = tokio::time::timeout(tokio::time::Duration::from_secs(2), handle).await;
+}
+
+/// 22-9 (D-22-9-07 B) — `idle` fires once per quiescence: no second firing while no frame
+/// arrives, and a new one only after an inbound frame followed by a full idle window.
+#[tokio::test]
+async fn idle_fires_once_per_quiescence_until_a_frame_arrives() {
+    maos_kernel_core::capability::cap_tokens::init_monotonic_base();
+    let scb = make_scb(vec!["on_idle".into()], 100);
+    scb.last_inbound_frame_ns.store(1, Ordering::Relaxed);
+    let scbs = Arc::new(RwLock::new(BTreeMap::new()));
+    scbs.write().unwrap().insert(1, Arc::clone(&scb));
+
+    one_poll(&scbs, 400).await;
+    let first = scb.last_idle_fire_ns.load(Ordering::Acquire);
+    assert!(first > 0, "the first quiescence fires `idle`");
+
+    one_poll(&scbs, 400).await;
+    assert_eq!(
+        scb.last_idle_fire_ns.load(Ordering::Acquire),
+        first,
+        "no frame arrived: `idle` does not fire again"
+    );
+
+    scb.last_inbound_frame_ns.store(
+        maos_kernel_core::capability::cap_tokens::monotonic_now_ns(),
+        Ordering::Relaxed,
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+    one_poll(&scbs, 400).await;
+    assert!(
+        scb.last_idle_fire_ns.load(Ordering::Acquire) > first,
+        "a frame followed by a full idle window arms `idle` again"
     );
 }
 
@@ -217,6 +263,7 @@ fn rendezvous_scb(pid: u32, spirit: RendezvousSpirit) -> Arc<SpiritControlBlock>
         },
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["on_idle".into()],
+            telemetry: None,
         },
         ..Default::default()
     };

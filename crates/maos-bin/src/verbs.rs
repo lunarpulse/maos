@@ -15,8 +15,7 @@
 //! in BOTH builds. At the story's baseline the network build hung (EXIT 124,
 //! daemon boot) on all four.
 //!
-//! The stdout shape of `maos --help` is FROZEN by the `check-exit-commands`
-//! contract: a `VERBS:` section header, one entry per verb (exactly two
+//! The stdout shape of `maos --help` is a FROZEN contract: a `VERBS:` section header, one entry per verb (exactly two
 //! leading spaces; the first whitespace-delimited token is the verb; build
 //! annotation in brackets), then a `MAOS_ONE_SHOT MODES:` section header, one
 //! entry per one-shot mode. Every verb of BOTH builds is listed in BOTH
@@ -66,6 +65,8 @@ pub enum VerbName {
     Install,
     Purge,
     Eval,
+    Workflow,
+    Serve,
 }
 
 /// One row of the verb table.
@@ -141,6 +142,18 @@ pub const VERBS: &[Verb] = &[
         builds: &[Build::Network],
         summary: "Replay a class's halt corpus and score it (eval halt --class <c>)",
     },
+    Verb {
+        name: VerbName::Workflow,
+        argv: "workflow",
+        builds: &[Build::Network],
+        summary: "Plan, apply, run or evaluate a business workflow",
+    },
+    Verb {
+        name: VerbName::Serve,
+        argv: "serve",
+        builds: &[Build::Network],
+        summary: "Serve a standing Host from a configuration file (serve --config <host.toml>)",
+    },
 ];
 
 /// Tokens that render the help table. Meta-flags, not verb rows: the frozen
@@ -158,9 +171,9 @@ pub const VERSION_FLAGS: &[&str] = &["--version", "-V"];
 /// orchestrator-status, revoke-token, revocations-import, revocations-list,
 /// hot-swap-precheck, spirit-upgrade, legal-hold-list): they reach the
 /// running daemon through the operator door or run as in-process maosctl
-/// readers, so `MAOS_ONE_SHOT` dispatches **32** distinct modes — re-measured
-/// against the one-shot block. This is the list the `check-exit-commands`
-/// gate resolves `MAOS_ONE_SHOT=<mode> maos` against.
+/// readers, so `MAOS_ONE_SHOT` dispatches **31** distinct modes — re-measured
+/// against the one-shot block. This is the list `MAOS_ONE_SHOT=<mode> maos`
+/// resolves against.
 pub const MAOS_ONE_SHOT_MODES: &[&str] = &[
     "acp-server",
     "bench-section-13-1",
@@ -178,7 +191,6 @@ pub const MAOS_ONE_SHOT_MODES: &[&str] = &[
     "smoke-abi-7-5a",
     "smoke-bench-5e",
     "smoke-compliance-7-3",
-    "smoke-discipline-7-1-5",
     "smoke-epic-4",
     "smoke-import-7-2",
     "smoke-mcp-acp-5",

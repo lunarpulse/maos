@@ -227,3 +227,72 @@ why one new POST route on the door does not cross that line.
 - **The read-route 405 guards stay.** `rotation-windows`, `peer-versions` and
   `self-identity` keep answering an authenticated POST with 405; the re-pin
   route is a separate path, not a widening of any certificate-identity read.
+
+## Amendment — Story 22-4
+
+Amended 2026-11-23 by Story `22-4-directed-task-ingress` (decisions D-22-4-02 to D-22-4-09, recommended
+answers), in the same change as the code it governs. The certificate-identity exclusion in the Decision above
+STANDS unchanged: cohort membership, peer identity, certificate rotation and serving-leaf replacement still have
+no operator POST mutation route. Directing a task is not an identity mutation.
+
+- **The two routes.** `POST /v1/spirits/<id>/ask` with body `{"text":"...","idempotency_key":"..."?}` becomes
+  `OperatorCommand::Ask`; it completes once the task is accepted into the Spirit's bounded queue with
+  `{task_id, spirit_id, state, replayed}`, and writes one completion row `operator.ask.<operation_id>:<outcome>`
+  whose receipt carries the `task_id`. `GET /v1/tasks/<task_id>` is a read route (405 to every other method,
+  fixed body) served by `task_status`; it writes no row and answers 404 `task_not_found` for an id the Host does
+  not hold. `maosctl ask` and `maosctl task show` drive them. Same bearer, authentication before route.
+- **The trust boundary (D-22-4-02 A).** The holder of the door bearer, the operator, may direct any running
+  directable cast member; there is no per-Spirit opt-in, because the bearer holder can already load, upgrade,
+  pause, unload and uninstall any Spirit through the same door. The task frame is **host-minted**:
+  `HumanAuthored`, `Standard`, from the host pseudo-address `@maos-shell`, so the local consent gate treats it as
+  operator authority, like a shell turn. **No other caller may mint it.** Spirits cannot reach the route (they
+  have no door client and Workers cannot read `control.json`); A2A peers cannot reach it (the door is
+  loopback-only and nothing in the A2A intake calls it). The Spirit's reply is the Spirit's own send, so the
+  consent gate and the reply route's validation apply to it. The task record carries `origin = "door"` and
+  `actor = "director"`; 24-1 replaces `actor` with the principal.
+- **`serve` is a door root.** The door binds when the root is a shell, a run or the cohort daemon. `maos serve`
+  is a run root (its Host file supplies the run arguments), so it binds the door and serves these routes; the
+  "Door roots" list of Amendment 16-1 predates it.
+- **Directable forms (D-22-4-03 A; Story 22-8 D-22-8-02/03 A).** Installed WASM-component cast members, and
+  Mira. Mira is a native class: no mailbox turn answers a task frame, so a native `TaskRunner` hands the text
+  to her own task handler in-process (`spirits/mira`: prompt adapter, deterministic diagnosis, per-subject
+  memory, advisory) and journals the answer as the `TaskComplete` reply row (`maos.task-reply/<hex>`) before
+  `completed`. The registry is the same one: bounds, accept row, idempotency key, halt correlation and
+  restart read-back apply unchanged, and the runner acts with operator authority, as any directed task. Nash
+  and every other native class, a `cli_wrapper` Worker and a single-session `maos run` component are refused
+  with a typed 409 `spirit_not_directable`. A directed task to Mira ends `halted` through her own
+  diagnostic-confidence scalar, which fires the `[epistemic_policy]` halt on her pid while the task runs.
+- **A carried halt is resolvable only by the operator (Story 22-8, D-22-8-05 A).** Every Spirit termination
+  still writes its halt receipt (NFR-Rel-11), and the pending-halt registry is in memory. Once per boot, after
+  the Host file's (or topology's) manifest cast is admitted, `halt_carry` scans the Transparency Log, sealed
+  segments included, for halts the cast member's admitted identity raised and no `halt.resolve` decision
+  closed, journals one `halt.carried` row (kind 3, at the new pid, naming the old boot and pid) and re-admits
+  it as `PendingResolution` under the same halt id. The old incarnation's receipt stays: the incarnation
+  ended, the decision did not. A halt a `maosctl halt resolve` closed is never carried; a Spirit outside the
+  cast (`maosctl load`, an installed component) carries nothing. The carried halt resolves through the same
+  door route as any pending halt, once (`halt_already_resolved` after), so nothing but the bearer holder can
+  resolve it. A `--once` run carries nothing.
+- **Log before deliver; bounded; at most once.** The accept row precedes the 200 and the delivery; delivery
+  happens only from the Spirit's own pump, one task at a time, so the door handler never waits on the mailbox
+  channel. One running plus 32 queued per Spirit and 512 host-wide; a full queue is a typed refusal that mints
+  no id. A stop leaves queued and running tasks `interrupted`, never re-run.
+- **The 23-5 hand-off.** A remote request enters the same task registry only after `handle_intake`'s consent
+  chain (TOFU pin, boot-nonce restart, consent granter and expiry, the accept allowlist and the cohort verdict),
+  with its own origin, and never mints a `HumanAuthored` frame. 23-5 writes that part; 24-1 puts a Cedar
+  decision before `submit`.
+
+## Amendment — Story 22-5
+
+Amended 2026-11-23 by Story `22-5-agents-list-and-session-view` (decisions D-22-5-02 to D-22-5-10,
+recommended answers), in the same change as the code it governs. Two read routes join the door, behind the same
+shared bearer, loopback-only and GET-only (405 with the fixed body to every other method), both before the
+POST-only `{verb}` arm: `GET /v1/agents` (one object per Spirit: id, pid, state, form, originator, task,
+`more_tasks`, `age_secs`, `spend {in,out}`) and `GET /v1/spirits/<id>/session` (an optional bounded JSON body
+`{after_rowid?, after_decision?, limit?}`, `limit` 1..=500). Neither submits an `OperatorCommand`, takes an
+operation id or writes a row; polling them never grows the log (D-22-5-10 A). The session route opens its own
+`READ_ONLY | NOFOLLOW` connection to the daemon's audit store and never uses the Transparency Log adapter. Its
+rows are **header only**: frame id, time, kind, intent, from/to, origin and a typed one-line summary built from
+parsed fields. Payload bytes, a halt's Spirit-supplied `derived_from` and the operator's typed halt context are
+never returned; an Approval Decision Log row is reduced to actor, capability, the decision and the resolution
+**kind** (`provided_context`, `accepted_halt` or `authorized_override`). The scope is the current boot
+(D-22-5-07 A). `maosctl audit query` remains the forensic path to full rows.

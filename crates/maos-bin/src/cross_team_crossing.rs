@@ -914,6 +914,53 @@ pub fn reconcile_home_team_with_manifest(
     }
 }
 
+/// Story 22-1 (AC4; 21-3 AC6, D4a) — THE REGION AXIS, one field over from the team axis
+/// above and argued by the same doctrine: a config-time fact never silently overrides a
+/// manifest-time fact, and disagreement is a boot error, never a warning.
+///
+/// `home_region` is the value that stamps rows: the one the composition root passes to
+/// `.with_home_region` (the kernel reader's result, which `maos serve` feeds from the Host
+/// file key). `None`/empty means region pinning is off, which is not a disagreement, like
+/// the team axis. A set region with no signed team for this host, or a team the manifest
+/// carries no `TeamEntry` for, is a refusal: absence never permits.
+pub fn reconcile_home_region_with_manifest(
+    manifest: &maos_cohort::CohortManifest,
+    local_host: &str,
+    home_region: Option<&str>,
+) -> Result<(), String> {
+    let Some(region) = home_region.map(str::trim).filter(|tag| !tag.is_empty()) else {
+        return Ok(());
+    };
+    let Some(team) = manifest.team_of_host(local_host) else {
+        return Err(format!(
+            "MAOS_REGION_HOME={region} is set but the signed cohort manifest declares NO team \
+             for host {local_host} (pre-V4 schema, or a V4 member with no team), so no signed \
+             region can corroborate it — absence never permits: declare the member's team or \
+             unset the region"
+        ));
+    };
+    let signed = manifest
+        .teams
+        .iter()
+        .flatten()
+        .find(|entry| entry.team_id == *team)
+        .map(|entry| &entry.region);
+    match signed {
+        Some(signed) if signed.as_str() == region => Ok(()),
+        Some(signed) => Err(format!(
+            "MAOS_REGION_HOME={region} disagrees with the signed cohort manifest, which \
+             declares region {signed} for team {} of host {local_host} — one host, one \
+             region: reconcile the region with the signed manifest",
+            team.as_str(),
+        )),
+        None => Err(format!(
+            "MAOS_REGION_HOME={region} is set but the signed cohort manifest carries no team \
+             entry for team {} of host {local_host} — absence never permits",
+            team.as_str(),
+        )),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{

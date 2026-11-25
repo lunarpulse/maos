@@ -39,12 +39,10 @@ fn copy_tree(from: &Path, to: &Path) {
 
 fn isolated() -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
-    for relative in [
-        "crates/maos-kernel-core/src",
-        "_bmad-output/planning-artifacts/epics",
-    ] {
-        copy_tree(&root().join(relative), &dir.path().join(relative));
-    }
+    copy_tree(
+        &root().join("crates/maos-kernel-core/src"),
+        &dir.path().join("crates/maos-kernel-core/src"),
+    );
     fs::create_dir_all(dir.path().join("xtask")).unwrap();
     fs::create_dir_all(dir.path().join(".github/workflows")).unwrap();
     fs::write(
@@ -52,12 +50,9 @@ fn isolated() -> tempfile::TempDir {
         "name: fixture\non: workflow_dispatch\njobs:\n  live:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
     )
     .unwrap();
-    let sprint = "_bmad-output/implementation-artifacts/sprint-status.yaml";
-    fs::create_dir_all(dir.path().join(sprint).parent().unwrap()).unwrap();
     for relative in [
         "xtask/kernel-core-baseline.toml",
         "xtask/gate-registry.toml",
-        sprint,
     ] {
         fs::copy(root().join(relative), dir.path().join(relative)).unwrap();
     }
@@ -218,16 +213,6 @@ fn composite_case(gate: &str, infrastructure_error: bool) {
     let pin = tree.path().join("xtask/kernel-core-baseline.toml");
     if infrastructure_error {
         fs::remove_file(&pin).unwrap();
-    } else if gate == "check-epic-close-coherence" {
-        let sprint = tree
-            .path()
-            .join("_bmad-output/implementation-artifacts/sprint-status.yaml");
-        let statuses = fs::read_to_string(&sprint).unwrap().replacen(
-            "development_status:",
-            "development_status:\n  epic-999: done\n  999-1-planted-open-story: in-progress",
-            1,
-        );
-        fs::write(&sprint, statuses).unwrap();
     } else {
         let original = fs::read_to_string(&pin).unwrap();
         let old = original
@@ -258,11 +243,6 @@ fn composite_case(gate: &str, infrastructure_error: bool) {
         );
     } else if !infrastructure_error && gate == "check-cohort-mesh" {
         assert!(String::from_utf8_lossy(&output.stderr).contains("kernel-abi-diff RED"));
-    } else if !infrastructure_error {
-        assert!(
-            String::from_utf8_lossy(&output.stdout).contains("epic-over-stories"),
-            "{value}"
-        );
     }
 }
 
@@ -286,36 +266,6 @@ fn loom_mismatch_emits_json() {
 fn loom_pin_read_error_emits_json() {
     composite_case("check-multi-tenant-loom", true);
 }
-#[test]
-#[ignore = "expensive: nested cargo test on the witness crate"]
-fn epic_mismatch_emits_json() {
-    composite_case("check-epic-close-coherence", false);
-}
-#[test]
-#[ignore = "expensive: nested cargo test on the witness crate"]
-fn epic_pin_read_error_emits_json() {
-    composite_case("check-epic-close-coherence", true);
-}
-
-#[test]
-fn epic_status_read_error_emits_json() {
-    let _guard = SERIAL.lock();
-    let tree = isolated();
-    fs::remove_file(
-        tree.path()
-            .join("_bmad-output/implementation-artifacts/sprint-status.yaml"),
-    )
-    .unwrap();
-    let output = command(tree.path(), tree.path(), "check-epic-close-coherence")
-        .arg("--json")
-        .output()
-        .unwrap();
-    let value = report(&output, "check-epic-close-coherence");
-    assert!(value["error"]
-        .as_str()
-        .unwrap()
-        .contains("no development_status"));
-}
 
 #[test]
 fn composite_child_spawn_error_emits_json() {
@@ -338,39 +288,4 @@ fn composite_child_spawn_error_emits_json() {
             .unwrap();
         report(&output, gate);
     }
-}
-
-#[test]
-fn workflow_plant_reaches_the_coherence_gate_and_restores_green() {
-    let _guard = SERIAL.lock();
-    let tree = isolated();
-    let run = || {
-        command(tree.path(), tree.path(), "check-epic-close-coherence")
-            .arg("--json")
-            .output()
-            .unwrap()
-    };
-    let clean = run();
-    assert!(clean.status.success(), "{:?}", clean);
-    let workflow = tree.path().join(".github/workflows/plant.yml");
-    fs::write(
-        &workflow,
-        "jobs:\n  planted:\n    if: false\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n",
-    )
-    .unwrap();
-    let red = run();
-    assert_eq!(red.status.code(), Some(1));
-    let value = report(&red, "check-epic-close-coherence");
-    assert_eq!(value["violations"].as_array().unwrap().len(), 1);
-    assert_eq!(value["violations"][0]["kind"], "disabled-workflow-job");
-    assert!(value["violations"][0]["detail"]
-        .as_str()
-        .unwrap()
-        .contains("plant.yml:3"));
-    fs::remove_file(workflow).unwrap();
-    let restored = run();
-    assert!(restored.status.success(), "{:?}", restored);
-    let value: Value = serde_json::from_slice(&restored.stdout).unwrap();
-    assert_eq!(value["passed"], true);
-    assert!(value["violations"].as_array().unwrap().is_empty());
 }

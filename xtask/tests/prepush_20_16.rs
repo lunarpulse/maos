@@ -602,3 +602,168 @@ fn dynamic_marker_skips_are_named_missing_and_static_drift_stay_red() {
     assert!(report.text().contains("indeterminate locally"));
     assert_eq!(report.exit_code(), 1);
 }
+
+fn workspace_metadata(packages: &[(&str, &[&str])]) -> Value {
+    let root = "/ws";
+    let packages: Vec<Value> = packages
+        .iter()
+        .map(|(directory, path_deps)| {
+            let name = directory.rsplit('/').next().unwrap();
+            serde_json::json!({
+                "name": name,
+                "manifest_path": format!("{root}/{directory}/Cargo.toml"),
+                "dependencies": path_deps
+                    .iter()
+                    .map(|dep| serde_json::json!({"name": dep, "path": format!("{root}/crates/{dep}")}))
+                    .chain([serde_json::json!({"name": "serde", "path": null})])
+                    .collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    serde_json::json!({"workspace_root": root, "packages": packages})
+}
+
+fn paths(listed: &[&str]) -> BTreeSet<String> {
+    listed.iter().map(|p| (*p).to_owned()).collect()
+}
+
+#[test]
+fn scope_is_changed_members_plus_direct_dependants_only() {
+    let metadata = workspace_metadata(&[
+        ("crates/base", &[]),
+        ("crates/mid", &["base"]),
+        ("crates/top", &["mid"]),
+        ("crates/lone", &[]),
+        ("crates/maos-kernel-core", &[]),
+        ("xtask", &["base"]),
+    ]);
+    let scope_of = |changed: &[&str]| scope(&metadata, &paths(changed)).unwrap();
+    // `mid` depends on `base` and `xtask` depends on `base`; `top` is a dependant of `mid`, not of `base`.
+    let scoped = scope_of(&["crates/base/src/lib.rs"]);
+    assert_eq!(
+        scoped.packages,
+        BTreeSet::from(["base".into(), "mid".into(), "xtask".into()])
+    );
+    assert!(!scoped.whole_workspace && !scoped.kernel);
+    assert_eq!(
+        scoped.nextest_selection(),
+        ["-p", "base", "-p", "mid", "-p", "xtask"]
+    );
+    // A kernel change turns the kernel lib leg on.
+    assert!(scope_of(&["crates/maos-kernel-core/src/lib.rs"]).kernel);
+    // Files no member owns change nothing; a docs-only diff has an empty scope.
+    assert!(scope_of(&[
+        "docs/testing/proof-contract.md",
+        ".github/workflows/ci-nightly.yml"
+    ])
+    .is_empty());
+    // Workspace-wide inputs select the whole workspace (and the kernel lib leg).
+    for wide in [
+        "Cargo.toml",
+        "Cargo.lock",
+        "rust-toolchain.toml",
+        ".config/nextest.toml",
+    ] {
+        let whole = scope_of(&[wide]);
+        assert!(whole.whole_workspace && whole.kernel, "{wide}");
+        assert_eq!(whole.nextest_selection(), ["--workspace"]);
+    }
+    // A member nested in another owns its own paths (deepest directory wins).
+    let nested = workspace_metadata(&[("crates/outer", &[]), ("crates/outer/inner", &[])]);
+    let nested = scope(&nested, &paths(&["crates/outer/inner/src/lib.rs"])).unwrap();
+    assert_eq!(nested.packages, BTreeSet::from(["inner".into()]));
+    assert!(scope(&serde_json::json!({}), &paths(&[])).is_err());
+}
+
+/// Real cargo over a throwaway workspace; reached only by the expensive-ignored plant below.
+fn plant_cargo(root: &Path, args: &[&str]) -> Output {
+    // expensive: the plant runs real cargo against a throwaway workspace
+    Command::new("cargo")
+        .args(args)
+        .current_dir(root)
+        .env("CARGO_TARGET_DIR", root.join("target"))
+        .output()
+        .unwrap()
+}
+
+/// Plants over a throwaway two-crate workspace (`changed` and its dependant, plus `unrelated`), run through
+/// the production scoped command string: a broken test in the changed crate is red in the scoped run; a broken
+/// test in an unrelated crate is green scoped and red when the selection is the whole workspace (`--full`).
+#[test]
+#[ignore = "expensive: nested cargo metadata, generate-lockfile and nextest over a throwaway workspace"]
+fn scoped_run_sees_the_changed_crate_and_misses_an_unrelated_one() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    let member = |name: &str, dep: Option<&str>, passes: bool| {
+        let crate_dir = root.join("crates").join(name);
+        fs::create_dir_all(crate_dir.join("src")).unwrap();
+        let dependency = dep.map_or(String::new(), |d| {
+            format!("{d} = {{ path = \"../{d}\" }}\n")
+        });
+        fs::write(
+            crate_dir.join("Cargo.toml"),
+            format!("[package]\nname = \"{name}\"\nversion = \"0.0.0\"\nedition = \"2021\"\n[dependencies]\n{dependency}"),
+        )
+        .unwrap();
+        fs::write(
+            crate_dir.join("src/lib.rs"),
+            format!("#[test]\nfn probe() {{ assert!({passes}); }}\n"),
+        )
+        .unwrap();
+    };
+    let write_workspace = |changed_ok: bool, unrelated_ok: bool| {
+        fs::write(
+            root.join("Cargo.toml"),
+            "[workspace]\nresolver = \"2\"\nmembers = [\"crates/*\"]\n",
+        )
+        .unwrap();
+        member("pp-changed", None, changed_ok);
+        member("pp-dependant", Some("pp-changed"), true);
+        member("pp-unrelated", None, unrelated_ok);
+    };
+    let run = |scope: &Scope| {
+        let mut report = Report::default();
+        let mut cmd = command(root, "cargo", &SCOPED_NEXTEST["cargo ".len()..]);
+        // The plant is itself run by nextest in CI (profile `expensive`): an inherited
+        // NEXTEST_* variable (profile, run id) makes the inner run fail on the throwaway
+        // workspace, which has no such profile, so every inner run would read "red".
+        for (key, _) in std::env::vars() {
+            if key.starts_with("NEXTEST") {
+                cmd.env_remove(key);
+            }
+        }
+        cmd.args(scope.nextest_selection())
+            .env("CARGO_TARGET_DIR", root.join("target"));
+        report.command("scoped-nextest", "plant", &mut cmd);
+        report.records[0].status
+    };
+    let metadata = |changed: &[&str]| {
+        let output = plant_cargo(
+            root,
+            &[
+                "metadata",
+                "--no-deps",
+                "--format-version",
+                "1",
+                "--offline",
+            ],
+        );
+        assert!(output.status.success(), "{output:?}");
+        let metadata: Value = serde_json::from_slice(&output.stdout).unwrap();
+        scope(&metadata, &paths(changed)).unwrap()
+    };
+    // Broken test in the changed crate: red scoped.
+    write_workspace(false, true);
+    let generated = plant_cargo(root, &["generate-lockfile", "--offline"]);
+    assert!(generated.status.success(), "{generated:?}");
+    let scoped = metadata(&["crates/pp-changed/src/lib.rs"]);
+    assert_eq!(
+        scoped.packages,
+        BTreeSet::from(["pp-changed".into(), "pp-dependant".into()])
+    );
+    assert_eq!(run(&scoped), "red");
+    // Broken test in an unrelated crate: green scoped, red with the whole workspace.
+    write_workspace(true, false);
+    assert_eq!(run(&scoped), "pass");
+    assert_eq!(run(&Scope::workspace()), "red");
+}

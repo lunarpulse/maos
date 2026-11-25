@@ -301,8 +301,8 @@ pub fn emit_model_provenance_event(
 /// admits at `SandboxTier::DEFAULT_FLOOR`), but it must honestly name the
 /// form's boundary: `rust-inproc` declares `T0`; `wasm-component` declares
 /// `T2`. The latter is parsed through every remaining section before a
-/// compile-time engine/launch refusal. A spawned component is launched only by
-/// 17-3c; the default binary keeps the WASM engine off for export Hold 2.
+/// compile-time engine refusal. The default build launches a supported component
+/// through the T2 runner; an explicitly engine-free build refuses it.
 #[derive(Debug, Clone)]
 pub enum AdmissionRefusal {
     /// Gate 1 — the manifest file could not be read.
@@ -330,6 +330,9 @@ pub enum AdmissionRefusal {
     },
     /// Last gate — the published default build omits the WASM engine.
     WasmEngineOff,
+    /// A WASM-capable build on a platform with no held-artifact handoff to the sandboxed runner.
+    /// Distinct from [`Self::WasmEngineOff`]: the engine is compiled in, the transport is absent.
+    WasmTransportUnsupported { detail: String },
     /// The selected composition surface has no spawned-session implementation.
     SpawnedSurfaceUnsupported { surface: &'static str },
     /// Gates 6 and 7 — a declared section did not parse.
@@ -376,9 +379,28 @@ pub enum AdmissionRefusal {
     SkillUnavailable { skill: String },
     /// A declared skill requires an undeclared action.
     SkillEscalation { skill: String },
+    /// `[[schedule]]` declares more entries than the per-manifest cap (AC8.7).
+    ScheduleEntryLimit { limit: usize, actual: usize },
+    /// `[[schedule]]` payloads decode to more than the per-manifest total cap (AC8.7).
+    ScheduleDecodedBytesLimit { limit: usize, actual: usize },
+    /// Story 22-9 — `[consent.recall]` names a recipient id the Host does not know.
+    ConsentRecipientUnknown { recipient: String },
+    /// Story 22-9 — an installed package's publisher is not the durable pin's.
+    InstalledPublisherMismatch { detail: String },
 }
 
 impl AdmissionRefusal {
+    /// A registry verification failure: a platform with no held-component handoff is its own
+    /// typed refusal, any other failure a plain admission refusal.
+    pub fn from_registry_error(error: &(dyn std::error::Error + Send + Sync + 'static)) -> Self {
+        let detail = error.to_string();
+        if error.is::<maos_registry::install::HeldComponentUnsupported>() {
+            Self::WasmTransportUnsupported { detail }
+        } else {
+            Self::Admission { detail }
+        }
+    }
+
     /// The stable machine code the door reports and the operator greps for.
     pub fn code(&self) -> &'static str {
         match self {
@@ -391,6 +413,7 @@ impl AdmissionRefusal {
             Self::RustInprocRequiresT0 { .. } => "rust_inproc_requires_t0",
             Self::WasmComponentRequiresT2 { .. } => "wasm_component_requires_t2",
             Self::WasmEngineOff => "wasm_engine_off",
+            Self::WasmTransportUnsupported { .. } => "wasm_transport_unsupported",
             Self::SpawnedSurfaceUnsupported { .. } => "spawned_surface_unsupported",
             Self::SectionParse { .. } => "manifest_section_invalid",
             Self::ModelProvenance { .. } => "model_provenance_refused",
@@ -407,6 +430,10 @@ impl AdmissionRefusal {
             Self::FallbackUnsupported => "fallback_unsupported",
             Self::SkillUnavailable { .. } => "skill_unavailable",
             Self::SkillEscalation { .. } => "skill_escalation",
+            Self::ScheduleEntryLimit { .. } => "schedule_entry_limit",
+            Self::ScheduleDecodedBytesLimit { .. } => "schedule_decoded_bytes_limit",
+            Self::ConsentRecipientUnknown { .. } => "consent_recipient_unknown",
+            Self::InstalledPublisherMismatch { .. } => "installed_publisher_mismatch",
         }
     }
 
@@ -447,9 +474,12 @@ impl std::fmt::Display for AdmissionRefusal {
                 )
             }
             Self::WasmEngineOff => f.write_str(
-                "wasm_engine_off: WASM engine disabled while Export Hold 2 is open; \
-                 `wasm-host` is the 5D002.c.1 export-control precondition",
+                "wasm_engine_off: this MAOS build omits the WASM engine; \
+                 use the default MAOS build on a supported host",
             ),
+            Self::WasmTransportUnsupported { detail } => {
+                write!(f, "wasm_transport_unsupported: {detail}")
+            }
             Self::SpawnedSurfaceUnsupported { surface } => write!(
                 f,
                 "spawned_surface_unsupported: {surface} supports only rust-inproc Spirits",
@@ -485,11 +515,79 @@ impl std::fmt::Display for AdmissionRefusal {
             Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
             Self::SkillUnavailable { skill } => write!(f, "skill_unavailable: {skill}"),
             Self::SkillEscalation { skill } => write!(f, "skill_escalation: {skill}"),
+            Self::ScheduleEntryLimit { limit, actual } => write!(
+                f,
+                "schedule_entry_limit: {actual} [[schedule]] entries declared, at most {limit} allowed"
+            ),
+            Self::ScheduleDecodedBytesLimit { limit, actual } => write!(
+                f,
+                "schedule_decoded_bytes_limit: [[schedule]] payloads decode to {actual} bytes in total, at most {limit} allowed"
+            ),
+            Self::ConsentRecipientUnknown { recipient } => write!(
+                f,
+                "consent_recipient_unknown: [consent.recall] names '{recipient}', which this Host does not know (not installed, not in its cast or topology, not loaded)"
+            ),
+            Self::InstalledPublisherMismatch { detail } => {
+                write!(f, "installed_publisher_mismatch: {detail}")
+            }
         }
     }
 }
 
 impl std::error::Error for AdmissionRefusal {}
+
+/// Story 22-9 (D-22-9-04 A) — spirit ids the Host declared before any admission (the host
+/// file's cast and the topology's members), so install and load order never decide a roster.
+static DECLARED_SPIRITS: std::sync::Mutex<std::collections::BTreeSet<String>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
+
+/// Record ids the Host knows by declaration (a poisoned lock is still a usable set).
+pub fn declare_known_spirits(ids: impl IntoIterator<Item = String>) {
+    DECLARED_SPIRITS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .extend(ids);
+}
+
+/// Declare the ids of the manifests a cast or topology will load (an unreadable one declares
+/// nothing: its own load refuses it).
+pub fn declare_manifest_ids(paths: impl IntoIterator<Item = PathBuf>) {
+    declare_known_spirits(
+        paths
+            .into_iter()
+            .filter_map(|path| peek_spirit_id_from_str(&read_manifest(&path).ok()?)),
+    );
+}
+
+/// Whether the Host knows `id`: loaded now (`loaded`), declared in its cast or topology, or an
+/// installed package, whatever order they arrived in.
+pub fn host_knows(id: &str, loaded: &dyn Fn(&str) -> bool) -> bool {
+    loaded(id)
+        || DECLARED_SPIRITS
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .contains(id)
+        || maos_registry::storage::LocalFsRegistryStorage::default_installed_manifests()
+            .is_ok_and(|held| held.iter().any(|(name, _)| name == id))
+}
+
+/// Refuse a `[consent.recall]` recipient the Host does not know (its own id always counts).
+pub fn check_consent_recipients(
+    gated: &GatedManifest,
+    known: &dyn Fn(&str) -> bool,
+) -> Result<(), AdmissionRefusal> {
+    let unknown = gated
+        .consent
+        .iter()
+        .flat_map(|c| c.recall.keys())
+        .find(|id| id.as_str() != gated.spirit_id && !known(id));
+    match unknown {
+        Some(recipient) => Err(AdmissionRefusal::ConsentRecipientUnknown {
+            recipient: recipient.clone(),
+        }),
+        None => Ok(()),
+    }
+}
 
 // One declaration generates the enum, its exhaustive enumeration, and the names
 // quoted by admission refusals. Adding a class also extends every exhaustive
@@ -564,6 +662,8 @@ pub struct GatedManifest {
     pub explanation_shape: Option<maos_manifest::ExplanationShapeSection>,
     pub intent_promotion_set: Option<maos_manifest::IntentPromotionSetSection>,
     pub swap_invariants: Option<maos_manifest::SwapInvariantsSection>,
+    /// Story 21-7 — the `[consent.recall]` grants this Spirit declares to local recipients.
+    pub consent: Option<maos_manifest::ConsentSection>,
     pub publisher: Option<[u8; 32]>,
     /// The raw text, kept for the model-provenance gate, which parses its own
     /// section out of the whole document, and for the FR11 archive record.
@@ -702,6 +802,22 @@ fn declared_swap_invariants(text: &str) -> Option<Vec<String>> {
 /// `successor` does not declare (the cold swap's restore source is that text).
 pub fn dropped_swap_invariant(predecessor: &str, successor: &str) -> Option<String> {
     first_unkept_swap_invariant(&declared_swap_invariants(predecessor)?, successor)
+}
+
+/// Story 21-7 — what the successor's `[consent.recall]` widens over the retained predecessor's
+/// (`None`: nothing, or a text the admission gate will refuse itself).
+pub fn widened_consent(predecessor: &str, successor: &str) -> Option<String> {
+    let declared = |text: &str| {
+        let root: toml::Value = toml::from_str(text).ok()?;
+        let parse = maos_manifest::ConsentSection::from_toml_str;
+        Some(
+            optional_section(&root, "consent", parse)
+                .ok()?
+                .map(|c| c.recall),
+        )
+    };
+    let (old, new) = (declared(predecessor)?, declared(successor)?);
+    maos_iac::adapter::ConsentPolicy::widening(old.as_ref(), new.as_ref())
 }
 
 /// The first of `preserve` — a predecessor's LIVE declaration, the one the kernel's swap
@@ -846,14 +962,24 @@ pub fn gate_manifest(
             .map_err(|e| parse_err("scheduling")(e.to_string()))?,
         None => SchedulingSection::default(),
     };
-    let lifecycle = match section("lifecycle") {
-        Some(s) => LifecycleSection::from_toml_str(&s)
-            .map_err(|e| parse_err("lifecycle")(e.to_string()))?,
-        None => LifecycleSection::default(),
-    };
     let budget = section("budget")
         .map(|s| Budget::from_toml_str(&s).map_err(|e| parse_err("budget")(e.to_string())))
         .transpose()?;
+    let lifecycle_toml = section("lifecycle");
+    let mut lifecycle = match &lifecycle_toml {
+        Some(s) => {
+            LifecycleSection::from_toml_str(s).map_err(|e| parse_err("lifecycle")(e.to_string()))?
+        }
+        None => LifecycleSection::default(),
+    };
+    // D-21-9-02 A — the explicit, version-governed `[lifecycle.telemetry]` declaration, refused
+    // here (before any pid, grant or dispatch) when a listing lacks or misstates it.
+    lifecycle.telemetry = maos_manifest::validate_telemetry_subscription(
+        class_section.manifest_schema_version,
+        lifecycle_toml.as_deref(),
+        budget.as_ref(),
+    )
+    .map_err(|e| parse_err("lifecycle")(e.to_string()))?;
     // Story 19-5 (D-19-5-06 A + r19_x1) — parsed here, carried by `bundle()`.
     let hot_swap = optional_section(&root, "hot_swap", HotSwapManifestSection::from_toml_str)?;
     let migrates_from =
@@ -923,6 +1049,10 @@ pub fn gate_manifest(
         }
         (None, None, None, None)
     };
+    let consent_schema = class_section.manifest_schema_version;
+    let consent = optional_section(&root, "consent", |text| {
+        maos_manifest::ConsentSection::from_toml_str_at(consent_schema, text)
+    })?;
     // Story 20-9 — the array-of-tables, wrapped as the kernel's successor parser wraps it
     // (`lifecycle/upgrade.rs`), so an admitted Spirit's schedule fires, not only a swapped one's.
     let schedules = match root.get("schedule") {
@@ -930,9 +1060,19 @@ pub fn gate_manifest(
             let mut wrapper = toml::value::Table::new();
             wrapper.insert("schedule".into(), value.clone());
             toml::to_string(&wrapper)
-                .map_err(|error| error.to_string())
-                .and_then(|text| SchedulesSection::from_toml_str(&text).map_err(|e| e.to_string()))
-                .map_err(parse_err("schedule"))?
+                .map_err(|error| parse_err("schedule")(error.to_string()))
+                .and_then(|text| {
+                    SchedulesSection::from_toml_str(&text).map_err(|error| match error {
+                        maos_manifest::ManifestError::ScheduleEntryLimit { limit, actual } => {
+                            AdmissionRefusal::ScheduleEntryLimit { limit, actual }
+                        }
+                        maos_manifest::ManifestError::ScheduleDecodedBytesLimit {
+                            limit,
+                            actual,
+                        } => AdmissionRefusal::ScheduleDecodedBytesLimit { limit, actual },
+                        other => parse_err("schedule")(other.to_string()),
+                    })
+                })?
         }
         None => SchedulesSection::default(),
     };
@@ -942,6 +1082,14 @@ pub fn gate_manifest(
     #[cfg(not(feature = "wasm-host"))]
     if wasm {
         return Err(AdmissionRefusal::WasmEngineOff);
+    }
+    // The engine is present but the held-artifact handoff exists on Linux only: a typed
+    // refusal of its own, after every structural gate, never `wasm_engine_off`.
+    #[cfg(all(feature = "wasm-host", not(target_os = "linux")))]
+    if wasm {
+        return Err(AdmissionRefusal::WasmTransportUnsupported {
+            detail: "no held-artifact handoff on this platform".into(),
+        });
     }
 
     Ok(GatedManifest {
@@ -969,6 +1117,7 @@ pub fn gate_manifest(
         explanation_shape,
         intent_promotion_set,
         swap_invariants,
+        consent,
         publisher: None,
         manifest_toml: manifest_toml.to_owned(),
     })
@@ -1171,7 +1320,7 @@ pub fn check_provider_pins(
 fn optional_section<T, E: std::fmt::Display>(
     root: &toml::Value,
     name: &'static str,
-    parse: fn(&str) -> Result<T, E>,
+    parse: impl Fn(&str) -> Result<T, E>,
 ) -> Result<Option<T>, AdmissionRefusal> {
     root.get(name)
         .map(|value| {
@@ -1230,6 +1379,8 @@ pub struct AdmissionDeps<'a> {
     pub hooks: Option<&'a crate::hook_pump::HookPump>,
     pub providers: Option<&'a ProviderCatalog>,
     pub iac: Option<&'a Arc<maos_iac::adapter::IacBusAdapter>>,
+    /// FR13 — re-applies an active quarantine hold of this identity before the SCB can run.
+    pub quarantine: Option<&'a crate::quarantine::QuarantineGate>,
 }
 
 /// Whether the triple runs its third leg.
@@ -1344,14 +1495,27 @@ pub async fn load_admit_start(
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
 ) -> Result<Admitted, AdmissionRefusal> {
-    admit_inner(deps, gated, spirit_obj, boot_nonce, start, on_loaded, true).await
+    let archive_root = maos_audit::default_archive_dir();
+    admit_inner(
+        deps,
+        gated,
+        spirit_obj,
+        boot_nonce,
+        start,
+        on_loaded,
+        &archive_root,
+        true,
+    )
+    .await
 }
 
 /// [`load_admit_start`] without the FR11 archive record (Story 20-9): a spawned component's start
 /// completes asynchronously, so the caller writes the record itself, with [`archive_provisional`]
 /// before the start (a death inside the window then cannot leave a started version unrecorded) and
 /// [`withdraw_provisional`] when it never starts: the restore of the predecessor is then judged
-/// against the predecessor's record, not against a version that never ran.
+/// against the predecessor's record, not against a version that never ran. The FR11 archive it
+/// checks the cross-major gate against is `archive_root`, the caller's (the root's), not the
+/// ambient default.
 pub async fn load_admit_start_unarchived(
     deps: &AdmissionDeps<'_>,
     gated: &GatedManifest,
@@ -1359,8 +1523,19 @@ pub async fn load_admit_start_unarchived(
     boot_nonce: u64,
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
+    archive_root: &std::path::Path,
 ) -> Result<Admitted, AdmissionRefusal> {
-    admit_inner(deps, gated, spirit_obj, boot_nonce, start, on_loaded, false).await
+    admit_inner(
+        deps,
+        gated,
+        spirit_obj,
+        boot_nonce,
+        start,
+        on_loaded,
+        archive_root,
+        false,
+    )
+    .await
 }
 
 async fn admit_inner(
@@ -1370,11 +1545,15 @@ async fn admit_inner(
     boot_nonce: u64,
     start: StartPolicy,
     on_loaded: &mut (dyn FnMut(u32) + Send),
+    archive_root: &std::path::Path,
     archive_now: bool,
 ) -> Result<Admitted, AdmissionRefusal> {
     let early_gates = (|| {
         check_gated_pins(gated, deps.providers)?;
         check_declared_skills(gated, deps.transparency_log)?;
+        check_consent_recipients(gated, &|id| {
+            host_knows(id, &|loaded| deps.scheduler.resolve_pid(loaded).is_some())
+        })?;
         if gated.intent_promotion_set.is_some() && deps.iac.is_none() {
             return Err(AdmissionRefusal::Admission {
                 detail: "intent promotion bus unavailable".into(),
@@ -1387,12 +1566,12 @@ async fn admit_inner(
         return Err(refusal);
     }
     let spirit_id = gated.spirit_id.clone();
-    let archive_root = maos_audit::default_archive_dir();
+    // `archive_root` is the caller's: the FR11 archive of this root, never an ambient global.
 
     // Story 19-5 (D-19-5-05 A) — FR11, BEFORE a pid is allocated: a
     // cross-major successor of an archived predecessor must declare a
     // migrator for it.
-    if let Err(refusal) = refuse_without_migrator(&archive_root, gated) {
+    if let Err(refusal) = refuse_without_migrator(archive_root, gated) {
         emit_structural_rejection(deps.transparency_log, &gated.manifest_toml, &refusal);
         return Err(refusal);
     }
@@ -1451,6 +1630,13 @@ async fn admit_inner(
     };
 
     on_loaded(pid);
+    crate::operator_door::record_form(
+        pid,
+        crate::operator_door::form_label(&gated.class_section.forms),
+    );
+    if let Some(gate) = deps.quarantine {
+        gate.reapply(pid, &spirit_id, &gated.class_section.version);
+    }
 
     // FR31: bind before admission/start; a rejected binding rolls the load back.
     if let Err(error) = deps
@@ -1525,7 +1711,7 @@ async fn admit_inner(
     // Story 19-5 (D-19-5-03 A) — only a GRANTED admission leaves the FR11
     // identity record a later cross-major load is checked against.
     if archive_now {
-        archive_admitted(&archive_root, gated);
+        archive_admitted(archive_root, gated);
     }
 
     deps.pid_by_spirit_id
@@ -1536,13 +1722,18 @@ async fn admit_inner(
         })
         .insert(spirit_id.clone(), pid);
     if let Some(iac) = deps.iac {
-        iac.register_promotion_set(
+        iac.register_promotion_set_for_pid(
             &spirit_id,
+            pid,
             gated
                 .intent_promotion_set
                 .as_ref()
                 .map(|s| s.to_allowed_set()),
         );
+        // Story 21-7 — the incarnation's own declaration, bound to its pid (a swap successor
+        // replaces its predecessor's); withdrawn with the promotion set at every removal site.
+        let grants = gated.consent.as_ref().map(|c| c.recall.clone());
+        iac.consent_policy().register(&spirit_id, pid, grants);
     }
 
     // Story 17-4 / 20-9 — register only after the granted admission and before `start`. A
@@ -1575,9 +1766,9 @@ async fn admit_inner(
                 // teardown after a panicked hook. A lost race can only lose
                 // crash classification, never corrupt scheduler state.
                 if let Some(iac) = deps.iac {
-                    iac.unregister_promotion_set(&spirit_id);
+                    iac.withdraw_spirit(&spirit_id, pid);
                 }
-                remove_pid_by_spirit_id(deps, &spirit_id);
+                remove_pid_by_spirit_id(deps, &spirit_id, pid);
             } else {
                 rollback(deps, pid, &spirit_id).await;
             }
@@ -1626,9 +1817,9 @@ async fn rollback(deps: &AdmissionDeps<'_>, pid: u32, spirit_id: &str) {
         );
     }
     if let Some(iac) = deps.iac {
-        iac.unregister_promotion_set(spirit_id);
+        iac.withdraw_spirit(spirit_id, pid);
     }
-    remove_pid_by_spirit_id(deps, spirit_id);
+    remove_pid_by_spirit_id(deps, spirit_id, pid);
 }
 
 /// Undo an admission whose component never started (Story 20-9): its session has ended, which
@@ -1643,9 +1834,9 @@ pub(crate) async fn unwind_admitted(deps: &AdmissionDeps<'_>, pid: u32, spirit_i
         rollback(deps, pid, spirit_id).await;
     } else {
         if let Some(iac) = deps.iac {
-            iac.unregister_promotion_set(spirit_id);
+            iac.withdraw_spirit(spirit_id, pid);
         }
-        remove_pid_by_spirit_id(deps, spirit_id);
+        remove_pid_by_spirit_id(deps, spirit_id, pid);
     }
 }
 
@@ -1800,13 +1991,15 @@ fn is_path_component(text: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'+' | b'_'))
 }
 
-/// Remove the door's lookup only; panic teardown retains scheduler ownership.
-fn remove_pid_by_spirit_id(deps: &AdmissionDeps<'_>, spirit_id: &str) {
-    deps.pid_by_spirit_id
-        .write()
-        .unwrap_or_else(|error| {
-            eprintln!("maos: CRITICAL — pid_by_spirit_id RwLock poisoned (admission removal)");
-            error.into_inner()
-        })
-        .remove(spirit_id);
+/// Remove the door's lookup only (panic teardown retains scheduler ownership), and only while
+/// `spirit_id` is still bound to `pid`, so a delayed cleanup of a predecessor cannot erase a
+/// newer admission's binding.
+fn remove_pid_by_spirit_id(deps: &AdmissionDeps<'_>, spirit_id: &str, pid: u32) {
+    let mut map = deps.pid_by_spirit_id.write().unwrap_or_else(|error| {
+        eprintln!("maos: CRITICAL — pid_by_spirit_id RwLock poisoned (admission removal)");
+        error.into_inner()
+    });
+    if map.get(spirit_id) == Some(&pid) {
+        map.remove(spirit_id);
+    }
 }

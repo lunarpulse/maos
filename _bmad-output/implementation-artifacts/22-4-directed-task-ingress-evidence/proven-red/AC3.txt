@@ -1,0 +1,17 @@
+AC3 plant: crates/maos-bin/src/operator_door.rs ask_command: state check arm 'Some(Scb::Running) => {}' replaced by 'Some(_) | None => {}' (the Running-state check removed; marker PLANT22_4_RED). Command: cargo nextest run --locked -p maos-bin --test directed_task_22_4 -E 'test(refusals_are_typed_and_mint_no_task)'. Result: FAILS - maosctl ask on the paused Spirit exits 0 and prints a task id (expected exit 1). Plant reverted.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+        FAIL [   2.609s] (1/1) maos-bin::directed_task_22_4 refusals_are_typed_and_mint_no_task
+  stdout 
+    running 1 test
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 2.60s
+  stderr 
+    thread 'refusals_are_typed_and_mint_no_task' (3841752) panicked at crates/maos-bin/tests/directed_task_22_4.rs:426:9:
+    assertion `left == right` failed: ["ask", "probe-d", "x"]: stdout: 01M846WTZBTBQ031JGYSYTGEDC
+    stderr: 
+      left: Some(0)
+     right: Some(1)
+     Summary [   2.609s] 1 test run: 0 passed, 1 failed, 4 skipped
+        FAIL [   2.609s] (1/1) maos-bin::directed_task_22_4 refusals_are_typed_and_mint_no_task
+rc=100

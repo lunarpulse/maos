@@ -47,9 +47,11 @@ maos-spirit-abi = { path = "../maos-spirit-abi" }
 # fixed 48.x (CI repair 2026-10-06, `cargo deny check`). 48.0.7 is the first
 # 48.x fixing RUSTSEC-2026-0378/0379 (2026-10-24, 18-0-green-main-ci-baseline;
 # the native-twin guest lock moves with it).
+# 48.0.9 fixes RUSTSEC-2026-0566 through RUSTSEC-2026-0573.
+# 48.0.10 also fixes the Windows WASI advisory RUSTSEC-2026-0587.
 # Keep the upstream 48.0.7 defaults except cache: its zstd dependency is
 # vulnerable (landing 40336401565, operator ruling 2026-10-26 A).
-wasmtime = { version = "48.0.7", default-features = false, features = [
+wasmtime = { version = "48.0.10", default-features = false, features = [
     "anyhow",
     "async",
     "backtrace",
@@ -76,7 +78,7 @@ wasmtime = { version = "48.0.7", default-features = false, features = [
     "compile-time-builtins",
     "wit-parser",
 ] }
-wasmtime-wasi = "48.0.7"
+wasmtime-wasi = "48.0.10"
 
 # The runner's ambient runtime for wasmtime-wasi's synchronous stdio bindings (src/runner.rs).
 # Current-thread only: no I/O or time driver, so it needs no syscall the T2 allow-list refuses.
@@ -96,6 +98,11 @@ serde_json = "1.0"
 # Logging
 tracing = "0.1"
 
+# Governed held-component handoff (src/runner.rs): descriptor flag inspection and the
+# SHA-256 of the exact compilation bytes.
+libc = "0.2"
+sha2 = "0.10"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "test-util"] }
 tempfile = "3"
@@ -104,7 +111,6 @@ smallvec = "1"
 # classify_exit on the forbidden-syscall probe fixture. Dev-dependency only:
 # does not ship and does not add wasmtime to kernel-core's own closure.
 maos-kernel-core = { path = "../maos-kernel-core" }
-libc = "0.2"
 # WIT AST parsing for the corpus completeness denominator (D5: "enumerated
 # mechanically from the .wit AST", not a hand-maintained const array).
 wit-parser = "0.254"

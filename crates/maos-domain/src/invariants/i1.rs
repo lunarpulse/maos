@@ -282,6 +282,46 @@ mod serde_sig64 {
     }
 }
 
+/// One external effect a Spirit caused and the registry-verified token scope behind it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Effect {
+    pub requested: Scope,
+    pub verified: Option<Scope>,
+}
+
+/// I1 observation: a Spirit's manifest-declared scopes and every effect it caused.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub declared: Vec<Scope>,
+    pub effects: Vec<Effect>,
+}
+
+/// I1 predicate: every effect carries a registry-verified token that covers it and that a
+/// declared manifest scope entitles.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for effect in &obs.effects {
+        let token = effect.verified.as_ref();
+        ensure(
+            token.is_some(),
+            "I1",
+            "effect without a registry-verified token",
+        )?;
+        let token = token.unwrap_or(&effect.requested);
+        ensure(
+            token.entitles(&effect.requested),
+            "I1",
+            "token scope does not cover the effect",
+        )?;
+        ensure(
+            obs.declared.iter().any(|d| d.entitles(token)),
+            "I1",
+            "token scope outside the declared manifest scopes",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

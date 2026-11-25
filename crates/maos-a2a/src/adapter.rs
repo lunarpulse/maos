@@ -65,6 +65,14 @@ impl LoopbackA2ARouter {
         self.core.install_intake_sink(sink).await;
     }
 
+    /// Story 22-8 — install the fail-closed rupture persistence seam the core's
+    /// accept-allowlist deny path writes through (before the NACK). Without one, a deny
+    /// leaves no `ConsentRupture` row. A pass-through to
+    /// [`A2ARouterCore::install_rupture_sink`].
+    pub async fn install_rupture_sink(&self, sink: Arc<dyn maos_a2a_core::ConsentRuptureSink>) {
+        self.core.install_rupture_sink(sink).await;
+    }
+
     pub fn clock(&self) -> Arc<LamportClock> {
         self.core.clock()
     }

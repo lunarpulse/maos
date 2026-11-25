@@ -202,6 +202,7 @@ impl World {
         AdmissionDeps {
             providers: None,
             iac: None,
+            quarantine: None,
             scheduler: &self.scheduler,
             security: &self.security,
             transparency_log: &self.tl,
@@ -341,16 +342,13 @@ fn echo_launch(spirit_id: &str) -> SessionLaunch {
     SessionLaunch {
         plan: maos_host::SpiritLaunchPlan {
             program: FIXTURES.runner.to_string_lossy().into_owned(),
-            argv: vec![
-                "--component".into(),
-                artifact.to_string_lossy().into_owned(),
-                "--fuel".into(),
-                "10000000".into(),
-            ],
+            argv: vec!["--fuel".into(), "10000000".into()],
             env: Vec::new(),
             wire: maos_host::WireShape::ContentLengthCbor,
         },
-        component_artifact: Some(artifact),
+        component_artifact: Some(
+            maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact).unwrap(),
+        ),
         turn_budget: Duration::from_secs(30),
         once: true,
         context_window: Default::default(),
@@ -625,12 +623,7 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                     .to_string_lossy()
                     .into_owned(),
                     argv: if wasm {
-                        vec![
-                            "--component".into(),
-                            artifact.to_string_lossy().into_owned(),
-                            "--fuel".into(),
-                            "10000000".into(),
-                        ]
+                        vec!["--fuel".into(), "10000000".into()]
                     } else {
                         Vec::new()
                     },
@@ -643,7 +636,10 @@ async fn eight_real_admitted_forms_use_trusted_sender_policy_not_echoed_claims()
                     core,
                     SessionLaunch {
                         plan,
-                        component_artifact: wasm.then_some(artifact),
+                        component_artifact: wasm.then(|| {
+                            maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact)
+                                .unwrap()
+                        }),
                         turn_budget: Duration::from_secs(30),
                         once: true,
                         context_window: Default::default(),
@@ -1509,12 +1505,7 @@ async fn assert_hostile_lifting(aliases: bool, count: usize, exhausts: bool) {
     };
     let plan = maos_host::SpiritLaunchPlan {
         program: FIXTURES.runner.to_string_lossy().into_owned(),
-        argv: vec![
-            "--component".into(),
-            artifact.to_string_lossy().into_owned(),
-            "--fuel".into(),
-            "10000000".into(),
-        ],
+        argv: vec!["--fuel".into(), "10000000".into()],
         env: Vec::new(),
         wire: maos_host::WireShape::ContentLengthCbor,
     };
@@ -1524,7 +1515,9 @@ async fn assert_hostile_lifting(aliases: bool, count: usize, exhausts: bool) {
         core,
         SessionLaunch {
             plan,
-            component_artifact: Some(artifact),
+            component_artifact: Some(
+                maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact).unwrap(),
+            ),
             turn_budget: Duration::from_secs(30),
             once: true,
             context_window: Default::default(),
@@ -1632,10 +1625,7 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
         .unwrap();
         let pid = admitted.pid;
         let artifact = FIXTURES.echo.clone();
-        let mut argv = vec![
-            "--component".into(),
-            artifact.to_string_lossy().into_owned(),
-        ];
+        let mut argv: Vec<String> = Vec::new();
         if forbidden {
             argv.push("--test-forbidden-syscall-after-ready".into());
         }
@@ -1651,7 +1641,10 @@ async fn actual_runner_sigsys_reaches_escape_consumer_but_planned_stop_does_not(
             core,
             SessionLaunch {
                 plan,
-                component_artifact: Some(artifact),
+                component_artifact: Some(
+                    maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact)
+                        .unwrap(),
+                ),
                 turn_budget: Duration::from_secs(30),
                 once: false,
                 context_window: Default::default(),
@@ -1832,10 +1825,7 @@ async fn repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall()
     let artifact = FIXTURES.relay.clone();
     let plan = maos_host::SpiritLaunchPlan {
         program: FIXTURES.runner.to_string_lossy().into_owned(),
-        argv: vec![
-            "--component".into(),
-            artifact.to_string_lossy().into_owned(),
-        ],
+        argv: Vec::new(),
         env: Vec::new(),
         wire: maos_host::WireShape::ContentLengthCbor,
     };
@@ -1845,7 +1835,9 @@ async fn repeated_mailbox_exports_survive_idle_without_an_active_task_or_stall()
         core,
         SessionLaunch {
             plan,
-            component_artifact: Some(artifact),
+            component_artifact: Some(
+                maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact).unwrap(),
+            ),
             turn_budget: TURN_BUDGET,
             once: false,
             context_window: Default::default(),
@@ -2100,12 +2092,7 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                 .to_string_lossy()
                 .into_owned(),
                 argv: if wasm {
-                    vec![
-                        "--component".into(),
-                        artifact.to_string_lossy().into_owned(),
-                        "--fuel".into(),
-                        "10000000".into(),
-                    ]
+                    vec!["--fuel".into(), "10000000".into()]
                 } else {
                     Vec::new()
                 },
@@ -2123,7 +2110,10 @@ async fn configured_enterprise_and_mixed_scope_refusals_are_atomic_for_both_form
                 core,
                 SessionLaunch {
                     plan,
-                    component_artifact: wasm.then_some(artifact),
+                    component_artifact: wasm.then(|| {
+                        maos_bin::spirit_session::LaunchArtifact::acquire_local_file(&artifact)
+                            .unwrap()
+                    }),
                     turn_budget: Duration::from_secs(30),
                     once: true,
                     context_window: Default::default(),
@@ -2907,6 +2897,13 @@ async fn admitted_t2_echo_enforces_exact_live_caps_in_delegated_mode() {
         CgroupTestMode::Delegated => {
             let mut launch = echo_launch(spirit_id);
             launch.once = false;
+            // The runner is cgroup-throttled to `cpu_max_pct = 10` (asserted below) from its first
+            // instruction, so its component compile and `Ready` take ten times the CPU time they
+            // need unthrottled: on a loaded hosted runner that outlasts the 30 s default. The
+            // session's `startup` wall is this same `turn_budget`; no assertion here reads it, so
+            // only the startup slack widens (the cap, the limits and the completed turn are
+            // still asserted exactly).
+            launch.turn_budget = Duration::from_secs(120);
             let turn_budget = launch.turn_budget;
             let session = tokio::spawn(run_admitted_session(
                 world.session(),

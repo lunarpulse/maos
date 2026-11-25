@@ -141,6 +141,8 @@ impl Daemon {
         None
     }
 
+    /// One `maosctl` call. A component that is still starting is waited for by the door itself
+    /// (Story 22-9: the readiness wait rides the swap's 90 s attempt), so no caller retries.
     fn ctl(&self, args: &[&str]) -> std::process::Output {
         self.command(&beside("maosctl"))
             .args(args)
@@ -295,8 +297,23 @@ fn maosctl_cold_swaps_a_component_to_a_new_pid_and_restores_it_when_the_successo
     let second = daemon.pid();
     assert_ne!(second, first, "a cold swap admits at a new pid");
     assert_eq!(report["pid"], second, "{report}");
-    // A refused successor (its artifact is gone) restores the predecessor at another new pid.
-    let refused = daemon.write("v3.toml", "1.2.0", "absent.wasm");
+    // A successor whose artifact is gone is refused BEFORE the unload (the door takes custody
+    // of the target's component first), so the running component is never disturbed.
+    let absent = daemon.write("v3-absent.toml", "1.2.0", "absent.wasm");
+    let output = daemon.upgrade(&absent, "cold-swap");
+    assert!(!output.status.success(), "{}", text(&output));
+    let reply = text(&output);
+    assert!(
+        reply.contains("cold_swap_target_artifact_refused")
+            && reply.contains("refused before unload")
+            && reply.contains("HTTP 409"),
+        "{reply}"
+    );
+    assert_eq!(daemon.pid(), second, "a pre-unload refusal keeps the pid");
+    // A successor whose artifact is held but is not a component fails AFTER the unload; the
+    // predecessor is restored at another new pid.
+    std::fs::write(daemon.package.join("corrupt.wasm"), b"not a component").unwrap();
+    let refused = daemon.write("v3.toml", "1.2.0", "corrupt.wasm");
     let output = daemon.upgrade(&refused, "cold-swap");
     assert!(!output.status.success(), "{}", text(&output));
     let reply = text(&output);

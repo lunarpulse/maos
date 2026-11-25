@@ -1,0 +1,10 @@
+AC13 plant: crates/maos-bin/src/installed_spirits.rs: the check_pin comparison removed (the refusal arm unreachable). Command: cargo nextest run --locked -p maos-bin --test wasm_form_residuals_22_9 -E 'test(an_installed_package_resigned_by_another_publisher_is_refused_at_boot)'. Result: FAILS (no typed boot refusal for the re-signed package). Plant reverted.
+
+        FAIL [  21.640s] (1/1) maos-bin::wasm_form_residuals_22_9 an_installed_package_resigned_by_another_publisher_is_refused_at_boot
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 21.63s
+    thread 'an_installed_package_resigned_by_another_publisher_is_refused_at_boot' (691298) panicked at crates/maos-bin/tests/wasm_form_residuals_22_9.rs:366:9:
+    no typed boot refusal for the re-signed package:
+     Summary [  21.641s] 1 test run: 0 passed, 1 failed, 5 skipped
+        FAIL [  21.640s] (1/1) maos-bin::wasm_form_residuals_22_9 an_installed_package_resigned_by_another_publisher_is_refused_at_boot
+error: test run failed
+rc=100

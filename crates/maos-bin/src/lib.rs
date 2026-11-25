@@ -7,6 +7,9 @@
 /// than a re-implementation of them.
 #[cfg(feature = "network")]
 pub mod admission;
+/// Story 22-6 (ADR-072) — audit-store rotation on the Host: the cut-floor registry, the 60 s
+/// policy task and the `audit rotate` door verb.
+pub mod audit_rotation;
 /// Story 18-1 — the `--once` Butler pass verdict.
 #[cfg(feature = "network")]
 pub mod butler_root;
@@ -31,6 +34,10 @@ pub mod crypto_provider;
 /// re-implementation of it.
 #[cfg(feature = "network")]
 pub mod delegation;
+/// Story 22-4 — directed task ingress: the door's per-Spirit bounded task queues, their pumps,
+/// the task records and the Transparency-Log read-back behind `GET /v1/tasks/{id}`. In the
+/// library so `crates/maos-bin/tests/` drives the real registry in-process.
+pub mod directed_task;
 #[cfg(all(feature = "network", unix))]
 pub mod egress;
 #[cfg(feature = "network")]
@@ -44,11 +51,17 @@ pub mod enterprise_identity;
 pub mod enterprise_pdp_runtime;
 /// Read-only sandbox-anomaly consumer, shared with actual process-boundary proofs.
 pub mod escape_detector_consumer;
+/// Story 22-8 — an unresolved halt survives a restart of the standing cast: the boot-time
+/// carry-over scan, the `halt.carried` row and the re-admission.
+pub mod halt_carry;
 /// Story 17-4 — the telemetry hook pump, the consolidation watchdog and the
 /// Observer activity writer: the first production callers of
 /// `fire_on_telemetry_event` and `fire_on_consolidate`. In the library beside
 /// `admission`, so `crates/maos-bin/tests/` drives the real pump.
 pub mod hook_pump;
+/// Story 22-1 — the Host configuration file and the standing cast (`maos serve`).
+#[cfg(feature = "network")]
+pub mod host_config;
 /// Story 15-6 — the one authoritative live/record/replay selector. Public so
 /// integration tests execute the production lattice; an in-`src` test module
 /// would be budget-charged and CI-invisible.
@@ -57,6 +70,13 @@ pub mod inference_mode;
 pub mod installed_spirits;
 /// Story 20-9 — one pump dispatch as its spawned session's link sees it (started or dropped).
 pub mod invocation;
+/// Story 22-8 — the in-process A2A cast: the Host's router over the declared
+/// `[[topology.a2a_peers]]`, Mira's advisory route and Nash's intake consumer.
+#[cfg(feature = "network")]
+pub mod loopback_cast;
+/// Story 22-8 — the native directed leg: Mira's door-task runner, her pid-bound diagnosis
+/// memory and the minted Inference Port of a native Spirit.
+pub mod native_task;
 /// Story 16-1 (D-16-1-N) — the operator door's port implementation over the
 /// daemon's real kernel objects, plus the store lock set (D-16-1-D). In the
 /// library, not `main.rs`, so `tests/operator_door_16_1.rs` drives the REAL
@@ -69,6 +89,8 @@ pub mod operator_door;
 pub mod orchestrator_root;
 /// Story 16-4 — authoritative MAOS footprint and offline purge implementation.
 pub mod purge;
+/// FR13 — the durable quarantine hold store and the fences it applies (not isolation).
+pub mod quarantine;
 #[cfg(feature = "network")]
 pub mod recall_mediation;
 /// Story 19-7 — the re-pin consent door (the set-once control the operator
@@ -136,3 +158,5 @@ pub mod yank_policy;
 /// `crates/maos-bin/tests/` can execute it — an in-`src` test module is
 /// budget-charged and CI-invisible.
 pub mod topology;
+#[cfg(feature = "network")]
+pub mod workflow;

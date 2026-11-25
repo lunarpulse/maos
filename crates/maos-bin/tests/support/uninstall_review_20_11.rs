@@ -120,11 +120,18 @@ impl maos_iac::adapter::redaction::RedactionPolicy for AtFirstReceipt {
     }
 }
 
-/// Both fixtures rewrite process-wide environment variables: one lock.
-static ENV: Mutex<()> = Mutex::new(());
-
+/// Both fixtures rewrite process-wide environment variables, so they take the
+/// ONE shared bin-unit-test home lock (`crate::migration_plan::MAOS_HOME_TEST_LOCK`).
+/// The previous private `ENV` mutex serialized these fixtures only against each
+/// other, not against `migration_plan::tests` — two locks over one process-global
+/// environment raced on wide runners (observed 8/8 on 32 threads; the 0.02 s
+/// migration tests' `load_plan` read OUR `MAOS_HOME` and found no plan file).
+/// This file is compiled into the bin's unit tests via `#[path]` ONLY (see
+/// `crates/maos-bin/src/main.rs`), so `crate::` resolves inside that binary.
 fn exercise(mode: LateObservation) {
-    let _serialized = ENV.lock().unwrap_or_else(|error| error.into_inner());
+    let _serialized = crate::migration_plan::MAOS_HOME_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
     let directory = tempfile::tempdir().expect("uninstall root");
     let home = directory.path();
     let _env = Env([
@@ -455,7 +462,9 @@ fn door_uninstall(
     watchdog_residue: &[&str],
     ghost_before: bool,
 ) -> serde_json::Value {
-    let _serialized = ENV.lock().unwrap_or_else(|error| error.into_inner());
+    let _serialized = crate::migration_plan::MAOS_HOME_TEST_LOCK
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
     let directory = tempfile::tempdir().expect("uninstall root");
     let home = directory.path();
     let _env = Env([

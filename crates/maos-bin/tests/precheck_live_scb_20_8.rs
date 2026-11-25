@@ -87,7 +87,11 @@ impl BinPrivateOps for RetainedOps {
     }
 }
 
-/// Butler's real manifest at schema 7 declaring `preserve` (a whole `[swap_invariants]`).
+/// Butler's real manifest at schema 7 declaring `preserve` (a whole `[swap_invariants]`),
+/// with its `[[capabilities.required.mcp.servers]]` blocks removed: the precheck also holds a
+/// successor to the live pid's authority (a swap may only keep or narrow it), and this
+/// world's hello-spirit holds only its provider scope, so Butler's McpCall scopes would be a
+/// genuine widening and mask the swap-invariant verdict under test.
 fn successor(dir: &Path, name: &str, preserve: &[&str]) -> PathBuf {
     let butler = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../spirits/butler/manifest.toml");
     let source = std::fs::read_to_string(butler).expect("butler manifest");
@@ -95,6 +99,18 @@ fn successor(dir: &Path, name: &str, preserve: &[&str]) -> PathBuf {
         source.contains("manifest_schema_version = 2"),
         "{source:.200}"
     );
+    let mut in_mcp_server = false;
+    let source = source
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with('[') {
+                in_mcp_server = trimmed == "[[capabilities.required.mcp.servers]]";
+            }
+            !in_mcp_server
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     let names = preserve
         .iter()
         .map(|name| format!("\"{name}\""))

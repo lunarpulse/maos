@@ -1,0 +1,9 @@
+# Example MAOS Host file for a domain Spirit you installed with `maosctl spirit install`.
+# Replace NAME with the Spirit's name (sed "s/NAME/my-spirit/" host.toml.example > host.toml), then:
+#   maos init --plain
+#   systemd-run --user --scope -p Delegate=yes -- maos serve --config host.toml
+# The cast is exactly this list: an installed Spirit the file does not name does not boot.
+[host]
+
+[[host.spirits]]
+installed = "NAME"

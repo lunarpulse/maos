@@ -301,6 +301,7 @@ impl OperatorCommandPort for FakePort {
             lifecycle_states: vec!["Running".into()],
             audit_degraded: false,
             audit_drop_count: 0,
+            audit_store_writable: true,
         }
     }
 
@@ -1299,6 +1300,7 @@ fn the_daemon_and_orchestrator_and_revocations_reads_report_the_ports_values() {
     assert_eq!(daemon["boot_nonce"], "cafe");
     assert_eq!(daemon["spirit_ids"][0], "butler");
     assert_eq!(daemon["audit_degraded"], false);
+    assert_eq!(daemon["audit_store_writable"], true);
     assert_eq!(daemon["audit_drop_count"], 0);
 
     let orchestrator = json_of(&request(&server, "GET", "/v1/orchestrator/butler", TOKEN));

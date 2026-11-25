@@ -76,7 +76,7 @@ async fn recipient_promotion_set_checks_stored_lineage_before_enqueue() {
     let digest = writer.write_distillate(1, request).unwrap().digest_frame_id;
     let mut review = AllowedPromotionSet::new();
     review.insert(A2AIntent::new("review"));
-    bus.register_promotion_set("recipient", Some(review));
+    bus.register_promotion_set_for_pid("recipient", 2, Some(review));
     assert!(matches!(
         bus.deliver_typed(frame(1, digest), 0, None).await,
         Err(IacBusError::IntentPromotionDenied { .. })
@@ -110,10 +110,10 @@ async fn recipient_promotion_set_checks_stored_lineage_before_enqueue() {
     assert!(matches!(handle.try_recv(), Ok(None)));
     let mut consult = AllowedPromotionSet::new();
     consult.insert(A2AIntent::new("consult"));
-    bus.register_promotion_set("recipient", Some(consult));
+    bus.register_promotion_set_for_pid("recipient", 2, Some(consult));
     assert!(bus.deliver_typed(frame(2, digest), 0, None).await.is_ok());
     assert!(matches!(handle.try_recv(), Ok(Some(_))));
-    bus.unregister_promotion_set("recipient");
+    bus.unregister_promotion_set_for_pid("recipient", 2);
     assert!(bus.deliver_typed(frame(3, digest), 0, None).await.is_ok());
     assert!(matches!(handle.try_recv(), Ok(Some(_))));
     let mut source_frame = frame(4, digest);
@@ -132,7 +132,7 @@ async fn recipient_promotion_set_checks_stored_lineage_before_enqueue() {
     let routed_digest = writer.write_distillate(0, request).unwrap().digest_frame_id;
     let mut standard = AllowedPromotionSet::new();
     standard.insert(A2AIntent::new("standard"));
-    bus.register_promotion_set("recipient", Some(standard));
+    bus.register_promotion_set_for_pid("recipient", 2, Some(standard));
     assert!(bus
         .deliver_typed(frame(5, routed_digest), 0, None)
         .await
@@ -143,4 +143,48 @@ async fn recipient_promotion_set_checks_stored_lineage_before_enqueue() {
         Err(IacBusError::PromotionDistillateNotFound)
     ));
     assert!(matches!(handle.try_recv(), Ok(None)));
+}
+
+#[test]
+fn promotion_registration_returns_old_set_only_to_same_owner() {
+    let bus = IacBusAdapter::default();
+    let mut old = AllowedPromotionSet::new();
+    old.insert(A2AIntent::new("review"));
+    assert!(bus
+        .register_promotion_set_for_pid("r", 1, Some(old.clone()))
+        .is_none());
+    let replaced = bus.register_promotion_set_for_pid("r", 1, Some(AllowedPromotionSet::new()));
+    assert_eq!(replaced, Some(old));
+    // A different PID replacing the entry never receives the old owner's set.
+    assert!(bus
+        .register_promotion_set_for_pid("r", 2, Some(AllowedPromotionSet::new()))
+        .is_none());
+    assert!(bus.register_promotion_set_for_pid("r", 1, None).is_none());
+    assert!(!bus.has_promotion_set("r"));
+}
+
+#[test]
+fn restore_promotion_set_replaces_only_an_empty_or_owned_slot() {
+    let bus = IacBusAdapter::default();
+    let set = |intent: &str| {
+        let mut set = AllowedPromotionSet::new();
+        set.insert(A2AIntent::new(intent));
+        set
+    };
+    // An empty slot takes the set, owned by the restoring PID.
+    bus.restore_promotion_set("r", 1, set("review"));
+    assert!(bus.has_promotion_set("r"));
+    // An owned slot is replaced in place.
+    bus.restore_promotion_set("r", 1, set("consult"));
+    assert_eq!(
+        bus.register_promotion_set_for_pid("r", 1, Some(set("standard"))),
+        Some(set("consult"))
+    );
+    // A slot another PID owns is left untouched.
+    bus.register_promotion_set_for_pid("r", 2, Some(set("delegate")));
+    bus.restore_promotion_set("r", 1, set("review"));
+    assert_eq!(
+        bus.register_promotion_set_for_pid("r", 2, None),
+        Some(set("delegate"))
+    );
 }

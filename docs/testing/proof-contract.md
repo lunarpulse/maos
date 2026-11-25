@@ -43,9 +43,9 @@ on one image.**
 - **Closing a story re-runs the tree-bound tests that read its status.** Flipping a sprint key to `done` changes the
   verdict of tests that read `sprint-status.yaml` and the story records: before the closing commit, run
   `cargo nextest run -p xtask --locked --test recovery_lane_ceiling_rule`. (It keeps the ADR-069 envelope/alarm
-  checks and the tree-bound seal notice; per-crate ceilings need no cited open story since SCP 2026-11-12 §5.B7c
-  option A, so the d11 ceiling ratchet no longer exists. 20-12's xtask-ceiling red that motivated this rule is
-  history, not a current failure mode.)
+  checks (24,000 / 23,000) and pins that the kernel row is the only `kloc.toml` ceiling; the per-crate ceilings were
+  removed by operator decision 11 (WP-23), so the d11 ceiling ratchet and the cited-open-story rule no longer exist.
+  20-12's xtask-ceiling red that motivated this rule is history, not a current failure mode.)
 - **A manifest or admission change widens the focused set to every reader of it.** When the diff changes a checked-in
   manifest (`spirits/*/manifest.toml`, `examples/*/manifest.toml`) or the manifest/capability parser
   (`crates/maos-manifest/src`, `capabilities_required_to_scopes`), the focused set adds every test file that names
@@ -53,33 +53,20 @@ on one image.**
   crates/*/tests spirits/*/tests`), `cargo test -p maos-kernel-core --test spirit_boundary_invariants` and
   `cargo run -p xtask -- check-corpus`. (17-11's review patches added `openai` to the Researcher manifest and refused
   an empty provider prefix; the focused set passed and the landing-tree workspace run found two reds.)
-- The four read-only review layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor, Test Infrastructure
-  Auditor) are unchanged.
-- **Reviewer model (operator ruling 2026-10-24).** Code-review layers run on `anthropic/claude-opus-5-5` or
-  `gpt-6.1-sol`. `anthropic/claude-fable-5-1` is reserved for plan review (PRD, architecture, epic, story and
-  decision documents) and for code review of a safety- or security-critical change — and every use of it, either
-  kind, needs the operator's permission first. 17-9, 17-10 and 17-11 were reviewed on fable-5.1 before this ruling.
-  Layer assignment is superseded by the 2026-10-26 ruling below: gpt-6.1-sol is now the dev model and never reviews
-  code it wrote.
-- **Agent models by role (operator ruling 2026-10-26, token cost).** Story creation runs on
-  `anthropic/claude-opus-5-5` (`.omp/agents/story-creator.md`); dev, finisher and review-patch passes run on
-  `openai-codex/gpt-6.1-sol` (the `task` agent; soft request budget 400); docs-only record work (ruling application,
-  done flips, deferred-work closures, tracker, CI excerpts) runs on `zai/glm-5.3` (`.omp/agents/scribe.md`).
-  Review is tiered by risk. A story is **difficult** when it grows the kernel (a measured kernel landing; since operator
-  ruling `kfree`, 2026-11-12, no FLAG-Winston grant is priced or asked inside the ADR-069 envelope), a security-critical
-  AC (auth, secrets, signatures, cross-Spirit isolation), concurrency or a new protocol. Blind and Edge always run on
-  opus-5.5; Acceptance runs on opus-5.5 for difficult stories and on `zai/glm-5.3` (`.omp/agents/review-light.md`)
-  otherwise; Test Infrastructure runs on glm-5.3 on every story. An easy story may merge Blind and Edge into one opus
-  layer. Every story keeps at least one opus layer; glm-5.3 is never a story's only reviewer.
-  *Session-only substitution (operator, latest 2026-10-27):* for the 20-15/20-16 review-correction phase coding
-  and high-risk reviews run on `anthropic/claude-opus-5-5` and light reviews/docs on Sonnet 5.5, superseding an
-  earlier temporary Terra substitution. This does not rewrite the standing policy above.
+- **Review by path (operator decision 5, 2026-11-23; replaces the reviewer-model, tiering, per-use-permission and
+  four-layer rules).** A PR whose diff matches a glob in [`trust-boundary-paths.txt`](trust-boundary-paths.txt) owes
+  one static review by a model family other than the author's, with at most two correction rounds. The PR body carries
+  a `Reviewed-by-family: <family>` line. Findings that survive the second round become issues labelled
+  `review-finding`. The operator waives the review with one PR comment. No other PR owes a review: CI is the gate.
+  Honest limit: the `Reviewed-by-family:` line proves a review was claimed, not that it was independent; that needs a
+  second identity. No CI step checks the line (no new gate).
 
 ### Retrospective size trend table
 
-Since SCP 2026-11-12 §5.B7c (option A, ruled 2026-11-13) the per-crate `xtask/kloc.toml` rows are **ceilings with
-stated headroom, re-based at each epic retrospective** (`scripts/repin.py --rebase`); a landing re-pins only the
-kernel exact pin (`scripts/repin.py --apply`). To keep the growth visible without a per-landing re-pin, every epic
+Since operator decision 11 (lean-gates WP-23, confirmed 2026-11-24) `xtask/kloc.toml` holds one row, the
+`maos-kernel-core` envelope (ADR-069); every other crate is measured and printed by `xtask kloc-check`, never gated,
+and a landing re-pins only the kernel exact pin (`xtask bless`, or `scripts/repin.py --apply`: values only, no per-landing
+HISTORY block; history is the commit message). To keep the growth visible without a ceiling, every epic
 retrospective produces one row of this table (documentation only: no gate reads it), measured on the retrospective
 commit after `cargo fmt --all` with the prebuilt xtask and `tokei` 14.0.0:
 
@@ -115,9 +102,10 @@ count beside the row when the kernel pin moved during the epic. Append the row; 
   (`cargo run -p xtask -- check-test-cost`). The `[[expensive]]` rows with `job = "expensive-tests"` run in that job,
   exactly that list, with `--run-ignored ignored-only`; every other row names the dedicated job that provisions its
   substrate and runs its ignored tests there (`--ignored`/`--include-ignored`, directly or through that job's gate).
-  Since the CI release-ready program W3 the `expensive-tests` job runs nightly in `.github/workflows/ci-nightly.yml`
-  (out of `aggregate.needs`; back after 10 consecutive green nightly runs and before GA, see `deferred-work.md`);
-  `check-test-cost` resolves a row's `job` in `discipline.yml` or `ci-nightly.yml`.
+  The `expensive-tests` job runs in `.github/workflows/discipline.yml` and is in `aggregate.needs` and
+  `release-ready.needs` (it ran nightly in `ci-nightly.yml` under the CI release-ready program W3 and returned for GA;
+  `repromotion.yml` is its 10-green dispatch); `check-test-cost` resolves a row's `job` in `discipline.yml` or
+  `ci-nightly.yml`.
 - A cargo call that compiles nothing — `cargo tree`, `cargo metadata`, `cargo locate-project`, `cargo pkgid` — says
   `// cargo-query: <reason>` on the line before instead, and stays in the default run (no `#[ignore]`).
   `cargo public-api` builds rustdoc JSON and stays expensive.
@@ -177,21 +165,28 @@ Before **every push of a story tree**, require `cargo run -p xtask -- prepush` t
 wall-clock in the story's Dev Agent Record before the landing push. It mirrors CI's drift classes; the landing CI
 run remains authoritative, and a local pass does not prove substrate-dependent marker values.
 
-- The test leg unsets `CI` and `GITHUB_ACTIONS` and runs `cargo nextest run --workspace --locked --no-fail-fast`,
-  `cargo test -p maos-kernel-core --lib` **unconditionally**, and `cargo test --workspace --doc`. The workspace
+- **Default run is scoped (lean-gates WP-11, operator decision 6, 2026-11-23).** It runs `cargo fmt --all -- --check`, the
+  gate loop, `cargo nextest run --locked` over `-p <changed workspace members and their direct dependants>`
+  (members come from the merge-base diff; a dependant is any workspace package with a path dependency on a changed
+  member), `cargo test -p maos-kernel-core --lib` only when the kernel changed, `cargo deny check` when `Cargo.lock` or
+  `deny.toml` changed, and the docs legs when the docs trigger fires. A change no single member owns (`Cargo.toml`,
+  `Cargo.lock`, `rust-toolchain.toml`, `.config/`) scopes to the whole workspace. **The trade, stated:** a broken
+  test in a crate the diff does not touch is NOT seen by the scoped run (green scoped, red under `--full` and in CI).
+- `--full` keeps the former default: the test leg unsets `CI` and `GITHUB_ACTIONS` and runs
+  `cargo nextest run --workspace --locked --no-fail-fast`, `cargo test -p maos-kernel-core --lib` **unconditionally**,
+  and `cargo test --workspace --doc`, plus the binary-size, test-budget and CI-pin legs below. The workspace
   resolution covers cross-crate scanners; nextest excludes kernel-core lib tests and does not run doctests.
   Substrate-dependent local skips are counted and printed, not treated as CI coverage.
 - The aggregate self-executes the gates with their CI arguments: `stability-matrix --check`, `error-catalog-check`,
   `gen-abi-docs --check`, `check-serde-error-handling`, `check-workspace-count`, `check-manifest-schema-version`,
-  `check-skill-schema`, `check-epic-close-coherence`, `check-coverage-matrix-completeness`, `check-test-cost`, `check-env-contract`,
+  `check-skill-schema`, `check-coverage-matrix-completeness`, `check-test-cost`, `check-env-contract`,
   `check-unsafe`, `check-service-boundary`, `check-kernel-baseline`, `kloc-check`, `check-breaking-md`,
   `check-composition-root-completeness`, `check-pub-field-constructors`, `check-dependency-closure`,
   `coverage-matrix`, and `check-corpus`; it also runs `cargo fmt --all -- --check`.
   Story 20-3b also pins standalone Blocking aggregate invocations: `abi-diff --base abi-baseline/v1-pre-bump.txt`,
   `check-empty-kernel`, `check-loom`, `check-fr47`, `check-a2a-sender-completeness`, `check-judge-config`,
   `check-security-md`, `templates-regen --check`, `corpus-staleness`,
-  `calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95`, `check-review-findings-resolved`,
-  `check-dev-record-completeness`, `check-dev-model-tier`, `check-ship-gate-completeness`,
+  `calibrate --corpus calibration-seed-v0.1 --n 100 --p 0.95`, `check-ship-gate-completeness`,
   `check-pentest-gate`, `check-third-party-trial`, `check-trial-attestation`, `check-red-team-gate`,
   `check-migration-merkle`, `nfr-onb-1-gate --check`, and `cassette-age-gate`.
   The migration leg needs the same deterministic million-row corpus that CI generates before invoking it.
@@ -217,7 +212,7 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   and the job then fails listing each step that did not pass; no `continue-on-error`, no retry), and the `maos-bin`
   smokes as named steps of `smoke-suite`. A gate's step name is its gate name, the command and `--json` output are the
   ones the per-gate job ran, and `check-ship-gate-completeness` enrols the ship gates that live there by step name.
-  `check-workspace-count`, `check-corpus`, `check-review-findings-resolved` and `check-dev-record-completeness` stay
+  `check-workspace-count` and `check-corpus` stay
   jobs because other jobs `needs` them. The pin above reads the steps of `xtask-gates` exactly as it read the old jobs.
   Release gating (CI release-ready program W4, 2026-11-15; operator decision 1 of
   `_bmad-output/planning-artifacts/decisions-2026-11-14-release-ci.md`): `discipline.yml` has a second fan-in,
@@ -225,8 +220,8 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   unchanged. `release-ready.needs` is `aggregate.needs` (with `v1-0-ship-gate` expanded into the jobs it fans in)
   minus the exclusion table `RELEASE_READY_EXCLUDED` in `xtask/src/check_ship_gate_completeness.rs`, one reason per row
   (merge-hygiene gates the plan names: `check-fuzz-targets`, `fuzz-build`, `check-env-contract`,
-  `check-decision-register`, `check-loom-substrate-drift`, `check-ship-gate-completeness`, `check-model-currency`,
-  `check-test-cost`, `check-test-budget`, `check-exit-commands`, `multi-provider-drift-tests`);
+  `check-loom-substrate-drift`, `check-ship-gate-completeness`,
+  `check-test-cost`, `check-test-budget`, `multi-provider-drift-tests`);
   `check-ship-gate-completeness` fails when the workflow drifts from the table or when a release-critical gate
   (`RELEASE_READY_R_SET`, including `check-stability-matrix`, `check-breaking-md`, `check-export-control`,
   `check-ko-coverage` and `workspace-test-suite`) is excluded. A red excluded `xtask-gates` STEP does not red

@@ -100,12 +100,12 @@ MAOS Spirit ABI는 14개의 라이프사이클 훅을 정의합니다. kernel은
 
 서비스 중인 `maos run` 루트(`--once` 제외)에서 호스트는 두 훅을 디스패치합니다:
 
-- `on_telemetry_event`: 훅 펌프는 해당 루트의 모든 `scalar.tap` 쓰기(`halt.context_provided` 같은 마커 포함)를 각 발행자의 쓰기 순서대로 전달합니다. 수신 대상은 어드미션된 컴파일 내장 Spirit 중 현재 클래스가 `observer`이고 상태가 `Running`인 모든 Spirit입니다. 이벤트의 `seq`는 한 루트 안에서 고유한 저장소 쓰기 식별 레이블이며, 시계나 정렬 키가 아닙니다.
+- `on_telemetry_event`: 훅 펌프는 해당 루트의 `scalar.tap` 쓰기(`halt.context_provided` 같은 마커 포함)를 각 발행자의 쓰기 순서대로 `Running` 상태의 적격 구독자에게 전달합니다. 이벤트의 `seq`는 한 루트 안에서 고유한 저장소 쓰기 식별 레이블이며, 시계나 정렬 키가 아닙니다.
 - `on_consolidate`: 어드미션된 모든 컴파일 내장 Spirit은 `Running` 상태에서 인바운드 프레임을 받지 않는 동안 자신의 `[scheduling].idle_window_ms`마다 한 번씩 빈 페이로드("지금 큐레이션하라")를 받습니다.
 
-`[cli_wrapper]` Worker는 Spirit 형태가 아니며 두 훅 모두 받지 않습니다. WASM 컴포넌트는 `lifecycle` export를 통해 두 훅을 모두 받습니다([아래](#spawned-wasm-component-spirits)). 텔레메트리 구독은 `on_telemetry_event`를 명시적으로 나열할 때만 이루어집니다. 두 훅 모두 `enabled_hooks`와 격리 상태를 따릅니다.
+`[cli_wrapper]` Worker는 Spirit 형태가 아니며 두 훅을 받지 않습니다. WASM 컴포넌트는 `lifecycle` export를 통해 두 훅을 받을 수 있습니다([아래](#spawned-wasm-component-spirits)). 컴파일 내장 Spirit 중에서는 운영자가 어드미션한 `observer` 클래스만 텔레메트리를 구독할 수 있습니다.
 
-텔레메트리 구독 권한은 manifest 필드가 아니라 운영자가 컴파일 내장 Observer 클래스를 어드미션하는 데서 나옵니다. 모든 부여/회수는 구독자의 pid에 `governance:telemetry-subscription:granted` / `governance:telemetry-subscription:revoked` 행으로 감사 기록되며, `maos audit query --spirit <id>`에서 볼 수 있습니다.
+[스키마 8](../manifest/v8)에서 텔레메트리를 구독하려면 `on_telemetry_event`를 명시하고 검증된 `[lifecycle.telemetry]` 테이블을 선언해야 합니다. 두 훅 모두 `enabled_hooks`와 격리 상태를 따릅니다. `maos audit query --spirit <id>`에서 구독자의 `governance:telemetry-subscription:granted`(`effective_wall_ms` 포함)와 `governance:telemetry-subscription:revoked` 기록을 확인할 수 있습니다.
 
 지연으로 건너뛴 이벤트 수는 집계되며 `maos: telemetry pump lagged: <n> event(s) skipped`로 보고됩니다. 연속 세 번 패닉하거나 훅 예산을 한 번 초과한 구독자는 해당 런타임 객체에 대해 격리됩니다. 핫스왑된 후속 객체는 격리 이력 없이 시작합니다.
 
@@ -117,7 +117,7 @@ Observer 활동은 크기가 제한된 출력 큐를 사용하므로 훅은 진�
 
 모든 훅은 kernel과 상호작용하는 단일 표면인 `&mut Ctx`를 받습니다. 재정의하지 않은 훅은 no-op입니다.
 
-`[lifecycle].enabled_hooks` manifest 필드는 최적화이자 안전 선언입니다: kernel에 발화할 훅을 알려줍니다. 생략하거나 비워 두면 모든 훅이 활성화됩니다. 특정 훅을 나열하면 kernel이 나열되지 않은 훅의 디스패치를 건너뛰어 오버헤드를 줄이고 Spirit의 공격 표면을 좁힙니다. `on_swap_out`, `snapshot`, `migrate`를 포함한 14개 훅 이름을 모두 허용하므로, 훅을 명시적으로 나열한 Spirit도 핫스왑할 수 있습니다.
+`[lifecycle].enabled_hooks` manifest 필드는 kernel에 발화할 훅을 알려줍니다. 생략하거나 비워 두면 `on_telemetry_event`를 제외한 모든 훅이 기본으로 활성화됩니다. 특정 훅을 나열하면 kernel은 나열되지 않은 훅을 호출하지 않습니다. `on_swap_out`, `snapshot`, `migrate`를 포함한 14개 훅 이름을 모두 허용하므로, 훅을 명시적으로 나열한 Spirit도 핫스왑할 수 있습니다.
 
 ## Spawned WASM component Spirits
 
@@ -136,7 +136,7 @@ Observer 활동은 크기가 제한된 출력 큐를 사용하므로 훅은 진�
 - **예산.** 각 export는 `[budget].time_cap_seconds`와 자체 명령어 fuel 아래에서 실행됩니다. 초과한 export는 kernel의 예산 초과 행을 만들고 세션이 끝납니다(자식 프로세스 종료, `spirit.lifecycle.deadline` 기록). 다른 export 뒤에 대기하다가 예산의 절반 안에(`telemetry`와 `consolidate`는 예산의 절반과 아래 펌프 wall의 절반 중 작은 값 안에) 시작하지 못한 트리거는 `maos: lifecycle trigger dropped` 줄을 남기고 버려집니다. 놓친 예산은 바쁜 세션의 것이므로 패닉이나 격리 스트라이크가 되지 않으며, 펌프는 이를 전달도 정상 실행도 아닌 것으로 셉니다. 버려진 트리거는 나중에 실행되지 않습니다.
 - **실패.** 모든 export는 `result<_, lifecycle-error>`(`declined(string)` 또는 `failed(string)`)를 반환합니다. 디스패처는 거부를 패닉한 훅으로 기록하고 평소의 회계를 적용합니다. 어떤 export도 프레임을 내보내지 않습니다. kernel 트리거에는 인바운드 intent 계보가 없으므로, 효과는 import나 다음 프레임 턴을 통해 일어납니다. 훅 ABI는 게스트에 capability 토큰을 전달하지 않습니다.
 - **import.** `idle`, `consolidate`, `telemetry`, `schedule`은 `recall`, `context`, `skills`를 호출할 수 있으며, export마다 턴당 recall 한도에 집계됩니다. `pause`, `resume`, `snapshot`, `swap-in`, `migrate`는 import가 불가능(`unavailable`)하므로, 스왑 단계는 스왑 시점의 로그에 의존하지 않습니다.
-- **텔레메트리는 명시적 나열이 필요합니다.** 컴포넌트는 `[lifecycle].enabled_hooks`가 `on_telemetry_event`를 명시할 때만 `telemetry`를 받습니다. 빈 목록은 구독하지 않습니다(다른 모든 훅과 다릅니다). 같은 `governance:telemetry-subscription:granted` / `…:revoked` 행이 기록됩니다. 펌프는 이벤트를 구독자에게 나란히 전달하며, 각 구독자를 `[budget].time_cap_seconds`의 95%와 5초 중 작은 값까지만 기다립니다(초과는 예산 초과로 보아 격리하며, 행에는 도달한 wall이 적힙니다). 텔레메트리가 예산의 80~95%를 쓴 경우가 최근 5회 중 3회이면 역시 격리됩니다. 이 집계는 텔레메트리에만 해당하며, 사이의 빠른 전달이나 consolidation은 이를 지우지 못합니다. `on_consolidate`(watchdog 패스와 forget의 프라이버시 통지)도 예산의 95%와 30초 중 작은 값으로 같은 방식으로 제한되고 나란히 실행됩니다. 프라이버시 통지는 격리된 구독자에게도 가지만 그 wall 동안만입니다.
+- **텔레메트리 구독과 시간 제한.** 유효한 `[lifecycle.telemetry]` 테이블 없이 훅을 명시적으로 나열하면 거부합니다. 스키마 8 미만에서는 훅 나열이나 테이블 중 하나라도 있으면 거부하며, 구독하지 않는 manifest는 계속 지원합니다. 펌프는 각 전달 시간을 선언된 텔레메트리 상한과 유효한 전체 상한의 95% 중 작은 값으로 제한합니다. 제한을 넘으면 구독자를 격리하고 감사 행에 초과한 제한을 기록합니다. 최근 텔레메트리 전달 5회 중 3회에 전체 예산의 80%를 초과한 구독자도 격리합니다. 이 집계에는 텔레메트리 전달만 포함됩니다. 통합 watchdog의 제한은 기존과 같이 전체 상한의 95%와 30초 중 작은 값입니다.
 - **wall은 export가 시작될 때부터 셉니다. 멈추는 것은 회계이지 훅이 아닙니다.** 텔레메트리와 consolidate의 wall은 컴포넌트의 세션이 export를 시작한 시점부터 흐르므로, 프레임 턴 뒤에서 대기한 트리거는 그 대기 시간으로 과금되지 않습니다(버려진 트리거는 과금도 집계도 되지 않으며, 버려진 것은 동시에 실행 중인 다른 훅이 아니라 바로 그 트리거로 귀속됩니다). wall을 넘긴 훅은 그 순간 회계되어 격리되지만 버려지지 않습니다. 종료는 무엇이든 언로드하기 전에 그 훅을 join하며, 컴포넌트의 경우 세션이 wall 2초 뒤에 이를 끊으므로 종료가 최대 하루에 달하는 manifest 예산만큼 지연되지 않습니다.
 - **스케줄.** `[[schedule]]` 항목은 모든 형태에 대해 어드미션 시점에 전달되므로, 컴포넌트의 스케줄은 첫 시작부터 발화합니다. 선언된 부수 효과 권한이 거부된 예약 발화(정책이 거부한 scope, 소진된 발급 쿼터, capability registry 미연결)는 억제됩니다. 훅은 실행되지 않고 `schedule.fire:<id>` 행도 기록되지 않으며, 그 발화를 위해 이미 발급한 scope는 철회되고 거부된 scope를 명시한 `schedule.suppressed:<id>` 행이 하나 기록됩니다. cadence와 rate bucket은 소진되므로, 거부된 스케줄은 매 poll이 아니라 다음 cadence에 다시 시도됩니다.
 
@@ -144,7 +144,7 @@ Observer 활동은 크기가 제한된 출력 큐를 사용하므로 훅은 진�
 
 `maosctl spirit upgrade <id> --to <manifest>`는 `maos run`이 시작했든 루트가 설치본에서 부팅했든 컴포넌트를 제자리에서 교체합니다. 후속 버전도 컴포넌트여야 하고(`swap_form_mismatch`), 운영자가 이 pid에 어드미션한 범위를 넘는 capability를 선언할 수 없으며(`swap_capability_widened`), `[lifecycle].enabled_hooks`에서 `on_swap_in`을 켜 두어야 하고(`swap_hook_disabled`), 두 버전 모두 `lifecycle`을 export해야 합니다(`spawned_swap_unsupported`. 실행 중인 컴포넌트가 아직 시작 중이면 `spawned_swap_not_ready`이므로 다시 시도하십시오). 아티팩트는 대상 manifest 옆에서 해석되며 그 디렉터리 안에 있어야 합니다(밖으로 나가는 심볼릭 링크는 `artifact_escapes_origin`). 이 거부는 모두 무엇이든 교체되기 전에 일어나며, 실행 중인 버전은 계속 서비스합니다. 커밋된 후속 버전이 채택되기를 기다리는 동안 발화한 훅은 유실되지 않고 그 후속 버전을 위해 대기열에 들어갑니다.
 
-후속 버전은 먼저 실행되고 probe됩니다. 이후 스왑은 턴 경계를 기다립니다. 진행 중인 턴은 자신의 lease 아래에서 선행 버전에서 끝나고, `snapshot`이 만들어지며, 후속 버전이 `swap-in`으로 받습니다. pid, 그 pid가 가진 모든 capability 토큰, 작업 메모리, 보류 중인 halt가 유지됩니다. 선행 버전의 자식 프로세스는 토큰을 회수하지 않고 은퇴합니다. 커밋된 스왑을 스왑 후 모니터가 되돌리면 선행 버전의 자식 프로세스는 이미 사라진 상태이므로, 세션은 기록되는 사유 `swap_reverted_after_retire`로 끝나고 Spirit은 언로드됩니다. 자동으로 복원되지 않습니다.
+후속 버전의 실행과 probe가 먼저 이루어집니다. 교체는 진행 중인 턴이 기존 버전에서 끝날 때까지 기다린 뒤 `snapshot` 상태를 후속 버전의 `swap-in`에 전달합니다. PID, 작업 메모리, 보류 중인 halt는 유지됩니다. 기존 토큰은 후속 버전에도 해당 권한이 있으면 계속 사용할 수 있습니다. 기존 자식이 종료된 뒤 교체를 되돌리면 `swap_reverted_after_retire`을 기록하고 세션을 종료한 뒤 Spirit을 언로드합니다. 기존 버전을 자동으로 재시작하지 않습니다.
 
 후속 버전이 채택되기 전에 하는 모든 일(실행과 `Ready`, lifecycle probe, `migrate`와 `swap-in`, cold swap의 준비 대기)은 선언한 예산이 얼마이든 시도당 하나의 90초 기한을 함께 씁니다. 침묵하거나 단계마다 느린 후속 버전은 90초가 다 지나면 `deadline`으로 거부되고, 그 자식 프로세스는 종료되며 선행 버전은 즉시 해제됩니다. 최대 하루에 달하는 예산 동안 단계마다 선행 버전을 펜스한 채 문 앞의 업그레이드 잠금을 붙들고 있지 않습니다. 교환을 거부(`declined`/`failed`)한 후속 버전도 그 순간 해제되며, 더 오래된 시도의 늦은 해제는 더 새로운 시도를 건드리지 않습니다. 선행 버전의 진행 중인 턴을 기다리는 시간도 같은 90초에 포함되므로, 그보다 오래 걸리는 턴이 있으면 시도가 `deadline`으로 실패합니다. 턴이 끝난 뒤 다시 시도하십시오.
 

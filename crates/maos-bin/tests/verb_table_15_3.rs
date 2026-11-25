@@ -53,12 +53,14 @@ fn expected_argv(name: verbs::VerbName) -> &'static str {
         verbs::VerbName::Install => "install",
         verbs::VerbName::Purge => "purge",
         verbs::VerbName::Eval => "eval",
+        verbs::VerbName::Workflow => "workflow",
+        verbs::VerbName::Serve => "serve",
     }
 }
 
 /// Every variant, spelled out — kept in sync with [`expected_argv`] (the
 /// compiler enforces both against the enum).
-const ALL_NAMES: [verbs::VerbName; 9] = [
+const ALL_NAMES: [verbs::VerbName; 11] = [
     verbs::VerbName::Init,
     verbs::VerbName::Run,
     verbs::VerbName::Shell,
@@ -68,6 +70,8 @@ const ALL_NAMES: [verbs::VerbName; 9] = [
     verbs::VerbName::Install,
     verbs::VerbName::Purge,
     verbs::VerbName::Eval,
+    verbs::VerbName::Workflow,
+    verbs::VerbName::Serve,
 ];
 
 fn maos() -> Command {
@@ -136,7 +140,7 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
         !verbs::VERBS.is_empty(),
         "the verb table must not be empty — a vacuous green is the failure mode"
     );
-    assert_eq!(verbs::VERBS.len(), 9, "exact expected verb count");
+    assert_eq!(verbs::VERBS.len(), 11, "exact expected verb count");
     for name in ALL_NAMES {
         let rows: Vec<&verbs::Verb> = verbs::VERBS
             .iter()
@@ -173,8 +177,10 @@ fn table_is_non_empty_and_exactly_the_expected_surface() {
             "init",
             "purge",
             "run",
+            "serve",
             "shell",
-            "traceback"
+            "traceback",
+            "workflow"
         ],
         "network build surface"
     );
@@ -216,7 +222,7 @@ fn one_shot_mode_table_is_complete_and_frozen() {
     assert!(!verbs::MAOS_ONE_SHOT_MODES.is_empty());
     assert_eq!(
         verbs::MAOS_ONE_SHOT_MODES.len(),
-        32,
+        31,
         "exact expected MAOS_ONE_SHOT mode count — Story 16-1 (D-16-1-A) removed the 16 door/read modes; re-measure main.rs's one-shot block before bumping"
     );
     let mut sorted = verbs::MAOS_ONE_SHOT_MODES.to_vec();

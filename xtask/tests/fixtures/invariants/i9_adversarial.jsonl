@@ -1,0 +1,5 @@
+{"scans":[{"subject":"kernel-core persistent state","planted":1,"reported":0}]}
+{"scans":[{"subject":"unregistered exemption","planted":1,"reported":0}]}
+{"scans":[{"subject":"persisted secret","planted":1,"reported":0}]}
+{"scans":[{"subject":"statistical state in kernel-core","planted":2,"reported":1}]}
+{"scans":[{"subject":"kernel-core persistent state","planted":0,"reported":1}]}

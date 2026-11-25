@@ -111,13 +111,20 @@ wall for one swap attempt (hosted: Ready after ~220 s), while at 100% start
 plus hot swap took 49.5 s.
 Current kernel scope policy compares scope kinds, not MCP server/tool selectors.
 
+A request from the operator shell (`@maos-shell`, `task-assign`, success criteria "Answer the operator's shell message") is answered with one `task-complete` addressed back to the shell and reading `echo: <goal>`; the host, not the guest, stamps the sender and routes the reply. Every other frame is echoed unchanged.
+
 `handleFrame` echoes the inbound frame only after `onStart`. Before startup it
 throws `{ tag: "fault", val: "..." }`, which is the generated guest binding's
 halt shape. Guest WASI stdout/stderr (including `console.log`) is routed to the
 runner's stderr and journaled as `spirit.diagnostic` rows, separate from framed
 output. Diagnostics are untrusted guest text, bounded per session (256 rows /
 64 KiB; overflow counted in `dropped_diagnostics`); over-long lines are
-truncated with a marker.
+truncated with a marker. Output written while a hot-swap successor is pre-warmed
+(`swap-in`) is journaled the same way, tagged `"phase": "prewarm"`, under the same bound.
+
+`idle` fires once per quiescence: it fires again only after an inbound frame
+followed by a full idle window, and a `maos run` component receives no inbound
+frame, so its `idle` fires once. Use `consolidate` for a periodic cadence.
 
 Generated bindings, dependencies, and build output are ignored so the template
 drift check reads only committed scaffold inputs.

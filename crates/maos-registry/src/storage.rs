@@ -274,7 +274,7 @@ impl LocalFsRegistryStorage {
         &self.root
     }
     fn default_root() -> PathBuf {
-        dirs_fallback().join(".local/share/maos/registry")
+        maos_domain::data_root::resolve("registry")
     }
 
     /// Enumerate boot inventory without creating registry or home directories.
@@ -1163,13 +1163,6 @@ pub(crate) fn monotonic_now_ns() -> u64 {
     static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
     let start = START.get_or_init(|| std::time::Instant::now());
     start.elapsed().as_nanos() as u64
-}
-
-/// Resolve the user's home directory.
-fn dirs_fallback() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"))
 }
 
 /// Storage errors.

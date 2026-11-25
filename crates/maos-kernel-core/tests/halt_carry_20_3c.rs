@@ -26,7 +26,7 @@ use maos_director_surface::halt_ui::HaltFlow;
 use maos_director_surface::notification::NotificationDispatcher;
 use maos_domain::frame::EpistemicHaltPayload;
 use maos_domain::halt::{HaltContinuityError, HaltId, HaltJournal, HaltState, Resolution};
-use maos_domain::hot_swap::HotSwapError;
+use maos_domain::hot_swap::{HotSwapError, PostSwapInvariantViolation};
 use maos_domain::memory::{MemoryNamespace, MemoryTier, MemoryValue};
 use maos_domain::ports::MemoryManagerPort;
 use maos_kernel_core::capability::working_memory::orchestrator::WorkingMemoryOrchestrator;
@@ -209,10 +209,22 @@ struct Rig {
 
 fn hooks() -> SpiritManifestBundle {
     SpiritManifestBundle {
+        scheduling: Default::default(),
         lifecycle: LifecycleSection {
             enabled_hooks: vec!["snapshot".into(), "on_swap_out".into(), "on_swap_in".into()],
+            telemetry: None,
         },
-        ..Default::default()
+        class: None,
+        hot_swap: None,
+        migrates_from: None,
+        halt_protocol_compatibility: None,
+        on_crash: None,
+        on_revocation: None,
+        supervision: None,
+        schedules: Default::default(),
+        gateways: Default::default(),
+        budget: None,
+        swap_invariants: None,
     }
 }
 
@@ -225,11 +237,15 @@ fn rig(swap_out_panics: bool) -> Rig {
     let journal = Arc::new(JournalAdapter::open(&tmp.path().join("journal.ndjson")).unwrap());
     let registry = Arc::new(HaltRegistry::new());
     let metrics = Arc::new(IacRtMetrics::new());
+    let policy = Arc::new(PolicyTable::new());
+    policy.mutate(|policy| {
+        policy.manifest_scopes.insert(PID, Default::default());
+    });
     let capability = Arc::new(CapabilityRegistryAdapter::new(
         Arc::new(maos_kernel_core::api::RingCryptoProvider),
         cap_tokens::Ed25519SigningKey::new([0; 32]),
         BOOT_NONCE,
-        Arc::new(PolicyTable::new()),
+        Arc::clone(&policy),
         cap_audit::channel().0,
         CapQuotaTracker::new(),
         Arc::new(WorkingMemoryStore::new()),
@@ -313,6 +329,14 @@ fn successor(version: Option<u32>) -> SpiritManifestBundle {
     }
 }
 
+/// A successor that carries the halt and differs from `successor(Some(1))` only by its hook order,
+/// so a stale revert overwriting the newer publication stays observable.
+fn successor_reordered() -> SpiritManifestBundle {
+    let mut bundle = successor(Some(1));
+    bundle.lifecycle.enabled_hooks.reverse();
+    bundle
+}
+
 fn probe() -> Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj> {
     make_spirit_obj(Probe {
         swap_out_panics: false,
@@ -353,6 +377,58 @@ async fn an_incompatible_successor_refuses_the_swap_with_the_halt_intact() {
     assert_eq!(metadata(&rig), before, "identity, owner, fire time, replay");
 }
 
+/// D-21-10-05 A (I14): a successor that declares no `halt_protocol_compatibility` is refused
+/// while the predecessor carries a halt (the pre-fix gate read the omission as version 1).
+#[tokio::test]
+async fn a_successor_declaring_no_compatibility_is_refused_while_a_halt_is_carried() {
+    let rig = rig(false);
+    let before = metadata(&rig);
+
+    let error = rig
+        .coordinator
+        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .await
+        .expect_err("an undeclared successor cannot be shown to carry the halt");
+    assert!(
+        matches!(
+            error,
+            HotSwapError::HaltContinuityViolation(
+                HaltContinuityError::MissingHaltProtocolCompatibility
+            )
+        ),
+        "{error:?}"
+    );
+    assert_eq!(
+        rig.registry.lookup_state(&rig.halt_id),
+        Some(HaltState::PendingResolution)
+    );
+    assert_eq!(metadata(&rig), before, "identity, owner, fire time, replay");
+}
+
+/// `precheck` judges the successor's own declaration with the swap gate's validator.
+#[tokio::test]
+async fn precheck_refuses_an_undeclared_or_mismatched_successor_and_admits_a_matching_one() {
+    let rig = rig(false);
+    let dir = tempfile::tempdir().unwrap();
+    for (compat, expected) in [
+        (None, PrecheckOutcome::HaltContinuityViolation),
+        (Some(2), PrecheckOutcome::HaltContinuityViolation),
+        (Some(1), PrecheckOutcome::SafeMigrated),
+    ] {
+        let mut text = "[class]\nname = \"s\"\nversion = \"0.2.0\"\nabi = \"1.0\"\nmin_substrate_version = \"0.1.0\"\nmanifest_schema_version = 1\ntrust_tier = \"local\"\nforms = [\"rust-inproc\"]\ndescription = \"d\"\n".to_string();
+        if let Some(v) = compat {
+            text += &format!("[halt_protocol_compatibility]\nversion = {v}\n");
+        }
+        let path = dir.path().join(format!("successor-{compat:?}.toml"));
+        std::fs::write(&path, text).unwrap();
+        let verdict = rig
+            .coordinator
+            .precheck(SPIRIT_ID, path.to_str().unwrap(), "0.2.0")
+            .unwrap();
+        assert_eq!(verdict.verdict, expected, "successor declaring {compat:?}");
+    }
+}
+
 #[tokio::test]
 async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_metadata() {
     let _window = monitor_window(false).await;
@@ -361,7 +437,7 @@ async fn a_swap_compensated_after_the_i14_gate_leaves_the_halt_pending_with_its_
 
     let error = rig
         .coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect_err("the predecessor's swap-out panics, after the gate has passed");
     assert!(
@@ -383,7 +459,7 @@ async fn a_halt_resolved_after_the_swap_writes_exactly_one_approval_row() {
     let rig = rig(false);
     let before = metadata(&rig);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     assert_eq!(
@@ -481,7 +557,7 @@ async fn resolving_the_carried_halt_inside_the_monitor_window_is_not_a_loss() {
     let _window = monitor_window(true).await;
     let rig = rig(false);
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     rig.registry
@@ -498,8 +574,17 @@ async fn resolving_the_carried_halt_inside_the_monitor_window_is_not_a_loss() {
 async fn a_carried_halt_that_leaves_the_registry_inside_the_window_is_still_a_loss() {
     let _window = monitor_window(true).await;
     let rig = rig(false);
+    let predecessor = rig
+        .coordinator
+        .spirits_map()
+        .read()
+        .unwrap()
+        .get(&PID)
+        .unwrap()
+        .runtime_snapshot()
+        .spirit_obj;
     rig.coordinator
-        .initiate_swap(SPIRIT_ID, &successor(None), probe())
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
         .await
         .expect("a same-major swap carries the halt");
     assert_eq!(rig.registry.drain_for_spirit(PID).len(), 1);
@@ -507,5 +592,343 @@ async fn a_carried_halt_that_leaves_the_registry_inside_the_window_is_still_a_lo
         auto_reverts_within(&rig, std::time::Duration::from_secs(5)).await,
         1,
         "a halt that vanished without a resolution still trips HaltSetLoss"
+    );
+    let live = rig
+        .coordinator
+        .spirits_map()
+        .read()
+        .unwrap()
+        .get(&PID)
+        .unwrap()
+        .runtime_snapshot()
+        .spirit_obj;
+    assert!(
+        std::ptr::addr_eq(Arc::as_ptr(&live), Arc::as_ptr(&predecessor)),
+        "auto-revert restores the exact predecessor runtime object"
+    );
+}
+
+/// A clean window releases the predecessor runtime it held for rollback exactly
+/// when the (paused) Tokio clock reaches the window, and nothing earlier.
+#[tokio::test(start_paused = true)]
+async fn a_clean_window_releases_the_predecessor_at_its_deadline() {
+    let _window = monitor_window(false).await;
+    let rig = rig(false);
+    let predecessor = {
+        let map = rig.coordinator.spirits_map().read().unwrap();
+        Arc::downgrade(&map.get(&PID).unwrap().runtime_snapshot().spirit_obj)
+    };
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
+        .await
+        .expect("a same-major swap carries the halt");
+
+    let window = std::time::Duration::from_secs(30);
+    let epsilon = std::time::Duration::from_nanos(1);
+    tokio::time::advance(window - epsilon).await;
+    tokio::task::yield_now().await;
+    assert!(
+        predecessor.upgrade().is_some(),
+        "the rollback window still holds the predecessor one tick before it closes"
+    );
+
+    tokio::time::advance(epsilon).await;
+    tokio::task::yield_now().await;
+    assert!(
+        predecessor.upgrade().is_none(),
+        "the window releases the predecessor once it closes"
+    );
+    let violation = PostSwapInvariantViolation::halt_set_loss(vec![rig.halt_id.as_str().into()])
+        .expect("nonempty carried halt id");
+    assert!(matches!(
+        rig.coordinator.auto_revert(PID, violation).await,
+        Err(HotSwapError::NotLoaded { .. })
+    ));
+    assert!(
+        rig.coordinator
+            .spirits_map()
+            .read()
+            .unwrap()
+            .contains_key(&PID),
+        "a clean window leaves the successor registered"
+    );
+}
+
+// ---- publication identity and revert custody (Story 21-9) -------------------
+
+fn lost_halt() -> PostSwapInvariantViolation {
+    PostSwapInvariantViolation::halt_set_loss(vec!["halt-fr53-original".into()])
+        .expect("nonempty carried halt id")
+}
+
+/// Holds ONLY its first `on_swap_out` (the auto-revert's) until released, so a test
+/// decides what happens while a revert waits in the successor hook.
+struct Gate {
+    calls: std::sync::atomic::AtomicUsize,
+    entered: Mutex<std::sync::mpsc::Sender<()>>,
+    release: Mutex<std::sync::mpsc::Receiver<()>>,
+}
+
+impl Spirit for Gate {
+    fn on_swap_out(&self, _ctx: &mut Ctx) {
+        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            self.entered.lock().unwrap().send(()).unwrap();
+            let _ = self.release.lock().unwrap().recv();
+        }
+    }
+    fn snapshot(&self, _ctx: &mut Ctx) -> Vec<u8> {
+        b"replay:frame:origin-203c".to_vec()
+    }
+}
+
+fn gate() -> (
+    Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>,
+    std::sync::mpsc::Receiver<()>,
+    std::sync::mpsc::Sender<()>,
+) {
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let obj = make_spirit_obj(Gate {
+        calls: Default::default(),
+        entered: Mutex::new(entered_tx),
+        release: Mutex::new(release_rx),
+    });
+    (obj, entered_rx, release_tx)
+}
+
+fn live_runtime(rig: &Rig) -> maos_kernel_core::scheduler::control_block::ScbRuntimeSnapshot {
+    rig.coordinator
+        .spirits_map()
+        .read()
+        .unwrap()
+        .get(&PID)
+        .unwrap()
+        .runtime_snapshot()
+}
+
+/// Start an `auto_revert` and wait until it sits inside the gated successor hook.
+async fn revert_waiting_in_swap_out(
+    rig: &Arc<Rig>,
+    entered: std::sync::mpsc::Receiver<()>,
+) -> tokio::task::JoinHandle<Result<(), HotSwapError>> {
+    let rig = Arc::clone(rig);
+    let reverting =
+        tokio::spawn(async move { rig.coordinator.auto_revert(PID, lost_halt()).await });
+    tokio::task::spawn_blocking(move || entered.recv())
+        .await
+        .unwrap()
+        .expect("the revert reached the successor's on_swap_out");
+    reverting
+}
+
+#[tokio::test]
+async fn a_revert_waiting_in_swap_out_cannot_overwrite_a_newer_publication_of_the_same_object() {
+    let _window = monitor_window(false).await;
+    let rig = Arc::new(rig(false));
+    let (obj, entered, release) = gate();
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor_reordered(), Arc::clone(&obj))
+        .await
+        .expect("first swap");
+    let reverting = revert_waiting_in_swap_out(&rig, entered).await;
+
+    // The caller reuses the same object for a second swap with a different manifest.
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), Arc::clone(&obj))
+        .await
+        .expect("second swap of the same object");
+    release.send(()).unwrap();
+
+    assert!(matches!(
+        reverting.await.unwrap(),
+        Err(HotSwapError::NotLoaded { .. })
+    ));
+    let live = live_runtime(&rig);
+    assert!(std::ptr::addr_eq(
+        Arc::as_ptr(&live.spirit_obj),
+        Arc::as_ptr(&obj)
+    ));
+    assert_eq!(
+        live.manifest.lifecycle.enabled_hooks,
+        hooks().lifecycle.enabled_hooks,
+        "the newer publication's manifest survives the stale revert"
+    );
+    assert_eq!(
+        auto_reverts_within(&rig, std::time::Duration::ZERO).await,
+        0
+    );
+}
+
+#[tokio::test]
+async fn cancelling_the_revert_future_inside_swap_out_keeps_the_rollback_claimable() {
+    let _window = monitor_window(false).await;
+    let rig = Arc::new(rig(false));
+    let predecessor = live_runtime(&rig).spirit_obj;
+    let (obj, entered, release) = gate();
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), Arc::clone(&obj))
+        .await
+        .expect("swap");
+    let reverting = revert_waiting_in_swap_out(&rig, entered).await;
+
+    reverting.abort();
+    assert!(reverting.await.unwrap_err().is_cancelled());
+    release.send(()).unwrap();
+
+    rig.coordinator
+        .auto_revert(PID, lost_halt())
+        .await
+        .expect("a retry still finds the rollback record");
+    assert!(std::ptr::addr_eq(
+        Arc::as_ptr(&live_runtime(&rig).spirit_obj),
+        Arc::as_ptr(&predecessor)
+    ));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_revert_claimed_the_instant_the_window_opens_is_journaled_after_the_swap() {
+    let _window = monitor_window(false).await;
+    let rig = Arc::new(rig(false));
+    let hammer = {
+        let rig = Arc::clone(&rig);
+        tokio::spawn(async move {
+            while rig.coordinator.auto_revert(PID, lost_halt()).await.is_err() {
+                tokio::task::yield_now().await;
+            }
+        })
+    };
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
+        .await
+        .expect("swap");
+    tokio::time::timeout(std::time::Duration::from_secs(10), hammer)
+        .await
+        .expect("the revert lands once the window opens")
+        .unwrap();
+
+    let journal = std::fs::read_to_string(rig._tmp.path().join("journal.ndjson")).unwrap();
+    let at = |event: &str| journal.lines().position(|line| line.contains(event));
+    let swapped = at("\"HotSwap\"").expect("the swap is journaled");
+    let reverted = at("\"HotSwapAutoReverted\"").expect("the revert is journaled");
+    assert!(swapped < reverted, "HotSwap precedes HotSwapAutoReverted");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_monitor_first_polled_with_little_window_left_still_checks_before_expiry() {
+    let _window = monitor_window(false).await;
+    let rig = rig(false);
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), probe())
+        .await
+        .expect("a same-major swap carries the halt");
+    assert_eq!(rig.registry.drain_for_spirit(PID).len(), 1);
+
+    // The monitor task has not been polled yet; its first poll lands 0.5s before the
+    // window closes, less than one cadence tick.
+    tokio::time::advance(std::time::Duration::from_millis(29_500)).await;
+    assert_eq!(
+        auto_reverts_within(&rig, std::time::Duration::from_secs(2)).await,
+        1,
+        "the loss is caught by the first check, not skipped to expiry"
+    );
+}
+
+/// Cancel a public revert that sits in the gated successor hook, then release the hook.
+async fn cancel_revert_in_swap_out(rig: &Arc<Rig>) {
+    let (obj, entered, release) = gate();
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), obj)
+        .await
+        .expect("swap");
+    let reverting = revert_waiting_in_swap_out(rig, entered).await;
+    reverting.abort();
+    assert!(reverting.await.unwrap_err().is_cancelled());
+    release.send(()).unwrap();
+}
+
+#[tokio::test(start_paused = true)]
+async fn cancelling_a_public_revert_leaves_the_windows_monitor_checking() {
+    let _window = monitor_window(false).await;
+    let rig = Arc::new(rig(false));
+    cancel_revert_in_swap_out(&rig).await;
+
+    // The re-armed window kept its own monitor: a carried halt that now leaves the
+    // registry is caught by that monitor's check, with no further public call.
+    assert_eq!(rig.registry.drain_for_spirit(PID).len(), 1);
+    assert_eq!(
+        auto_reverts_within(&rig, std::time::Duration::from_secs(5)).await,
+        1
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_window_re_armed_after_a_cancelled_revert_still_expires_at_its_deadline() {
+    let _window = monitor_window(false).await;
+    let rig = Arc::new(rig(false));
+    let predecessor = Arc::downgrade(&live_runtime(&rig).spirit_obj);
+    cancel_revert_in_swap_out(&rig).await;
+
+    tokio::time::advance(std::time::Duration::from_secs(30)).await;
+    tokio::task::yield_now().await;
+    assert!(
+        predecessor.upgrade().is_none(),
+        "the window's own expiry still releases the rollback"
+    );
+    assert!(matches!(
+        rig.coordinator.auto_revert(PID, lost_halt()).await,
+        Err(HotSwapError::NotLoaded { .. })
+    ));
+}
+
+#[tokio::test(start_paused = true)]
+async fn shutdown_cancels_a_monitor_revert_waiting_in_the_successor_hook() {
+    let _window = monitor_window(false).await;
+    let rig = rig(false);
+    let (obj, entered, release) = gate();
+    rig.coordinator
+        .initiate_swap(SPIRIT_ID, &successor(Some(1)), Arc::clone(&obj))
+        .await
+        .expect("swap");
+    let spirits = Arc::clone(rig.coordinator.spirits_map());
+
+    // The carried halt left the registry: the window's own monitor starts the revert
+    // at its check and waits inside the gated successor hook.
+    assert_eq!(rig.registry.drain_for_spirit(PID).len(), 1);
+    tokio::task::spawn_blocking(move || entered.recv())
+        .await
+        .unwrap()
+        .expect("the monitor's revert reached the successor's on_swap_out");
+
+    let Rig {
+        coordinator,
+        tl,
+        _tmp,
+        ..
+    } = rig;
+    drop(coordinator);
+    release.send(()).unwrap();
+    // Grace for the released hook to finish, so a surviving monitor would have acted.
+    tokio::task::spawn_blocking(|| std::thread::sleep(std::time::Duration::from_millis(250)))
+        .await
+        .unwrap();
+    tokio::task::yield_now().await;
+
+    let reverts = tl
+        .query_frames(FrameFilter {
+            kind: Some(FrameKind::HotSwapAborted),
+            ..Default::default()
+        })
+        .unwrap()
+        .len();
+    assert_eq!(reverts, 0, "no revert may complete after shutdown");
+    let live = spirits
+        .read()
+        .unwrap()
+        .get(&PID)
+        .unwrap()
+        .runtime_snapshot();
+    assert!(
+        std::ptr::addr_eq(Arc::as_ptr(&live.spirit_obj), Arc::as_ptr(&obj)),
+        "the predecessor was not republished after shutdown"
     );
 }

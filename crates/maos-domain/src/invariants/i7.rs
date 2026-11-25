@@ -56,6 +56,49 @@ pub struct ScalarTapEvent {
     pub timestamp: u64,
 }
 
+/// One topic's delivery: whether any Spirit subscribed to it and whether events reached it.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Delivery {
+    pub topic: String,
+    pub subscribed: bool,
+    pub delivered: bool,
+}
+
+/// One halt: the scalars written before it and the ones a `scalar.tap` observer saw.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Halt {
+    pub written: u32,
+    pub observed: u32,
+}
+
+/// I7 observation: per-topic deliveries and the halts whose run-up was observed.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Observation {
+    pub deliveries: Vec<Delivery>,
+    pub halts: Vec<Halt>,
+}
+
+/// I7 predicate: telemetry reaches only subscribed topics, and every halt's whole `scalar.tap`
+/// run-up (at least the scalar that tripped it) was observable.
+pub fn check(obs: &Observation) -> Result<(), crate::invariants::Violation> {
+    use crate::invariants::ensure;
+    for d in &obs.deliveries {
+        ensure(
+            !d.delivered || d.subscribed,
+            "I7",
+            "telemetry delivered without a subscription",
+        )?;
+    }
+    for h in &obs.halts {
+        ensure(
+            h.written > 0 && h.observed == h.written,
+            "I7",
+            "halt run-up was not observable",
+        )?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

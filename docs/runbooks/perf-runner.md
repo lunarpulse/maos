@@ -12,7 +12,7 @@ fingerprint, calibration or ledger entry exists until the host produces one.
 
 | Tier | Where | Trigger | Gate |
 |---|---|---|---|
-| C — counts | GitHub-hosted `ubuntu-24.04`, fork-safe | every pull request | `check-perf-counts` (`discipline.yml`) |
+| C — counts | GitHub-hosted `ubuntu-24.04`, fork-safe | nightly `schedule` (advisory, lean-gates WP-06; it left the pull-request path) | `check-perf-counts` (`ci-nightly.yml`) |
 | W — wall clock | the `maos-perf` host only | `push` to `main`, nightly `schedule`, weekly soak, main-only `workflow_dispatch` | `check-perf-verdict` on the ledger |
 
 `.github/workflows/perf.yml` is the only allowed host workflow. The structural

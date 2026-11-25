@@ -1,0 +1,18 @@
+{
+  "schema_version": "maos.journey.cassette/v1",
+  "provenance": "seed",
+  "model_id": "claude-haiku-4-5-20251001",
+  "spirit_id": "invoice-evidence-extractor",
+  "session": "invoice-evidence-present",
+  "entries": [{
+    "sequence": 0,
+    "prompt_sha256": "145366996d478a88ee7d8ad531a8aa2a39a860074237e71b79d829b4382006df",
+    "prompt_len": 236,
+    "response": {
+      "text": "{\"outcome\":\"finding_ready\",\"artifact\":{\"purchase_order_present\":true,\"quote\":\"Purchase order PO-921 is attached.\"}}",
+      "stop_reason": "stop_sequence",
+      "usage": {"input_tokens": 61, "output_tokens": 34},
+      "provider_attribution": {"provider_id": "anthropic", "model_id": "claude-haiku-4-5-20251001", "endpoint_url": "cassette://invoice-evidence/present"}
+    }
+  }]
+}

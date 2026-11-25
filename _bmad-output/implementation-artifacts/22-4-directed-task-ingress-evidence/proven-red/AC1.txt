@@ -1,0 +1,16 @@
+AC1 plant: crates/maos-bin/src/spirit_session.rs claim(): inserted 'if true { return Ok(None); }' as first statement (the session never binds the task frame; marker PLANT22_4_RED). Command: cargo nextest run --locked -p maos-bin --test directed_task_22_4 -E 'test(ask_returns_a_task_id_and_task_show_returns_the_answer)'. Result: FAILS - task ends state=failed with reason deadline_exceeded (the unbound frame is never answered; the story text says no_answer, the observed typed reason is deadline_exceeded because the unclaimed frame waits out the turn deadline), expected completed. Plant reverted; grep PLANT22_4_RED finds nothing; git status clean.
+
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+332 |                     (_, Err(_)) => DisconnectOutcome::Failed("task panicked".into()),
+        FAIL [  32.609s] (1/1) maos-bin::directed_task_22_4 ask_returns_a_task_id_and_task_show_returns_the_answer
+  stdout 
+    running 1 test
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 32.60s
+  stderr 
+    thread 'ask_returns_a_task_id_and_task_show_returns_the_answer' (3840026) panicked at crates/maos-bin/tests/directed_task_22_4.rs:311:5:
+    assertion `left == right` failed: {"task_id":"01M846TFD4V4ZF3E0ST322JHVE","spirit_id":"probe-d","origin":"door","state":"failed","accepted_ns":1795437706660391771,"reason":"deadline_exceeded","ended_ns":1795437738206587712}
+      left: String("failed")
+     right: "completed"
+     Summary [  32.611s] 1 test run: 0 passed, 1 failed, 4 skipped
+        FAIL [  32.609s] (1/1) maos-bin::directed_task_22_4 ask_returns_a_task_id_and_task_show_returns_the_answer
+rc=100

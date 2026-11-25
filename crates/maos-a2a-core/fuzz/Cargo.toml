@@ -1,0 +1,23 @@
+[package]
+name = "maos-a2a-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+maos-a2a-core = { path = ".." }
+maos-domain = { path = "../../maos-domain" }
+maos-spirit-abi = { path = "../../maos-spirit-abi" }
+smallvec = "1"
+tokio = { version = "1", features = ["rt", "macros"] }
+
+[[bin]]
+name = "i8_consent_intent"
+path = "fuzz_targets/i8_consent_intent.rs"
+
+# Standalone cargo-fuzz workspace root.
+[workspace]

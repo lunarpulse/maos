@@ -1,0 +1,35 @@
+AC5 plant (drop the 'no halt.resolve decision' predicate): crates/maos-audit/src/halts.rs unresolved_halts(): '|| resolved.contains(&halt_id)' -> '|| (false && resolved.contains(&halt_id)) /* E228-PLANT AC5b */'. Command: cargo nextest run --locked -p maos-bin --test halt_carry_22_8 -p maos-audit --test halts_22_8. Result: halt_carry_22_8::a_resolved_halt_is_not_carried FAILS (and the first test's 'resolved before the kill is not carried again' check), plus 3 halts_22_8 unit tests FAIL (the resolved halt is returned as unresolved). Plant reverted.
+
+        PASS [   0.004s] ( 1/12) maos-audit::halts_22_8 a_missing_log_has_no_halts
+        PASS [   0.177s] ( 2/12) maos-audit::halts_22_8 a_raised_halt_nobody_resolved_is_unresolved_with_its_raising_incarnation
+        PASS [   0.230s] ( 3/12) maos-audit::halts_22_8 the_running_boot_holds_its_own_halts_and_a_frame_a_spirit_routed_is_not_a_raise
+        PASS [   0.263s] ( 4/12) maos-audit::halts_22_8 a_carried_halt_is_held_by_the_newest_incarnation
+        PASS [   0.269s] ( 5/12) maos-audit::halts_22_8 a_registered_segment_that_is_missing_refuses_rather_than_reading_a_shorter_log
+        PASS [   0.276s] ( 6/12) maos-audit::halts_22_8 only_cast_members_halts_are_unresolved
+        FAIL [   0.329s] ( 7/12) maos-audit::halts_22_8 a_resolved_halt_is_not_unresolved_and_another_spirits_resolution_does_not_close_it
+    thread 'a_resolved_halt_is_not_unresolved_and_another_spirits_resolution_does_not_close_it' (123190) panicked at crates/maos-audit/tests/halts_22_8.rs:204:5:
+    assertion `left == right` failed
+      left: [("H-OPEN", "mira", 29, 3), ("H-RESOLVED", "mira", 29, 3)]
+     right: [("H-OPEN", "mira", 29, 3)]
+        FAIL [   0.368s] ( 8/12) maos-audit::halts_22_8 a_shutdown_receipt_does_not_close_a_halt_but_a_decision_does
+    thread 'a_shutdown_receipt_does_not_close_a_halt_but_a_decision_does' (123193) panicked at crates/maos-audit/tests/halts_22_8.rs:218:5:
+    assertion `left == right` failed
+      left: [("H-DECIDED", "mira", 29, 3), ("H-UNPLANNED", "mira", 29, 3)]
+     right: [("H-UNPLANNED", "mira", 29, 3)]
+        FAIL [   0.572s] ( 9/12) maos-audit::halts_22_8 a_halt_raised_in_a_sealed_segment_is_found_and_a_decision_in_the_live_log_closes_it
+    thread 'a_halt_raised_in_a_sealed_segment_is_found_and_a_decision_in_the_live_log_closes_it' (123191) panicked at crates/maos-audit/tests/halts_22_8.rs:278:5:
+    assertion `left == right` failed
+      left: [("H-SEALED-DECIDED", "mira", 29, 3), ("H-SEALED-OPEN", "mira", 224, 2)]
+     right: [("H-SEALED-OPEN", "mira", 224, 2)]
+        PASS [   1.291s] (10/12) maos-bin::halt_carry_22_8 a_loaded_spirit_carries_nothing
+        FAIL [   1.526s] (11/12) maos-bin::halt_carry_22_8 a_pending_halt_is_carried_after_sigterm_and_sigkill
+    thread 'a_pending_halt_is_carried_after_sigterm_and_sigkill' (123331) panicked at crates/maos-bin/tests/halt_carry_22_8.rs:337:5:
+        FAIL [   1.108s] (12/12) maos-bin::halt_carry_22_8 a_resolved_halt_is_not_carried
+    thread 'a_resolved_halt_is_not_carried' (123521) panicked at crates/maos-bin/tests/halt_carry_22_8.rs:380:5:
+     Summary [   3.927s] 12 tests run: 7 passed, 5 failed, 0 skipped
+        FAIL [   0.329s] ( 7/12) maos-audit::halts_22_8 a_resolved_halt_is_not_unresolved_and_another_spirits_resolution_does_not_close_it
+        FAIL [   0.368s] ( 8/12) maos-audit::halts_22_8 a_shutdown_receipt_does_not_close_a_halt_but_a_decision_does
+        FAIL [   0.572s] ( 9/12) maos-audit::halts_22_8 a_halt_raised_in_a_sealed_segment_is_found_and_a_decision_in_the_live_log_closes_it
+        FAIL [   1.526s] (11/12) maos-bin::halt_carry_22_8 a_pending_halt_is_carried_after_sigterm_and_sigkill
+        FAIL [   1.108s] (12/12) maos-bin::halt_carry_22_8 a_resolved_halt_is_not_carried
+rc=100
