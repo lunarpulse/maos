@@ -166,7 +166,7 @@ fn keyless_one_shot_validates_an_unregistered_providers_declared_pin() {
     assert!(
         !refused.status.success()
             && stderr.contains("model_not_admitted")
-            && stderr.contains("gpt-4"),
+            && stderr.contains("pinned model 'gpt-4'"),
         "a retired id on an unregistered provider must refuse: {} {stderr}",
         refused.status
     );

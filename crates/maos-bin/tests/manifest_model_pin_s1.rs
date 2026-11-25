@@ -663,3 +663,31 @@ fn declared_pins_are_validated_for_a_known_but_unregistered_provider() {
     // A provider absent from the catalog stays out of scope of this check.
     check_declared_pins(&declared(&["mystery.model-x"]), Some(&catalog)).unwrap();
 }
+
+/// The refusal echoes `[providers].primary.model_id`, an uncapped manifest field:
+/// the message stays bounded and printable whatever the id holds, and is still
+/// `model_not_admitted`.
+#[test]
+fn a_hostile_model_id_yields_a_bounded_printable_refusal() {
+    let catalog: ProviderCatalog = BTreeMap::from([(
+        "anthropic".to_owned(),
+        ConfiguredProvider {
+            endpoint: "https://api.anthropic.com".into(),
+            model: "claude-haiku-5-5",
+            registered: true,
+        },
+    )]);
+    // TOML escapes: BEL, ESC, newline, then padding to 4,000 characters.
+    let hostile = format!("bad\\u0007\\u001b[2J\\n{}", "x".repeat(4000 - 12));
+    let section = maos_kernel_core::security::ProvidersSection::from_toml_str(&format!(
+        "[primary]\nid = \"anthropic\"\nmodel_id = \"{hostile}\"\n"
+    ))
+    .expect("the section parses: the field is uncapped");
+    assert!(section.primary.model_id.as_deref().unwrap().len() >= 3_900);
+    let refusal = check_provider_pins(&section, Some(&catalog)).expect_err("not admitted");
+    assert_eq!(refusal.code(), "model_not_admitted");
+    let message = refusal.to_string();
+    assert!(message.chars().count() < 256, "{}", message.len());
+    assert!(!message.chars().any(char::is_control), "{message:?}");
+    assert!(message.contains("bad\\u{7}"), "{message:?}");
+}

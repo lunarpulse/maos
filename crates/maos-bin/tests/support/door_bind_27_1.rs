@@ -6,7 +6,7 @@
 //! admitted. The witness is the real `prepare_spirit_from` over real kernel adapters: the
 //! admitted text declares a provider the router registers, the file on disk declares one it
 //! does not. A binding taken from the file would fail the build.
-use super::{prepare_spirit_from, SpiritBuildDeps};
+use super::{door_manifest_text, prepare_spirit_from, SpiritBuildDeps};
 use maos_domain::ports::inference::{
     InferenceError, InferencePort, InferenceRequest, InferenceResponse,
 };
@@ -168,4 +168,19 @@ fn a_file_that_differs_after_admission_cannot_change_what_the_door_binds() {
         "the admitted text must bind, whatever the file now holds: {:?}",
         admitted.map(|_| ()).map_err(|refusal| refusal.to_string())
     );
+}
+
+/// `load_spirit` takes its text from `door_manifest_text`: the door's pre-read bytes win over
+/// whatever the pathname now holds, and the pathname is read only when the door read none.
+/// (The call site in `load_spirit` is one line; this witnesses the choice, not the async method.)
+#[test]
+fn the_door_loads_from_its_pre_read_text_not_the_pathname() {
+    let dir = tempfile::tempdir().expect("scratch dir");
+    let path = dir.path().join("manifest.toml");
+    std::fs::write(&path, "# the file after the door read it\n").expect("write");
+    let pread = Arc::new(ORCHESTRATOR.to_owned());
+    let chosen = door_manifest_text(&path, Some(Arc::clone(&pread))).expect("pre-read text");
+    assert_eq!(*chosen, ORCHESTRATOR, "the pre-read text is what loads");
+    let fallback = door_manifest_text(&path, None).expect("no pre-read: read the path");
+    assert_eq!(*fallback, "# the file after the door read it\n");
 }

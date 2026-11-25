@@ -22,3 +22,8 @@ Command: `cargo test --locked -p maos-bin --bin maos door_bind_27_1` (exit 101):
 ## Not planted
 Item 5 (one-shot positive arm) is test hardening with no production change; it is red-capable only if the
 admitted run fails to exit 0 or print an `introduction`, which a restored-source run does not do.
+
+## Run C — post-review plants (both removed)
+- `E271-PLANT echo`: `echoed` returns the value verbatim. `cargo test --locked -p maos-bin --test manifest_model_pin_s1` ⇒ `a_hostile_model_id_yields_a_bounded_printable_refusal` FAILED (9 passed / 1 failed).
+- `E271-PLANT door-reread`: `door_manifest_text` rereads the pathname over a pre-read text. `cargo test --locked -p maos-bin --bin maos door_bind_27_1` ⇒ `the_door_loads_from_its_pre_read_text_not_the_pathname` FAILED (1 passed / 1 failed).
+- (d) the one-shot assertion now matches `pinned model 'gpt-4'`, which `gpt-4o-mini` cannot satisfy; not planted.

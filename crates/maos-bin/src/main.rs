@@ -1125,6 +1125,20 @@ fn prepare_spirit_from(
         .map_err(|detail| maos_bin::admission::AdmissionRefusal::ClassBuild { detail })?;
     Ok((gated, spirit_obj))
 }
+
+/// The text a door `load` gates, pin-checks and builds from: the bytes the door already read
+/// when it keyed the Spirit lock, and only when it read none, the pathname. The pathname is
+/// never reread over a pre-read text.
+#[cfg(feature = "network")]
+fn door_manifest_text(
+    manifest: &std::path::Path,
+    pread: Option<Arc<String>>,
+) -> Result<Arc<String>, maos_bin::admission::AdmissionRefusal> {
+    match pread {
+        Some(text) => Ok(text),
+        None => Ok(Arc::new(maos_bin::admission::read_manifest(manifest)?)),
+    }
+}
 #[cfg(feature = "network")]
 /// Story 8.14b — Live MCP port for Butler. Wraps the kernel's
 /// `McpClientAdapter` (capability mediation + audit) with per-tool-type
@@ -3355,10 +3369,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // factory creates a new concrete Spirit for every successor manifest;
     // upgrade code is never given the predecessor object.
     // Story 16-1 (D-16-1-W) — where the door's upgrade handler stages the
-    // TARGET manifest path for the factory's butler arm: the kernel factory
-    // signature passes only the parsed bundle, which carries no source path,
-    // but a FAITHFUL butler successor must re-parse `[epistemic_policy]` from
-    // the target file. The door stages before the upgrade and clears after.
+    // TARGET manifest path for the factory: the kernel factory signature
+    // passes only the parsed bundle, which carries no source path, but a
+    // FAITHFUL butler successor must re-parse `[epistemic_policy]` from the
+    // target manifest. The in-process factory reads the staged file once and
+    // builds from that text; the door stages before the upgrade and clears after.
     let successor_manifest_slot = maos_bin::operator_door::SuccessorManifestSlot::default();
     // Moved clones for the factory closure (`SuccessorSpiritFactory` is
     // 'static; it cannot borrow the composition root).
@@ -11021,10 +11036,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         manifest: &std::path::Path,
         pread: Option<std::sync::Arc<String>>,
     ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
-        let manifest_toml = match pread {
-            Some(text) => text,
-            None => std::sync::Arc::new(maos_bin::admission::read_manifest(manifest)?),
-        };
+        let manifest_toml = door_manifest_text(manifest, pread)?;
         let (gated, spirit_obj) =
             self.prepare_spirit(manifest, &manifest_toml)
                 .map_err(|refusal| {

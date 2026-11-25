@@ -444,6 +444,29 @@ impl AdmissionRefusal {
     }
 }
 
+/// The longest manifest-supplied identifier a refusal message echoes: the cap
+/// `provider.complete` entries already carry. `[providers].primary.model_id` is
+/// uncapped, so its echo is bounded here.
+const ECHOED_ID_LIMIT: usize = 128;
+
+/// A manifest-supplied identifier made safe to print: at most [`ECHOED_ID_LIMIT`]
+/// characters (an ellipsis marks a cut) with control characters escaped.
+fn echoed(value: &str) -> String {
+    let mut out = String::with_capacity(value.len().min(ECHOED_ID_LIMIT + 3));
+    for (index, c) in value.chars().enumerate() {
+        if index == ECHOED_ID_LIMIT {
+            out.push('…');
+            break;
+        }
+        if c.is_control() {
+            out.extend(c.escape_default());
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 impl std::fmt::Display for AdmissionRefusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -511,7 +534,7 @@ impl std::fmt::Display for AdmissionRefusal {
             ),
             Self::ProviderUnavailable { provider } => write!(f, "provider_unavailable: '{provider}' is undeclared, unregistered, or its model assertion differs"),
             Self::EndpointPinMismatch { provider } => write!(f, "endpoint_pin_mismatch: '{provider}' does not match the configured endpoint"),
-            Self::ModelNotAdmitted { provider, model } => write!(f, "model_not_admitted: '{provider}' does not admit the pinned model '{model}'"),
+            Self::ModelNotAdmitted { provider, model } => write!(f, "model_not_admitted: '{}' does not admit the pinned model '{}'", echoed(provider), echoed(model)),
             Self::FallbackUnsupported => f.write_str("fallback_unsupported: a primary token cannot authorise fallback providers"),
             Self::SkillUnavailable { skill } => write!(f, "skill_unavailable: {skill}"),
             Self::SkillEscalation { skill } => write!(f, "skill_escalation: {skill}"),
