@@ -135,11 +135,11 @@ impl Gate {
     }
 }
 
-// ── the server ───────────────────────────────────────────────────────────────
-
 /// How the next connection is treated.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
+    /// Complete the handshake, then stop reading until `alert_hold` opens (a write that blocks).
+    StopReading,
     /// Complete the handshake, then close (alert and FIN) WITHOUT reading anything.
     CloseWithoutReading,
     /// Read to the client's `close_notify`, then (after the ack gate) answer with ours.
@@ -395,6 +395,49 @@ fn serve(
                 return;
             }
         };
+        if mode == Mode::StopReading && !conn.is_handshaking() {
+            // Handshake complete, then the collector STOPS READING (a full receive window):
+            // the client's write blocks until the test opens `alert_hold`.
+            while conn.wants_write() {
+                if conn.write_tls(&mut tcp).is_err() {
+                    let _ = events.send(Event::Unacked { bytes });
+                    return;
+                }
+            }
+            let _ = gates.alert_hold.wait_open();
+            let _ = events.send(Event::Unacked { bytes });
+            return;
+        }
+        if mode == Mode::CloseWithoutReading && !conn.is_handshaking() {
+            // Handshake complete: the collector closes WITHOUT reading anything. This is
+            // decided BEFORE any application read (TLS 1.3 can deliver the client's Finished
+            // and its first data in one read), so `bytes` is what was really captured: nothing.
+            // It waits for the test to release the alert (open by default), writes close_notify
+            // (a failed write is reported and `alert_sent` stays closed), half-closes, and only
+            // drains the socket so the close is not a reset.
+            // The server's own final flight (TLS 1.2: CCS and Finished) goes out first, so the
+            // client can finish its handshake whatever the alert gate does.
+            while conn.wants_write() {
+                if conn.write_tls(&mut tcp).is_err() {
+                    let _ = events.send(Event::Unacked { bytes });
+                    return;
+                }
+            }
+            gates.alert_hold.wait();
+            conn.send_close_notify();
+            while conn.wants_write() {
+                if conn.write_tls(&mut tcp).is_err() {
+                    let _ = events.send(Event::Unacked { bytes });
+                    return;
+                }
+            }
+            gates.alert_sent.open();
+            let _ = tcp.shutdown(std::net::Shutdown::Write);
+            let mut sink = [0_u8; 4096];
+            while matches!(std::io::Read::read(&mut tcp, &mut sink), Ok(n) if n > 0) {}
+            let _ = events.send(Event::Unacked { bytes });
+            return;
+        }
         let readable = state.plaintext_bytes_to_read();
         if readable > 0 {
             let mut chunk = vec![0_u8; readable];
@@ -418,24 +461,6 @@ fn serve(
             let mut sink = [0_u8; 4096];
             while matches!(std::io::Read::read(&mut tcp, &mut sink), Ok(n) if n > 0) {}
             let _ = events.send(Event::Unacked { bytes });
-            return;
-        }
-        if mode == Mode::CloseWithoutReading && !conn.is_handshaking() {
-            // The collector closes WITHOUT having read anything: it waits for the test to
-            // release the alert (open by default), sends close_notify and the FIN, never
-            // processes the batch, then only drains the socket so the close is not a reset.
-            gates.alert_hold.wait();
-            conn.send_close_notify();
-            while conn.wants_write() {
-                if conn.write_tls(&mut tcp).is_err() {
-                    break;
-                }
-            }
-            gates.alert_sent.open();
-            let _ = tcp.shutdown(std::net::Shutdown::Write);
-            let mut sink = [0_u8; 4096];
-            while matches!(std::io::Read::read(&mut tcp, &mut sink), Ok(n) if n > 0) {}
-            let _ = events.send(Event::Unacked { bytes: Vec::new() });
             return;
         }
         if state.peer_has_closed() {

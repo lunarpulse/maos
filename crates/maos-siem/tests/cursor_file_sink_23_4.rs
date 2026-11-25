@@ -78,10 +78,12 @@ impl Rig {
         result
     }
 
+    /// Non-blank lines: the file sink may write a blank line (downstream ignores them).
     fn lines(&self) -> usize {
         std::fs::read_to_string(&self.sink_path)
             .unwrap_or_default()
             .lines()
+            .filter(|line| !line.is_empty())
             .count()
     }
 }
@@ -304,25 +306,6 @@ fn a_blocked_cursor_write_journals_the_same_gap_payload_every_attempt() {
     );
 }
 
-/// A partial append leaves an unterminated record; the retry cuts it back to the last line
-/// terminator before appending, so the file never holds a fragment.
-#[test]
-fn a_partial_tail_is_cut_back_before_the_retry_appends() {
-    let rig = Rig::new();
-    seed(&rig.db, 2);
-    std::fs::write(
-        &rig.sink_path,
-        "earlier line\n<134>1 PARTIAL-RECORD-WITHOUT-NEWLINE",
-    )
-    .unwrap();
-    assert_eq!(rig.tick().unwrap().delivered, 2);
-    let text = std::fs::read_to_string(&rig.sink_path).unwrap();
-    assert!(!text.contains("PARTIAL"), "{text}");
-    assert!(text.starts_with("earlier line\n"));
-    assert_eq!(text.lines().count(), 3);
-    assert!(text.ends_with('\n'));
-}
-
 // ── review round 2 ───────────────────────────────────────────────────────────
 
 impl Rig {
@@ -430,19 +413,19 @@ fn a_frame_over_one_mebibyte_is_sent_alone_and_the_next_row_follows() {
     );
 }
 
-// ── review round 3 ───────────────────────────────────────────────────────────
+// ── review rounds 3 and 4: the append-only file sink ─────────────────────────
 
-/// An appender that writes half of the batch and then fails once (ENOSPC mid-write).
-fn short_write_once() -> maos_siem::export::Appender {
+/// A writer that writes half of the batch and then fails, `times` times, then behaves.
+#[allow(deprecated)] // `fetch_update` is the name older toolchains have
+fn short_writes(times: usize) -> maos_siem::export::Writer {
     use std::io::Write;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    let failing = Arc::new(AtomicBool::new(true));
-    Arc::new(move |path, bytes| {
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)?;
-        if failing.swap(false, Ordering::SeqCst) {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let left = Arc::new(AtomicUsize::new(times));
+    Arc::new(move |file, bytes| {
+        if left
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+            .is_ok()
+        {
             file.write_all(&bytes[..bytes.len() / 2])?;
             return Err(std::io::Error::other("injected ENOSPC after a short write"));
         }
@@ -451,76 +434,179 @@ fn short_write_once() -> maos_siem::export::Appender {
     })
 }
 
-fn assert_whole_lines(path: &Path, expected: usize) {
-    let text = std::fs::read_to_string(path).unwrap();
-    assert!(text.ends_with('\n'), "the file ends at a record boundary");
-    assert_eq!(text.lines().count(), expected);
-    for line in text.lines() {
+/// The non-blank lines of a file (downstream shippers ignore blank lines).
+fn records(path: &Path) -> Vec<String> {
+    std::fs::read_to_string(path)
+        .unwrap()
+        .lines()
+        .filter(|line| !line.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// What a clean run of the same rows writes (another file, its own cursor).
+fn clean_records(rig: &Rig) -> Vec<String> {
+    let path = rig.sink_path.with_file_name("clean.log");
+    let mut sink = FileSink::new(path.clone(), Arc::new(SiemExporter));
+    rig.tick_using(&mut sink).expect("clean run");
+    records(&path)
+}
+
+fn is_complete(line: &str) -> bool {
+    line.starts_with("<134>1 ") && line.contains(" CEF:0|") && line.matches("<134>1 ").count() == 1
+}
+
+/// R4 (replaces the offset/truncate design): CONSECUTIVE short writes, then a clean retry.
+/// The sink only appends; each retry begins with a newline that terminates the fragment the
+/// failure left, so no record is ever glued to a fragment, the cursor moves only after the
+/// whole batch was written, and the last records of the file are exactly a clean run's.
+#[test]
+fn consecutive_short_writes_then_a_clean_retry_keep_every_record_line_aligned() {
+    let rig = Rig::new();
+    seed(&rig.db, 3);
+    let clean = clean_records(&rig);
+    let mut sink = rig.sink().with_writer(short_writes(2));
+    let cursor = rig.db.with_file_name("siem-cursor.json");
+    let identity = sink.identity();
+    let _ = identity;
+    for attempt in 1..=2 {
+        let failure = rig.tick_using(&mut sink).expect_err("short write");
+        assert_eq!(failure.code(), "siem_sink_file_io", "attempt {attempt}");
+        assert!(!cursor_for(&rig, &sink).exists(), "the cursor stays");
+    }
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
+    let _ = cursor;
+    let lines = records(&rig.sink_path);
+    assert_eq!(
+        &lines[lines.len() - 3..],
+        &clean[..],
+        "the final batch is whole"
+    );
+    for line in &lines {
         assert!(
-            line.starts_with("<134>1 ") && line.contains(" CEF:0|"),
-            "a malformed record was acknowledged: {line:?}"
+            line.matches("<134>1 ").count() <= 1,
+            "a record was glued to a fragment: {line:?}"
         );
     }
+    let fragments = lines.iter().filter(|line| !is_complete(line)).count();
+    assert!(fragments <= 2, "only the failed attempts' fragments remain");
 }
 
-/// R3-2: a short write leaves a fragment; the retry cuts the file back to the offset recorded
-/// before the failed append (write permission alone is enough, so a WRITE-ONLY file works),
-/// and every record boundary is intact afterwards.
-#[cfg(unix)]
-#[test]
-fn a_short_write_is_cut_back_before_the_retry_even_on_a_write_only_file() {
-    use std::os::unix::fs::PermissionsExt;
-    let rig = Rig::new();
-    seed(&rig.db, 3);
-    std::fs::write(&rig.sink_path, "").unwrap();
-    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o200)).unwrap();
-    let mut sink = rig.sink().with_appender(short_write_once());
-    let cursor = rig.db.with_file_name("siem-cursor.json");
-    let failure = rig
-        .tick_using(&mut sink)
-        .expect_err("the short write fails");
-    assert_eq!(failure.code(), "siem_sink_file_io");
-    assert!(!cursor.exists());
-    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
-    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    assert_whole_lines(&rig.sink_path, 3);
+fn cursor_for(rig: &Rig, sink: &FileSink) -> PathBuf {
+    CursorStore::beside(&rig.db, &sink.identity())
+        .path()
+        .to_path_buf()
 }
 
-/// R3-2: a known partial tail that cannot be repaired (no write permission to cut it) is never
-/// appended to and acknowledged: the cursor stays and the error is typed; once the file is
-/// writable again the batch goes out whole.
-#[cfg(unix)]
+/// A fragment already in a pre-existing file (a crash) is never modified: the first append of
+/// the process starts with a newline and the records follow on their own lines.
 #[test]
-fn an_unrepairable_partial_tail_refuses_to_advance_the_cursor() {
-    use std::os::unix::fs::PermissionsExt;
+fn a_fragment_left_by_a_crash_is_terminated_never_modified() {
     let rig = Rig::new();
-    seed(&rig.db, 3);
-    let mut sink = rig.sink().with_appender(short_write_once());
-    let cursor = rig.db.with_file_name("siem-cursor.json");
-    rig.tick_using(&mut sink)
-        .expect_err("the short write fails");
-    let fragment = std::fs::read(&rig.sink_path).unwrap();
-    assert!(!fragment.is_empty() && !fragment.ends_with(b"\n"));
-
-    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o400)).unwrap();
-    let failure = rig
-        .tick_using(&mut sink)
-        .expect_err("the tail cannot be cut");
-    assert_eq!(failure.code(), "siem_file_tail_unrecoverable");
-    assert!(!cursor.exists(), "the cursor did not move");
-    assert_eq!(
-        std::fs::read(&rig.sink_path).unwrap(),
-        fragment,
-        "nothing was appended"
+    seed(&rig.db, 2);
+    let before = "earlier line\n<134>1 PARTIAL-RECORD-WITHOUT-NEWLINE";
+    std::fs::write(&rig.sink_path, before).unwrap();
+    assert_eq!(rig.tick().unwrap().delivered, 2);
+    let text = std::fs::read_to_string(&rig.sink_path).unwrap();
+    assert!(
+        text.starts_with(before),
+        "not a byte of it was touched: {text}"
     );
-
-    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o600)).unwrap();
-    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
-    assert_whole_lines(&rig.sink_path, 3);
+    assert_eq!(text[before.len()..].chars().next(), Some('\n'));
+    let lines = records(&rig.sink_path);
+    assert_eq!(lines.len(), 4);
+    assert!(is_complete(&lines[2]) && is_complete(&lines[3]));
 }
 
-/// R3-3: a service that may only SEARCH the directory of a provisioned file appends to it
-/// (no directory sync is required for a pre-existing entry).
+/// A path that now names a populated UNRELATED file (replaced between ticks): nothing is
+/// truncated or modified, and the new records follow a leading newline.
+#[cfg(unix)]
+#[test]
+fn a_populated_replacement_file_is_appended_to_after_a_newline_and_never_truncated() {
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let mut sink = rig.sink();
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    let other = rig.sink_path.with_file_name("unrelated.log");
+    let unrelated = "unrelated A\nunrelated B\nunrelated C without a newline";
+    std::fs::write(&other, unrelated).unwrap();
+    std::fs::rename(&other, &rig.sink_path).unwrap();
+    seed(&rig.db, 1);
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 1);
+    let text = std::fs::read_to_string(&rig.sink_path).unwrap();
+    assert!(
+        text.starts_with(unrelated),
+        "nothing truncated or modified: {text}"
+    );
+    assert_eq!(&text[unrelated.len()..unrelated.len() + 1], "\n");
+    assert!(is_complete(text[unrelated.len() + 1..].trim_end()));
+}
+
+/// logrotate (move, the sink creates the new file): the created entry owes a parent-directory
+/// sync before the cursor may move; a failing sync keeps the cursor, the retry syncs.
+#[cfg(unix)]
+#[test]
+fn a_file_created_after_a_logrotate_move_owes_a_directory_sync_before_the_cursor_moves() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&calls);
+    let mut sink = rig.sink().with_dir_sync(Arc::new(move |_| {
+        // 1: the first creation; 2: the creation after the move FAILS; 3+: fine.
+        if counter.fetch_add(1, Ordering::SeqCst) == 1 {
+            Err(std::io::Error::other("injected dir sync failure"))
+        } else {
+            Ok(())
+        }
+    }));
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    std::fs::rename(&rig.sink_path, rig.sink_path.with_file_name("siem.log.1")).unwrap();
+    seed(&rig.db, 1);
+    let cursor = cursor_for(&rig, &sink);
+    let before = std::fs::read(&cursor).unwrap();
+    rig.tick_using(&mut sink)
+        .expect_err("the new entry is not durable yet");
+    assert_eq!(
+        std::fs::read(&cursor).unwrap(),
+        before,
+        "the cursor did not move"
+    );
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 1);
+    assert_eq!(calls.load(Ordering::SeqCst), 3);
+    assert_ne!(std::fs::read(&cursor).unwrap(), before);
+    assert_eq!(
+        records(&rig.sink_path.with_file_name("siem.log.1")).len(),
+        2
+    );
+}
+
+/// copytruncate (the file is truncated to 0 under the sink): `O_APPEND` writes land at the new
+/// end, and the records stay aligned.
+#[cfg(unix)]
+#[test]
+fn a_copytruncated_file_keeps_receiving_aligned_records_at_its_new_end() {
+    let rig = Rig::new();
+    seed(&rig.db, 3);
+    let mut sink = rig.sink();
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&rig.sink_path)
+        .unwrap()
+        .set_len(0)
+        .unwrap();
+    seed(&rig.db, 2);
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    let lines = records(&rig.sink_path);
+    assert_eq!(lines.len(), 2);
+    assert!(lines.iter().all(|line| is_complete(line)));
+    let text = std::fs::read_to_string(&rig.sink_path).unwrap();
+    assert!(text.starts_with("<134>1 "), "no stale offset, no NUL hole");
+}
+
+/// A service that may only SEARCH the directory of a provisioned file appends to it: a
+/// pre-existing entry owes no directory sync.
 #[cfg(unix)]
 #[test]
 fn a_search_only_parent_directory_does_not_stop_appends_to_an_existing_file() {
@@ -536,37 +622,8 @@ fn a_search_only_parent_directory_does_not_stop_appends_to_an_existing_file() {
     let result = rig.tick_using(&mut sink);
     std::fs::set_permissions(&sub, std::fs::Permissions::from_mode(0o700)).unwrap();
     assert_eq!(result.expect("append and cursor").delivered, 2);
-    assert_whole_lines(&path, 2);
+    assert_eq!(records(&path).len(), 2);
     assert!(rig.db.with_file_name("siem-cursor.json").exists());
-}
-
-/// R3-3: a pathname replaced between attempts does not inherit the directory-sync debt (or
-/// credit) of the file this sink created: the new entry is not ours to sync.
-#[test]
-fn a_replaced_file_does_not_inherit_the_directory_sync_state_of_the_old_one() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    let rig = Rig::new();
-    seed(&rig.db, 2);
-    let attempts = Arc::new(AtomicUsize::new(0));
-    let counter = Arc::clone(&attempts);
-    let mut sink = rig.sink().with_dir_sync(Arc::new(move |_| {
-        counter.fetch_add(1, Ordering::SeqCst);
-        Err(std::io::Error::other("injected dir sync failure"))
-    }));
-    rig.tick_using(&mut sink)
-        .expect_err("the created entry cannot be synced");
-    assert_eq!(attempts.load(Ordering::SeqCst), 1);
-    // Replace the entry with ANOTHER file (the new one exists while the old one does, so
-    // the inode numbers differ).
-    let other = rig.sink_path.with_file_name("replacement.log");
-    std::fs::write(&other, "").unwrap();
-    std::fs::rename(&other, &rig.sink_path).unwrap();
-    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
-    assert_eq!(
-        attempts.load(Ordering::SeqCst),
-        1,
-        "no directory sync is owed for an entry this sink did not create"
-    );
 }
 
 /// R3-8: when the sink refuses a batch AND the log can no longer be read to count what remains,
@@ -598,4 +655,66 @@ fn an_unreadable_log_after_a_sink_failure_reports_an_unknown_backlog_not_zero() 
         run_tick(&snapshot, &store, &mut sink, &|_, _| Ok(())).expect_err("the sink refuses");
     assert_eq!(failure.code(), "siem_sink_timeout");
     assert_eq!(failure.buffered(), None, "unknown, not zero");
+}
+
+/// R4-1: the gap and reset transitions are DECIDED under the read transaction but EXECUTED
+/// after it ended. The journal callback (what the daemon runs as an audit write while rotation
+/// may be checkpointing) runs `PRAGMA wal_checkpoint(TRUNCATE)` itself: it can only complete
+/// (busy = 0) when the exporter holds no WAL reader at that moment. Live adapter, live runtime
+/// entry point.
+#[test]
+fn gap_and_reset_transitions_hold_no_wal_reader_while_they_journal() {
+    use maos_siem::export::{run_tick_live, IdleGuard};
+    use std::sync::atomic::AtomicBool;
+    for case in ["gap", "reset"] {
+        let rig = Rig::new();
+        let tl = TransparencyLogAdapter::open(&rig.db, 1).expect("live adapter");
+        for n in 0..5 {
+            tl.insert_frame_event(
+                FrameKind::CapabilityInvocation,
+                1,
+                None,
+                "test.capability.invoke",
+                format!("row {n}").as_bytes(),
+                FrameOrigin::Kernel,
+            );
+        }
+        let mut sink = rig.sink();
+        let store = CursorStore::beside(&rig.db, &sink.identity());
+        if case == "gap" {
+            raw(&rig.db)
+                .execute_batch(
+                    "DELETE FROM transparency_log WHERE rowid <= 2; \
+                     INSERT INTO transparency_log_segments VALUES (1, 0, 1, 2, 2, 1, 2, 'a', NULL, 3, 9);",
+                )
+                .unwrap();
+        } else {
+            std::fs::write(store.path(), "not a cursor").unwrap();
+        }
+        let seen = Mutex::new(Vec::new());
+        let db = rig.db.clone();
+        let journal = |intent: &str, _payload: serde_json::Value| {
+            let busy: i64 = raw(&db)
+                .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+                .unwrap();
+            seen.lock().unwrap().push((intent.to_owned(), busy));
+            Ok(())
+        };
+        run_tick_live(
+            &rig.db,
+            &store,
+            &mut sink,
+            &journal,
+            &AtomicBool::new(false),
+            &IdleGuard::default(),
+        )
+        .unwrap_or_else(|failure| panic!("{case}: {failure}"));
+        let seen = seen.into_inner().unwrap();
+        assert!(!seen.is_empty(), "{case}: the transition journaled");
+        assert!(
+            seen.iter().all(|(_, busy)| *busy == 0),
+            "{case}: a WAL reader was held while journaling: {seen:?}"
+        );
+        drop(tl);
+    }
 }

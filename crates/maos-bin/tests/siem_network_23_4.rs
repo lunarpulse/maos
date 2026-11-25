@@ -585,7 +585,8 @@ mod online {
         assert_eq!(expired, vec![1]);
         assert!(!host.segments().join("0000000001.sqlite").exists());
 
-        let first = mine(&host.export().expect("tick over the gap"));
+        let first_all = host.export().expect("tick over the gap");
+        let first = mine(&first_all);
         assert_eq!(
             first,
             vec![hex(3), hex(4)],
@@ -604,8 +605,20 @@ mod online {
         );
         assert_eq!(payload["sink"].as_str().map(str::len), Some(16));
 
-        // The journal row was written mid-tick and the next batch's FRESH read already carried
-        // it, so the next tick has nothing left and invents no second gap.
+        // The journal row was written mid-tick and the next batch's FRESH read carried it: ITS
+        // frame id (persisted in the log) is among the `externalId`s of the FIRST tick.
+        let gap_frame: String = rusqlite::Connection::open(&host.db)
+            .unwrap()
+            .query_row(
+                "SELECT lower(hex(frame_id)) FROM transparency_log WHERE intent LIKE '%siem.gap%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(
+            first_all.contains(&gap_frame),
+            "the gap row {gap_frame} was journaled but not sent in the same tick: {first_all:?}"
+        );
         assert!(host.export().expect("second tick").is_empty());
         assert_eq!(host.rows_with_intent("siem.gap").len(), 1);
     }
@@ -771,6 +784,172 @@ mod online {
             "an idle tick creates no file"
         );
         assert!(host.fake.drain().is_empty(), "an idle tick dials nothing");
+    }
+
+    /// R4-2 / AC3 through the LIVE runtime: a log that ends at the SAME maximum insertion id as
+    /// the cursor but holds other frames (a restore of a different log) is not "idle": the
+    /// cursor is reset, one `siem.cursor.reset` row is journaled and the rows are re-exported.
+    #[test]
+    fn a_restored_log_with_the_same_maximum_id_but_other_frames_is_reset_and_re_exported() {
+        let host = Host::new();
+        for n in 1..=5 {
+            host.put(n);
+        }
+        assert_eq!(mine(&host.export().unwrap()).len(), 5);
+        assert!(host.export().unwrap().is_empty(), "an ordinary idle tick");
+
+        // Same ids 1..=5, other frame ids: what restoring a different log looks like.
+        let raw = rusqlite::Connection::open(&host.db).expect("raw connection");
+        raw.execute(
+        "UPDATE transparency_log SET frame_id = randomblob(16) WHERE intent LIKE 'test.frame.%'",
+        [],
+    )
+    .unwrap();
+        let new_ids: Vec<String> = raw
+            .prepare("SELECT lower(hex(frame_id)) FROM transparency_log WHERE intent LIKE 'test.frame.%' ORDER BY rowid")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(new_ids.len(), 5);
+        let exported = host.export().expect("the reset tick");
+        for id in &new_ids {
+            assert!(exported.contains(id), "row {id} was not re-exported");
+        }
+        assert_eq!(
+            host.rows_with_intent("siem.cursor.reset").len(),
+            1,
+            "exactly one reset row"
+        );
+    }
+
+    /// R4-2: the idle probe cannot hide a missing segment forever: every 60th consecutive idle
+    /// tick takes the full path and reports it.
+    #[test]
+    fn the_idle_probe_does_not_hide_a_missing_segment_forever() {
+        let host = Host::new();
+        for n in 1..=3 {
+            host.put(n);
+        }
+        host.rotate();
+        host.put(4);
+        assert_eq!(mine(&host.export().unwrap()).len(), 4);
+        std::fs::remove_file(host.segments().join("0000000001.sqlite")).unwrap();
+        for tick in 1..=59 {
+            let idle = host
+                .runtime
+                .forward_audit_to_siem()
+                .unwrap_or_else(|failure| panic!("idle tick {tick} must stay cheap: {failure}"));
+            assert_eq!(idle.delivered, 0);
+        }
+        match host.runtime.forward_audit_to_siem() {
+            Err(EnterpriseFailure::SiemSinkDown { reason, .. }) => {
+                assert_eq!(reason, "siem_source_unavailable")
+            }
+            other => panic!("the 60th idle tick runs the full path, got {other:?}"),
+        }
+    }
+
+    /// AC6: after a run that USES the client key (a real mutual-TLS export), the key's material
+    /// is nowhere in the Transparency Log: not in any row, and not in the database file, its
+    /// WAL, the cursor or the sealed segments (a byte search, not a Debug check).
+    #[test]
+    fn the_client_key_never_appears_in_the_transparency_log_after_a_run_that_uses_it() {
+        let dir = tempfile::tempdir().expect("fixture dir");
+        let db = dir.path().join("audit").join("transparency.sqlite");
+        std::fs::create_dir_all(db.parent().unwrap()).unwrap();
+        let tl = Arc::new(TransparencyLogAdapter::open(&db, NONCE).expect("open log"));
+        let ca = Ca::new("mtls-ca");
+        let client = ca.client("maos-host");
+        let fake = FakeSiem::start(
+            &ca.server(HOST),
+            Options {
+                require_client_ca: Some(ca.der()),
+                ..Options::default()
+            },
+        );
+        let ca_file = write(dir.path(), "ca.pem", &ca.pem);
+        let cert_file = write(dir.path(), "client.pem", &client.cert_pem);
+        let endpoint = format!("{HOST}:{}", fake.addr.port());
+        let siem = configure_siem(
+            &SiemEnv {
+                endpoint: Some(&endpoint),
+                ca_file: Some(&ca_file),
+                client_cert_file: Some(&cert_file),
+                client_key_in_env: true,
+                allow_private: true,
+                ..SiemEnv::default()
+            },
+            StubResolver::loopback(HOST),
+        )
+        .expect("select")
+        .expect("a network sink");
+        siem.provision_client_key(Some(client.key_pem.as_str()))
+            .expect("the certificate's own key");
+        let runtime = EnterpriseRuntime::from_ports(
+            EnterpriseConfig::empty().with_siem_available(),
+            None,
+            None,
+            Some(Arc::new(SiemExporter) as Arc<dyn SiemProjectionPort>),
+            None,
+            Some(db.clone()),
+            None,
+            NONCE,
+        )
+        .with_configured_siem(&siem);
+        for n in 0..3 {
+            tl.insert_frame_event(
+                FrameKind::TaskAssign,
+                7,
+                None,
+                &format!("mtls.row.{n}"),
+                b"payload",
+                FrameOrigin::HumanAuthored,
+            );
+        }
+        let tick = runtime
+            .forward_audit_to_siem()
+            .expect("export over mutual TLS");
+        assert!(tick.delivered >= 3);
+        assert!(
+            matches!(fake.next_event(), Event::Acked { .. }),
+            "the collector demanded and got a client certificate"
+        );
+
+        let body: String = client
+            .key_pem
+            .lines()
+            .filter(|line| !line.starts_with("-----"))
+            .collect();
+        assert!(body.len() > 80);
+        let needles = [
+            body[..40].to_owned(),
+            body[body.len() - 40..].to_owned(),
+            "PRIVATE KEY".to_owned(),
+        ];
+        let wal = db.with_file_name("transparency.sqlite-wal");
+        let mut files = vec![db.clone(), wal, db.with_file_name("siem-cursor.json")];
+        files.extend(
+            std::fs::read_dir(db.parent().unwrap().join("segments"))
+                .into_iter()
+                .flatten()
+                .flatten()
+                .map(|entry| entry.path()),
+        );
+        for file in files {
+            let bytes = std::fs::read(&file).unwrap_or_default();
+            for needle in &needles {
+                assert!(
+                    !bytes
+                        .windows(needle.len())
+                        .any(|window| window == needle.as_bytes()),
+                    "key material in {}",
+                    file.display()
+                );
+            }
+        }
+        drop(tl);
     }
 
     /// AC5: a sink that is down leaves the cursor and reports the rows after it with a typed
@@ -1053,6 +1232,29 @@ mod online {
 
 // ── boot refusals: the `maos` binary, scrubbed environment (AC7, AC6) ────────
 
+/// A fresh random audit key (64 hex characters) in a 0600 file under `root`: its path is the
+/// value of `MAOS_AUDIT_KEY`. Random per call, never a constant.
+#[cfg(feature = "online-adapters")]
+fn audit_key_file(root: &Path, name: &str) -> String {
+    use std::io::{Read, Write};
+    use std::os::unix::fs::OpenOptionsExt;
+
+    let mut bytes = [0_u8; 32];
+    std::fs::File::open("/dev/urandom")
+        .and_then(|mut random| random.read_exact(&mut bytes))
+        .expect("read random bytes");
+    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    let path = root.join(format!("audit-key-{name}"));
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .and_then(|mut file| file.write_all(hex.as_bytes()))
+        .expect("write the audit key");
+    path.to_string_lossy().into_owned()
+}
+
 fn boot(root: &Path, name: &str, vars: &[(&str, &str)]) -> Output {
     use std::io::Write;
 
@@ -1214,9 +1416,14 @@ fn boot_refuses_a_client_certificate_without_a_usable_key_and_boots_with_one() {
     }
 
     // The certificate's own key boots (the endpoint need not be reachable).
+    // AC7: the keyed child boot passes a RANDOM audit key explicitly (the helper scrubs the
+    // job-wide one, so the parent's key proves nothing about the child).
     let good = run(
         "good-key",
-        base(&[("MAOS_SIEM_CLIENT_KEY", client.key_pem.clone())]),
+        base(&[
+            ("MAOS_SIEM_CLIENT_KEY", client.key_pem.clone()),
+            ("MAOS_AUDIT_KEY", audit_key_file(root, "good-key")),
+        ]),
     );
     let text = stderr(&good);
     assert!(good.status.success(), "{text}");
@@ -1274,10 +1481,12 @@ fn boot_reads_the_client_key_from_the_encrypted_file_store() {
     .expect("seal the client key");
 
     let master = "42".repeat(32);
+    let audit_key = audit_key_file(root, "sealed");
     let output = boot(
         root,
         "sealed",
         &[
+            ("MAOS_AUDIT_KEY", &audit_key),
             ("MAOS_SECRETS_BACKEND", "encrypted-file"),
             ("MAOS_KMS_MASTER_KEY", &master),
             ("MAOS_SIEM_ENDPOINT", "127.0.0.1:1"),

@@ -49,7 +49,7 @@ use maos_domain::ports::{
 use maos_loom_lite::seal::AtRestSeal;
 use maos_secrets::{seal_at_rest_opt, LocalMasterKeyKms};
 use maos_siem::cursor::CursorStore;
-use maos_siem::export::{run_tick_live, BatchSink, FileSink, Tick};
+use maos_siem::export::{run_tick_live, BatchSink, FileSink, IdleGuard, Tick};
 use maos_siem::SiemExporter;
 use maos_sso::{OidcAlgorithm, OidcVerifier};
 use rusqlite::OpenFlags;
@@ -167,6 +167,8 @@ pub struct EnterpriseRuntime {
     /// One export tick at a time: the consumer is the only production caller, but a
     /// second concurrent tick would race the cursor.
     siem_tick: std::sync::Mutex<Option<FileSink>>,
+    /// Idle ticks since the last full check (the cheap probe is bounded).
+    siem_idle: IdleGuard,
     /// Raised at shutdown: the running export stops at its next step.
     siem_cancel: Arc<std::sync::atomic::AtomicBool>,
     /// Acknowledged batches so far (D-23-4-09 A).
@@ -192,6 +194,7 @@ impl EnterpriseRuntime {
             #[cfg(feature = "online-adapters")]
             siem_network: None,
             siem_tick: std::sync::Mutex::new(None),
+            siem_idle: IdleGuard::default(),
             siem_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce: 0,
@@ -312,6 +315,7 @@ impl EnterpriseRuntime {
             #[cfg(feature = "online-adapters")]
             siem_network: None,
             siem_tick: std::sync::Mutex::new(None),
+            siem_idle: IdleGuard::default(),
             siem_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce,
@@ -464,6 +468,7 @@ impl EnterpriseRuntime {
     pub fn forward_audit_to_siem(&self) -> Result<Tick, EnterpriseFailure> {
         let down = |reason: &'static str| EnterpriseFailure::SiemSinkDown {
             buffered: None,
+            at_least: false,
             reason,
             notes: Vec::new(),
         };
@@ -515,6 +520,7 @@ impl EnterpriseRuntime {
                             .map_err(|error| error.to_string())
                     },
                     &self.siem_cancel,
+                    &self.siem_idle,
                 );
                 match outcome {
                     Ok(tick) => {
@@ -530,6 +536,7 @@ impl EnterpriseRuntime {
                         buffered: failure
                             .buffered()
                             .map(|count| usize::try_from(count).unwrap_or(usize::MAX)),
+                        at_least: failure.buffered_is_lower_bound(),
                         reason: failure.code(),
                         notes: failure.tick.notes,
                     }),
@@ -628,10 +635,12 @@ pub enum EnterpriseFailure {
     SsoIssuanceDenied { spirit_pid: u32, reason: String },
     #[error("KMS sealed write refused: {reason}")]
     KmsSealedWriteRefused { reason: String },
-    #[error("SIEM sink down ({reason}); {} record(s) buffered", buffered.map_or_else(|| "an unknown number of".to_owned(), |count| count.to_string()))]
+    #[error("SIEM sink down ({reason}); {} record(s) buffered", maos_siem::export::describe_backlog(buffered.map(|count| count as u64), *at_least))]
     SiemSinkDown {
         /// Rows after the cursor; `None` when the log could not be counted (unknown, not 0).
         buffered: Option<usize>,
+        /// `buffered` is a lower bound (the count was capped).
+        at_least: bool,
         reason: &'static str,
         /// Typed lines (gap, reset) the failed tick completed before it stopped.
         notes: Vec<String>,
@@ -666,6 +675,7 @@ impl SiemReport {
             }
             Err(EnterpriseFailure::SiemSinkDown {
                 buffered,
+                at_least,
                 reason,
                 notes,
             }) => {
@@ -675,7 +685,10 @@ impl SiemReport {
                     lines.push(format!(
                         "maos: SIEM export not acknowledged ({reason}) — {} record(s) \
                          remain in the Transparency Log and are re-sent; operator action may be required",
-                        buffered.map_or_else(|| "an unknown number of".to_owned(), |count| count.to_string())
+                        maos_siem::export::describe_backlog(
+                            (*buffered).map(|count| count as u64),
+                            *at_least
+                        )
                     ));
                 }
             }
@@ -1813,6 +1826,7 @@ mod available_arm_tests {
             #[cfg(feature = "online-adapters")]
             siem_network: None,
             siem_tick: std::sync::Mutex::new(None),
+            siem_idle: IdleGuard::default(),
             siem_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce: 7,

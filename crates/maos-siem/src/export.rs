@@ -11,7 +11,7 @@
 //! cursor transition, however many ticks fail on the cursor file in between or crash between
 //! the journal write and the cursor write.
 
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -71,26 +71,42 @@ pub trait BatchSink {
     fn set_cancel(&mut self, _cancel: Arc<AtomicBool>) {}
 }
 
-/// The localhost file sink: acknowledged when the lines are written and synced, and, for a
-/// directory entry this sink created, once the directory has been synced.
+/// The localhost file sink. It only ever APPENDS (`O_APPEND`, no truncate, no read, never a
+/// byte it did not write), so a service with write permission alone can use it, and a batch
+/// is acknowledged only when the whole batch was written and fsynced.
 ///
-/// The sink is long-lived (the runtime keeps one) so what it learned from a failed append
-/// survives the next tick.
+/// To keep records line-aligned, the FIRST append after process start and the FIRST append
+/// after ANY failed append, and the first append to a file that replaced the one written
+/// before, begin with a single `\n`: that terminates whatever fragment a crash or a short
+/// write left, so a retried record is never glued to it. A blank line may therefore appear
+/// in the file: downstream shippers MUST ignore blank lines (RELEASE-HOLDS 23-4.j).
+///
+/// Creation is decided atomically at open (`O_EXCL` first, then plain append): a file this
+/// sink created owes a parent-directory sync, retried until it succeeds, before the batch is
+/// acknowledged. The sink keeps the identity (device, inode) of the file it wrote last, so a
+/// path that now names another file (logrotate, a replacement) is treated as a new
+/// creation or replacement. A pre-existing file owes no directory sync, and a replacement
+/// is synced with `EACCES` on opening the directory tolerated (documented limit).
+///
+/// The sink is long-lived (the runtime keeps one) so what it learned survives the tick.
 pub struct FileSink {
     path: PathBuf,
     port: Arc<dyn SiemProjectionPort>,
-    /// The file length before an append that FAILED: bytes after it may be a partial record.
-    dirty_since: Option<u64>,
-    /// The tail has been checked (or an append has succeeded) in this sink's lifetime.
-    tail_checked: bool,
-    /// The file this sink created whose directory entry is not yet known to be durable.
-    unsynced_entry: Option<FileId>,
+    /// The next append begins with `\n`.
+    lead_newline: bool,
+    /// The file the previous append went to.
+    last_file: Option<FileId>,
+    /// A directory entry whose parent sync is owed: (file, created by this sink).
+    owed_dir_sync: Option<(FileId, bool)>,
     dir_sync: DirSync,
-    appender: Appender,
+    writer: Writer,
 }
 
 /// Syncs the directory holding a path (injectable so a failure can be simulated).
 pub type DirSync = Arc<dyn Fn(&Path) -> std::io::Result<()> + Send + Sync>;
+
+/// Writes the bytes to the open append handle and syncs its data (injectable: a short write).
+pub type Writer = Arc<dyn Fn(&mut std::fs::File, &[u8]) -> std::io::Result<()> + Send + Sync>;
 
 impl FileSink {
     #[must_use]
@@ -98,11 +114,11 @@ impl FileSink {
         Self {
             path,
             port,
-            dirty_since: None,
-            tail_checked: false,
-            unsynced_entry: None,
+            lead_newline: true,
+            last_file: None,
+            owed_dir_sync: None,
             dir_sync: Arc::new(sync_parent),
-            appender: Arc::new(append_and_sync),
+            writer: Arc::new(write_and_sync),
         }
     }
 
@@ -113,49 +129,40 @@ impl FileSink {
         self
     }
 
-    /// Replace the append (tests inject a short write).
+    /// Replace the write (tests inject a short write).
     #[must_use]
-    pub fn with_appender(mut self, appender: Appender) -> Self {
-        self.appender = appender;
+    pub fn with_writer(mut self, writer: Writer) -> Self {
+        self.writer = writer;
         self
     }
 }
 
-/// A partial append (a crash or ENOSPC mid-write) can leave an unterminated record at the
-/// end. The batch that wrote it was never acknowledged and is about to be re-sent whole, so
-/// cut the file back to its last line terminator; a file with no terminator at all is
-/// terminated instead (it is not ours to truncate).
-fn recover_tail(path: &Path) -> std::io::Result<()> {
-    let mut file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(path)?;
-    let len = file.metadata()?.len();
-    if len == 0 {
-        return Ok(());
-    }
-    let mut last = [0_u8; 1];
-    file.seek(SeekFrom::Start(len - 1))?;
-    file.read_exact(&mut last)?;
-    if last[0] == b'\n' {
-        return Ok(());
-    }
-    let mut end = len;
-    let mut chunk = vec![0_u8; 8192];
-    while end > 0 {
-        let start = end.saturating_sub(chunk.len() as u64);
-        let size = (end - start) as usize;
-        file.seek(SeekFrom::Start(start))?;
-        file.read_exact(&mut chunk[..size])?;
-        if let Some(at) = chunk[..size].iter().rposition(|byte| *byte == b'\n') {
-            file.set_len(start + at as u64 + 1)?;
-            return file.sync_all();
+fn write_and_sync(file: &mut std::fs::File, bytes: &[u8]) -> std::io::Result<()> {
+    file.write_all(bytes)?;
+    file.sync_data()
+}
+
+/// Open for append, creating atomically: `(file, created by this call)`.
+fn open_append(path: &Path) -> std::io::Result<(std::fs::File, bool)> {
+    for _ in 0..3 {
+        match std::fs::OpenOptions::new()
+            .append(true)
+            .create_new(true)
+            .open(path)
+        {
+            Ok(file) => return Ok((file, true)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                match std::fs::OpenOptions::new().append(true).open(path) {
+                    Ok(file) => return Ok((file, false)),
+                    // Moved away between the two opens: create it on the next pass.
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error),
+                }
+            }
+            Err(error) => return Err(error),
         }
-        end = start;
     }
-    file.seek(SeekFrom::End(0))?;
-    file.write_all(b"\n")?;
-    file.sync_all()
+    Err(std::io::Error::other("the sink file kept vanishing"))
 }
 
 fn sync_parent(path: &Path) -> std::io::Result<()> {
@@ -178,7 +185,6 @@ impl BatchSink for FileSink {
 
     fn deliver(&mut self, frames: &[Frame]) -> Result<(), SinkFailure> {
         let io = |_: std::io::Error| SinkFailure::new("siem_sink_file_io");
-        let unrecoverable = || SinkFailure::new("siem_file_tail_unrecoverable");
         let mut out = Vec::new();
         for frame in frames {
             let line = self
@@ -189,78 +195,45 @@ impl BatchSink for FileSink {
             out.push(b'\n');
         }
 
-        let before = match std::fs::metadata(&self.path) {
-            Ok(meta) => Some(meta),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-            Err(error) => return Err(io(error)),
-        };
-        let offset = before.as_ref().map_or(0, std::fs::Metadata::len);
-
-        // Repair the tail BEFORE appending, and never acknowledge a batch appended to a
-        // fragment. A failed append of THIS sink left a known pre-append offset: cut the file
-        // back to it (needs only write permission). With no such record (first use) the tail
-        // is recovered by reading the last line terminator, which needs read permission: a
-        // file we may not read is the documented limit (a crash in the middle of a write on a
-        // write-only file is not repaired). Any other failure to repair leaves the cursor
-        // where it is.
-        match (before.is_some(), self.dirty_since) {
-            (true, Some(known)) => {
-                if offset > known {
-                    truncate_to(&self.path, known).map_err(|_| unrecoverable())?;
-                }
-                self.dirty_since = None;
-            }
-            (false, _) => self.dirty_since = None,
-            (true, None) if !self.tail_checked => {
-                match recover_tail(&self.path) {
-                    Ok(()) => {}
-                    Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {}
-                    Err(error) => return Err(io(error)),
-                }
-                self.tail_checked = true;
-            }
-            (true, None) => {}
+        let (mut file, created) = open_append(&self.path).map_err(io)?;
+        let meta = file.metadata().map_err(io)?;
+        let id = file_id(&meta);
+        let replaced = self.last_file.is_some_and(|last| last != id);
+        if created || replaced {
+            self.owed_dir_sync = Some((id, created));
         }
-
-        let appended = (self.appender)(&self.path, &out);
-        if before.is_none() {
-            // WE created this directory entry: it is not durable until the directory is synced.
-            self.unsynced_entry = std::fs::metadata(&self.path)
-                .ok()
-                .map(|meta| file_id(&meta));
+        if replaced {
+            self.lead_newline = true;
         }
-        if let Err(error) = appended {
-            self.dirty_since = Some(offset); // bytes after `offset` may be a partial record
+        self.last_file = Some(id);
+
+        // A leading newline only where there is something to terminate.
+        let mut payload = Vec::with_capacity(out.len() + 1);
+        if self.lead_newline && meta.len() > 0 {
+            payload.push(b'\n');
+        }
+        payload.extend_from_slice(&out);
+        if let Err(error) = (self.writer)(&mut file, &payload) {
+            self.lead_newline = true; // a fragment may now end the file
             return Err(io(error));
         }
-        self.tail_checked = true;
+        self.lead_newline = false;
 
-        // The cursor syncs the audit directory, not this one. Only an entry this sink
-        // created needs its directory synced (a pre-existing entry is durable already, and a
-        // service that may only SEARCH its directory could not open it to sync), kept until
-        // that has succeeded once and dropped if the pathname now names another file. A
-        // directory we may not open for reading is the documented limit.
-        if let Some(created) = self.unsynced_entry {
-            let current = std::fs::metadata(&self.path)
-                .ok()
-                .map(|meta| file_id(&meta));
-            if current == Some(created) {
+        // The cursor syncs the audit directory, not this one: a directory entry this sink
+        // created (or a replacement) is durable only once its parent was synced.
+        if let Some((owed, ours)) = self.owed_dir_sync {
+            if owed == id {
                 match (self.dir_sync)(&self.path) {
                     Ok(()) => {}
-                    Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => {}
+                    Err(error) if !ours && error.kind() == std::io::ErrorKind::PermissionDenied => {
+                    }
                     Err(error) => return Err(io(error)),
                 }
             }
-            self.unsynced_entry = None;
+            self.owed_dir_sync = None;
         }
         Ok(())
     }
-}
-
-fn truncate_to(path: &Path, len: u64) -> std::io::Result<()> {
-    let file = std::fs::OpenOptions::new().write(true).open(path)?;
-    file.set_len(len)?;
-    file.sync_all()
 }
 
 /// What names one file regardless of its path (device and inode where the platform has them).
@@ -279,16 +252,14 @@ fn file_id(meta: &std::fs::Metadata) -> FileId {
     }
 }
 
-/// Appends `bytes` to the file at a path (creating it) and syncs its data.
-pub type Appender = Arc<dyn Fn(&Path, &[u8]) -> std::io::Result<()> + Send + Sync>;
-
-fn append_and_sync(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
-    file.write_all(bytes)?;
-    file.sync_data()
+/// The operator wording of a backlog count: exact, a lower bound, or unknown (never 0).
+#[must_use]
+pub fn describe_backlog(buffered: Option<u64>, at_least: bool) -> String {
+    match (buffered, at_least) {
+        (Some(count), true) => format!("at least {count}"),
+        (Some(count), false) => count.to_string(),
+        (None, _) => "an unknown number of".to_owned(),
+    }
 }
 
 /// Why a tick stopped. None of these moves the cursor.
@@ -297,11 +268,13 @@ pub enum ExportError {
     /// The log could not be read (never a gap: a registered segment that is missing is this).
     #[error("siem_source_unavailable: {0}")]
     Source(#[from] maos_audit::AuditError),
-    /// The sink did not acknowledge a batch; `buffered` rows lie after the cursor.
-    #[error("{failure}; {} record(s) remain after the cursor", buffered.map_or_else(|| "an unknown number of".to_owned(), |count| count.to_string()))]
+    /// The sink did not acknowledge a batch; `buffered` rows lie after the cursor (at least
+    /// that many when `at_least`; unknown when `None`).
+    #[error("{failure}; {} record(s) remain after the cursor", describe_backlog(*buffered, *at_least))]
     Sink {
         failure: SinkFailure,
         buffered: Option<u64>,
+        at_least: bool,
     },
     /// A `siem.gap` or `siem.cursor.reset` row could not be journaled.
     #[error("siem_journal_failed: {0}")]
@@ -342,6 +315,12 @@ impl ExportError {
             _ => None,
         }
     }
+
+    /// `true` when [`ExportError::buffered`] is only a lower bound (the count was capped).
+    #[must_use]
+    pub fn buffered_is_lower_bound(&self) -> bool {
+        matches!(self, Self::Sink { at_least: true, .. })
+    }
 }
 
 /// What one tick did.
@@ -371,6 +350,12 @@ impl TickFailure {
     #[must_use]
     pub fn buffered(&self) -> Option<u64> {
         self.error.buffered()
+    }
+
+    /// `true` when [`TickFailure::buffered`] is a lower bound only.
+    #[must_use]
+    pub fn buffered_is_lower_bound(&self) -> bool {
+        self.error.buffered_is_lower_bound()
     }
 }
 
@@ -413,7 +398,7 @@ pub fn run_tick_cancellable(
     journal: Journal<'_>,
     cancel: &AtomicBool,
 ) -> Result<Tick, TickFailure> {
-    run_with(source, false, store, sink, journal, cancel)
+    run_with(source, false, None, store, sink, journal, cancel)
 }
 
 /// Run one tick against the LIVE log a daemon is writing (Story 23-4 review round 3): no
@@ -429,20 +414,42 @@ pub fn run_tick_live(
     sink: &mut dyn BatchSink,
     journal: Journal<'_>,
     cancel: &AtomicBool,
+    idle: &IdleGuard,
 ) -> Result<Tick, TickFailure> {
-    run_with(db, true, store, sink, journal, cancel)
+    run_with(db, true, Some(idle), store, sink, journal, cancel)
+}
+
+/// Every this-many-th consecutive idle tick runs the FULL path (all sources opened, anchor
+/// and registry checked) instead of the one-row probe.
+pub const FULL_CHECK_EVERY_IDLE_TICKS: u32 = 60;
+
+/// At most this many rows are counted for the "records remain" figure of a sink failure.
+pub const BACKLOG_COUNT_CAP: u64 = 5_000;
+
+/// Counts idle ticks so the cheap probe cannot hide a diagnostic forever.
+#[derive(Debug, Default)]
+pub struct IdleGuard(std::sync::atomic::AtomicU32);
+
+impl IdleGuard {
+    /// `true` when this idle tick may take the cheap path; every
+    /// [`FULL_CHECK_EVERY_IDLE_TICKS`]-th one must not.
+    fn skip_this_tick(&self) -> bool {
+        self.0.fetch_add(1, Ordering::Relaxed) % FULL_CHECK_EVERY_IDLE_TICKS
+            != FULL_CHECK_EVERY_IDLE_TICKS - 1
+    }
 }
 
 fn run_with(
     source: &Path,
     live: bool,
+    idle: Option<&IdleGuard>,
     store: &CursorStore,
     sink: &mut dyn BatchSink,
     journal: Journal<'_>,
     cancel: &AtomicBool,
 ) -> Result<Tick, TickFailure> {
     let mut tick = Tick::default();
-    match drive(source, live, store, sink, journal, cancel, &mut tick) {
+    match drive(source, live, idle, store, sink, journal, cancel, &mut tick) {
         Ok(()) => Ok(tick),
         Err(error) => Err(TickFailure { error, tick }),
     }
@@ -456,9 +463,11 @@ fn open_view(source: &Path, live: bool) -> Result<LogView, maos_audit::AuditErro
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn drive(
     source: &Path,
     live: bool,
+    idle: Option<&IdleGuard>,
     store: &CursorStore,
     sink: &mut dyn BatchSink,
     journal: Journal<'_>,
@@ -466,15 +475,20 @@ fn drive(
     tick: &mut Tick,
 ) -> Result<(), ExportError> {
     let loaded = store.load();
-    // The idle probe: a cursor that names the newest live row has nothing after it. No view,
-    // no segment is opened, no file is created. (A restored log with the same high water is
-    // caught by the anchor check on the first tick that has a row to send.)
-    if live {
+    // The idle probe: the newest live row IS the row the cursor names (same insertion id AND
+    // same frame id), so there is nothing after the cursor. No view, no segment is opened and
+    // no file is created. A different frame id at that id (a restored log) falls through to
+    // the full path, which resets and journals; and every `FULL_CHECK_EVERY_IDLE_TICKS`-th
+    // idle tick takes the full path anyway, so a missing segment or a registry change is
+    // diagnosed within a bounded number of ticks.
+    if let (true, Some(idle)) = (live, idle) {
         if let Loaded::Valid(cursor) = &loaded {
-            if cursor.frame_id.is_some()
-                && LogView::live_high_water(source)? == Some(cursor.insertion_id)
+            if let (Some(frame), Some((id, latest))) =
+                (&cursor.frame_id, LogView::live_latest(source)?)
             {
-                return Ok(());
+                if id == cursor.insertion_id && &latest == frame && idle.skip_this_tick() {
+                    return Ok(());
+                }
             }
         }
     }
@@ -495,13 +509,19 @@ fn drive(
                 Loaded::Valid(cursor) => match check_anchor(&view, &cursor)? {
                     None => cursor.insertion_id,
                     Some(reason) => {
+                        // Decided: release the read transaction, THEN journal and move the
+                        // cursor aside, and start over from the oldest retained row.
+                        drop(view);
                         reset(store, journal, reason, tick)?;
-                        0
+                        after = 0;
+                        continue;
                     }
                 },
                 Loaded::Rejected(reason) => {
+                    drop(view);
                     reset(store, journal, reason, tick)?;
-                    0
+                    after = 0;
+                    continue;
                 }
             };
         }
@@ -516,17 +536,22 @@ fn drive(
             let from = range.first_rowid.max(after.saturating_add(1));
             rows.retain(|row| row.insertion_id < from);
             if rows.is_empty() {
+                // The transition is DECIDED: end the read transaction BEFORE executing it
+                // (the journal write, the cursor file and its directory sync), so no WAL
+                // reader is held while a writer or a rotation checkpoint is waited for.
+                let (to, seq) = (range.last_rowid, range.seq);
+                drop(view);
                 journal(
                     "siem.gap",
                     serde_json::json!({
                         "from": from,
-                        "to": range.last_rowid,
-                        "segment_seq": range.seq,
+                        "to": to,
+                        "segment_seq": seq,
                         "sink": sink_tag,
                     }),
                 )
                 .map_err(ExportError::Journal)?;
-                after = range.last_rowid;
+                after = to;
                 store
                     .save(&Cursor {
                         insertion_id: after,
@@ -534,8 +559,7 @@ fn drive(
                     })
                     .map_err(ExportError::Cursor)?;
                 tick.notes.push(format!(
-                    "siem_gap: ids {from}..={} of expired segment {} were never delivered",
-                    range.last_rowid, range.seq
+                    "siem_gap: ids {from}..={to} of expired segment {seq} were never delivered"
                 ));
                 continue;
             }
@@ -562,12 +586,21 @@ fn drive(
             return Ok(());
         };
         if let Err(failure) = sink.deliver(&frames) {
-            // The backlog is counted through a fresh short view; when the log cannot be read
-            // the count is UNKNOWN, never zero.
-            let buffered = open_view(source, live)
-                .and_then(|view| view.count_after(after))
+            // The backlog is counted through a fresh short view, bounded (a scan of a huge
+            // backlog must not hold a read transaction); when the log cannot be read the
+            // count is UNKNOWN, never zero.
+            let counted = open_view(source, live)
+                .and_then(|view| view.count_after_capped(after, BACKLOG_COUNT_CAP))
                 .ok();
-            return Err(ExportError::Sink { failure, buffered });
+            let (buffered, at_least) = match counted {
+                Some((count, capped)) => (Some(count), capped),
+                None => (None, false),
+            };
+            return Err(ExportError::Sink {
+                failure,
+                buffered,
+                at_least,
+            });
         }
         after = last.insertion_id;
         store

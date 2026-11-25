@@ -147,6 +147,25 @@ impl LogView {
         .map_err(AuditError::Read)
     }
 
+    /// The newest row of the LIVE file as `(insertion id, frame id hex)`: ONE indexed lookup,
+    /// so the idle probe compares the id AND the frame the cursor names (a restored log that
+    /// ends at the same id has another frame).
+    ///
+    /// # Errors
+    /// The file cannot be opened or read.
+    pub fn live_latest(db_path: &Path) -> Result<Option<(i64, String)>, AuditError> {
+        let conn = segment::open_ro_live(db_path).map_err(AuditError::Open)?;
+        let found: Option<(i64, Vec<u8>)> = conn
+            .query_row(
+                "SELECT rowid, frame_id FROM transparency_log ORDER BY rowid DESC LIMIT 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()
+            .map_err(AuditError::Read)?;
+        Ok(found.map(|(id, frame)| (id, crate::hex_encode(&frame))))
+    }
+
     /// The sanctioned, redaction-applying read: rows with `insertion_id > after`, in
     /// insertion-id order across every source, at most `max_rows` of them and, once the first
     /// row is taken, no more than about `max_bytes` of stored payload (each row also counts a
@@ -248,6 +267,31 @@ impl LogView {
             total = total.saturating_add(count.max(0) as u64);
         }
         Ok(total)
+    }
+
+    /// As [`LogView::count_after`], but never scans more than `cap` rows per source: the
+    /// count and `true` when it reached the cap (a lower bound). A huge backlog must not
+    /// turn a failure report into a long read transaction.
+    ///
+    /// # Errors
+    /// A read failure of any source.
+    pub fn count_after_capped(&self, after: i64, cap: u64) -> Result<(u64, bool), AuditError> {
+        let limit = i64::try_from(cap).unwrap_or(i64::MAX);
+        let mut total: u64 = 0;
+        for conn in &self.sources {
+            let count: i64 = conn
+                .query_row(
+                    "SELECT count(*) FROM (SELECT 1 FROM transparency_log WHERE rowid > ?1 LIMIT ?2)",
+                    [after, limit],
+                    |row| row.get(0),
+                )
+                .map_err(AuditError::Read)?;
+            total = total.saturating_add(count.max(0) as u64);
+            if total >= cap {
+                return Ok((cap, true));
+            }
+        }
+        Ok((total, false))
     }
 
     /// The row at `insertion_id`, if any readable source holds it, and the view's high water.

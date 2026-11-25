@@ -1233,8 +1233,13 @@ fn an_alert_readable_before_our_pre_close_look_is_refused_in_tls_13_and_12() {
         let mut sink = rig.sink().with_close_hook(Arc::new(move |tcp, stage| {
             if stage == CloseStage::BeforeEarlyCheck {
                 assert!(sent.wait_open(), "the collector never sent its alert");
-                // Readable now: peek blocks (one read slice) until bytes are queued.
-                let _ = tcp.peek(&mut [0_u8; 1]);
+                let peeked = tcp.peek(&mut [0_u8; 1]);
+                // TLS 1.3: the alert is queued, unread. TLS 1.2: it may already have been
+                // consumed together with the server's final flight (peek then sees EOF).
+                assert!(
+                    matches!(peeked, Ok(n) if n > 0 || tls12),
+                    "the collector's bytes are readable: {peeked:?}"
+                );
             }
         }));
         let failure = sink
@@ -1268,7 +1273,11 @@ fn an_alert_that_arrives_after_our_pre_close_look_is_accepted_though_nothing_was
                 // The look found nothing; only now does the collector's alert leave.
                 hold.open();
                 assert!(sent.wait_open(), "the collector never sent its alert");
-                let _ = tcp.peek(&mut [0_u8; 1]);
+                let peeked = tcp.peek(&mut [0_u8; 1]);
+                assert!(
+                    matches!(peeked, Ok(n) if n > 0),
+                    "the collector's bytes are readable: {peeked:?}"
+                );
             }
         }));
         sink.deliver(&[dummy_frame()]).unwrap_or_else(|failure| {
@@ -1295,4 +1304,85 @@ fn a_collector_that_closes_after_ours_without_keeping_the_batch_is_acknowledged(
         Event::Acked { bytes, .. } => assert!(bytes.is_empty(), "the collector kept nothing"),
         other => panic!("{other:?}"),
     }
+}
+
+// ── review round 4 (AC5) ─────────────────────────────────────────────────────
+
+/// AC5: a REAL frame over 1 MiB on the wire (not the 10-byte artificial limit of a reader
+/// test) is sent alone in its own TLS connection, and the row after it follows in the next.
+#[test]
+fn a_real_frame_over_one_mebibyte_is_sent_alone_and_the_next_row_follows() {
+    let rig = Rig::new();
+    seed(&rig.db, 1, "schema");
+    raw_insert(&rig.db, 1, "small.before", b"a");
+    raw_insert(&rig.db, 2, "huge.row", &vec![b'b'; MAX_BATCH_BYTES + 4096]);
+    raw_insert(&rig.db, 3, "small.after", b"c");
+    let (mut sink, store) = (rig.sink(), rig.store());
+    let tick = rig.tick(&mut sink, &store).expect("tick");
+    assert_eq!((tick.delivered, tick.batches), (4, 3));
+    let first = rig.acked_frames();
+    assert_eq!(first.len(), 2, "the rows that fit together go first");
+    let second = rig.acked_frames();
+    assert_eq!(second.len(), 1, "the huge frame is alone");
+    assert!(
+        second[0].len() > MAX_BATCH_BYTES,
+        "a single frame over 1 MiB on the wire: {} bytes",
+        second[0].len()
+    );
+    let third = rig.acked_frames();
+    assert_eq!(third.len(), 1, "the next row follows");
+    assert!(third[0].len() < MAX_BATCH_BYTES);
+}
+
+/// AC5: the CONNECT phase is bounded by its own budget: an exhausted budget is a typed timeout
+/// and no connection is attempted.
+#[test]
+fn the_connect_phase_has_its_own_bound() {
+    let rig = Rig::new();
+    let mut sink = TlsSink::new(
+        HOST,
+        rig.fake.addr.port(),
+        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
+        OutboundPolicy::strict().allow_private(),
+        rig.resolver.clone(),
+        Timeouts {
+            connect: Duration::ZERO,
+            ..Timeouts::default()
+        },
+    );
+    let failure = sink
+        .deliver(&[dummy_frame()])
+        .expect_err("no connect budget");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    assert!(rig.fake.drain().is_empty(), "nothing connected");
+}
+
+/// AC5: the WRITE phase is bounded: a collector that completes the handshake and then stops
+/// reading (a full window) turns a large batch into `siem_sink_timeout`; the cursor stays.
+#[test]
+fn a_collector_that_stops_reading_turns_the_write_phase_into_a_timeout() {
+    let rig = Rig::new();
+    rig.fake.set_mode(Mode::StopReading);
+    rig.fake.alert_hold.close();
+    let mut sink = TlsSink::new(
+        HOST,
+        rig.fake.addr.port(),
+        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
+        OutboundPolicy::strict().allow_private(),
+        rig.resolver.clone(),
+        Timeouts {
+            write: Duration::from_millis(300),
+            ..Timeouts::default()
+        },
+    );
+    // Larger than any loopback socket buffering, so the write cannot complete unread.
+    let huge = Frame {
+        syslog: "x".repeat(48 << 20),
+        ..dummy_frame()
+    };
+    let failure = sink.deliver(&[huge]).expect_err("the write blocks");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    drop(sink);
+    rig.fake.alert_hold.open();
+    assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
 }

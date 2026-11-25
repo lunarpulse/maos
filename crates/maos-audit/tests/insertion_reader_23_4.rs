@@ -371,3 +371,39 @@ fn the_live_view_reads_an_active_wal_and_releases_its_read_mark_when_dropped() {
     assert_eq!(checkpoint(&db), 0, "dropping it releases the mark");
     assert_eq!(LogView::live_high_water(&db).unwrap(), Some(5));
 }
+
+// ── review round 4 ───────────────────────────────────────────────────────────
+
+/// R4-1: the failure-report backlog count is bounded: it never scans past the cap and says so.
+#[test]
+fn the_backlog_count_is_capped_and_reports_a_lower_bound() {
+    let (_dir, db, tl) = seeded(10);
+    drop(tl);
+    let view = LogView::open(&db).unwrap();
+    assert_eq!(view.count_after_capped(0, 100).unwrap(), (10, false));
+    assert_eq!(view.count_after_capped(0, 4).unwrap(), (4, true));
+    assert_eq!(view.count_after_capped(8, 100).unwrap(), (2, false));
+}
+
+/// R4-2: the idle probe reads the newest live row WITH its frame id.
+#[test]
+fn the_live_probe_returns_the_newest_row_and_its_frame_id() {
+    let (_dir, db, tl) = seeded(3);
+    let (id, frame) = LogView::live_latest(&db).unwrap().expect("a row");
+    assert_eq!(id, 3);
+    let stored: Vec<u8> = raw(&db)
+        .query_row(
+            "SELECT frame_id FROM transparency_log WHERE rowid = 3",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        frame,
+        stored
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    drop(tl);
+}
