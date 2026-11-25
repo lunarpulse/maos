@@ -1,0 +1,5 @@
+B1b (marker E232-PLANT-r2-B1b) — lane B
+Plant: discovery.rs refresher publication: `fetched_at: completed,` -> `fetched_at: self.clock.now_millis(),` (TTL origin = publication time).
+Test: `... --test oidc_discovery_23_2 the_ttl` -> the_ttl_origin_is_the_workers_completion_stamp
+Failing assertion: oidc_discovery_23_2.rs:1536 `assert!(!verifier.is_healthy(), "100 s after the worker finished the keys are expired")`.
+Plant removed.

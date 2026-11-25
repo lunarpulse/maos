@@ -1,0 +1,5 @@
+B1a (marker E232-PLANT-r2-B1a) — lane B
+Plant: crates/maos-sso/src/discovery.rs, run_fetch `settle`: `if completed.saturating_sub(started) >= bound {` -> `if false && ... {` (an overdue answer is consumed).
+Test: `cargo test -p maos-sso --features discovery --test oidc_discovery_23_2 an_answer_that_completed`
+Failing assertion: oidc_discovery_23_2.rs:1509 `assert_eq!(verdict, Err(IdentityError::JwksUnavailable))`, left: Ok(AuthenticatedPrincipal{ subject: "reza@maos.example" ...}) (overdue keys were published).
+Plant removed.

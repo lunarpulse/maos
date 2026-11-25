@@ -1,0 +1,6 @@
+C4 (marker E232-PLANT-r2-C4) — lane C
+Decision: `enter(pid, None)` now checks occupancy (refuses with ScopeBusy while another scope holds the pid) instead of skipping it. Proven safe for the session flow: shell_turn_tests (3) and the daemon tests pass; the session loop claims only while `!active && pending.is_none()` (spirit_session.rs:1829) and drops the scope before the next claim (:1994-1997, :2161). One consequence found by the sweep: tests of ONE process that share a pid and hold scopes in parallel now collide (native_task_22_8: the scope test uses its own SCOPE_PID=8; assertion_scope_23_2 already used distinct pids).
+Test: crates/maos-bin/tests/assertion_scope_23_2.rs `a_scope_serves_its_own_pid_only_and_ends_on_every_exit` (while a scope holds `pid`, `enter(pid, None)` must be Err(ScopeBusy); another pid's `enter(other, None)` is Ok(None)).
+Plant: assertion_supply::enter returns Ok(None) for an assertion-less caller without looking at the registry (the round-1 behaviour).
+Failing assertion: assertion_scope_23_2.rs:200 `assert_eq!(assertion_supply::enter(pid, None).unwrap_err(), ScopeBusy)` -> panicked at `unwrap_err()` on Ok(None).
+Plant removed.

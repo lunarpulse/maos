@@ -1,0 +1,5 @@
+B8 (marker E232-PLANT-r2-B8) — lane B
+Plant: discovery.rs key_for: `let wait = self.config.verify_wait;` -> `let wait = Duration::from_secs(5);` (verification ignores the configured 50 ms wait; the recorded and used wait is 5 s).
+Test: `... --test oidc_discovery_23_2 a_hung_fetch` -> a_hung_fetch_is_bounded_and_fails_closed. Seam: `DiscoveringVerifier::last_verify_wait()` (the duration actually passed to the condvar wait).
+Failing assertion: oidc_discovery_23_2.rs:446 `assert_eq!(verifier.last_verify_wait(), Duration::from_millis(50))` left: 5s, right: 50ms. (The old assertions all passed with the 5 s wait: the test took 5.01 s but accepted any verdict inside 10 s.)
+Plant removed.

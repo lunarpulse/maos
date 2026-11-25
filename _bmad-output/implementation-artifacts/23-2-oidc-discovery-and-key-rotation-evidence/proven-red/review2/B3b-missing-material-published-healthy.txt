@@ -1,0 +1,5 @@
+B3b (marker E232-PLANT-r2-B3b) — lane B
+Plant: discovery.rs parse_key_set: the material check `if decoding_key_for(&key, algorithm).is_err() { return Err(JwksMalformed) }` disabled (`if false && ...`): an RSA entry with a kid and no n/e is published as healthy.
+Test: `... --test oidc_discovery_23_2 a_malformed_replacement` -> a_malformed_replacement_key_set_keeps_the_populated_cache.
+Failing assertion: oidc_discovery_23_2.rs:1614 `assert_eq!(verifier.last_error(), Some(JwksMalformed), "{\"keys\":[{\"kty\":\"RSA\",...\"kid\":\"key-b\"}]}")` left: None (the set was accepted).
+Plant removed.

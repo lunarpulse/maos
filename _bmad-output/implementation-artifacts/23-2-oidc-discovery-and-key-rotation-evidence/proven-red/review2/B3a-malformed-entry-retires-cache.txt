@@ -1,0 +1,5 @@
+B3a (marker E232-PLANT-r2-B3a) — lane B
+Plant: discovery.rs parse_key_set: an entry that is not an object naming a `kty` is skipped (`continue`) instead of refusing the set as `JwksMalformed` (the round-1 behaviour).
+Test: `... --test oidc_discovery_23_2 a_malformed_replacement` -> a_malformed_replacement_key_set_keeps_the_populated_cache (populated cache first).
+Failing assertion: oidc_discovery_23_2.rs:1614 `assert_eq!(verifier.last_error(), Some(JwksMalformed), "{\"keys\":[null]}")` left: Some(NoUsableKeys) (cache retired).
+Plant removed.

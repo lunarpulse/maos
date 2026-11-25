@@ -403,17 +403,25 @@ impl From<GovernedMintError> for String {
     }
 }
 
+/// A principal verified by [`resolve_enterprise_principal`], with the assertion it came from
+/// so a lock-holding commit point can re-check it ([`recheck_enterprise_principal`]).
+#[cfg(feature = "network")]
+pub struct ResolvedPrincipal {
+    pub principal: maos_domain::ports::AuthenticatedPrincipal,
+    assertion: String,
+}
+
 /// Resolve the SSO principal a mint for `spirit_pid` will be issued under (`Ok(None)` when SSO
 /// is not configured). This is the only step of a governed mint that can WAIT on the identity
 /// provider (a discovery refresh, bounded by `verify_wait`), so a caller that holds a lock for
-/// the commit resolves it BEFORE taking the lock and hands the result to
-/// [`issue_enterprise_governed_capability_for_principal`] inside it (Story 23-2 F4).
+/// the commit resolves it BEFORE taking the lock, then calls [`recheck_enterprise_principal`]
+/// and [`issue_enterprise_governed_capability_for_principal`] inside it (Story 23-2 F4).
 #[cfg(feature = "network")]
 pub fn resolve_enterprise_principal(
     enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
     spirit_pid: u32,
     capability_key: &str,
-) -> Result<Option<maos_domain::ports::AuthenticatedPrincipal>, GovernedMintError> {
+) -> Result<Option<ResolvedPrincipal>, GovernedMintError> {
     match enterprise_runtime {
         Some(runtime) if runtime.sso_configured() => {
             let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
@@ -421,11 +429,39 @@ pub fn resolve_enterprise_principal(
                     "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
                 ))
             })?;
-            runtime
+            let principal = runtime
                 .verify_principal_for_issuance(spirit_pid, &assertion)
-                .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))
+                .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?;
+            Ok(principal.map(|principal| ResolvedPrincipal {
+                principal,
+                assertion,
+            }))
         }
         _ => Ok(None),
+    }
+}
+
+/// Re-check a resolved principal at the commit point, WITHOUT waiting on discovery: the
+/// assertion must still verify from the keys already held (a key retired, a key set expired or
+/// a token expired since resolution refuses) and to the same principal.
+#[cfg(feature = "network")]
+pub fn recheck_enterprise_principal(
+    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+    spirit_pid: u32,
+    resolved: Option<&ResolvedPrincipal>,
+) -> Result<(), GovernedMintError> {
+    let Some(resolved) = resolved else {
+        return Ok(());
+    };
+    let stale = |why: String| GovernedMintError::SsoAssertionMissing(why);
+    let runtime =
+        enterprise_runtime.ok_or_else(|| stale("enterprise runtime vanished".to_string()))?;
+    match runtime
+        .reverify_principal_no_wait(spirit_pid, &resolved.assertion)
+        .map_err(|e| stale(format!("resolved identity is stale at commit: {e}")))?
+    {
+        Some(now) if now == resolved.principal => Ok(()),
+        _ => Err(stale("resolved identity changed before commit".to_string())),
     }
 }
 
@@ -441,7 +477,8 @@ pub fn issue_enterprise_governed_capability(
     intent_class: IntentClass,
 ) -> Result<CapabilityToken, GovernedMintError> {
     let principal =
-        resolve_enterprise_principal(enterprise_runtime, spirit_pid, scope_action_key(&scope))?;
+        resolve_enterprise_principal(enterprise_runtime, spirit_pid, scope_action_key(&scope))?
+            .map(|resolved| resolved.principal);
     issue_enterprise_governed_capability_for_principal(
         capability,
         enterprise_runtime,

@@ -112,6 +112,7 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
     );
     let seam = block_from(find("fn govern_collective_read("));
     for required in [
+        "recheck_enterprise_principal(",
         "issue_enterprise_governed_capability_for_principal(",
         "Scope::LoomRead",
         "self.at_rest.seal(",

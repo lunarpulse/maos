@@ -130,6 +130,15 @@ impl BoundedResolver {
             now,
         }
     }
+
+    /// The same resolver (same worker, same clock) with another per-call deadline.
+    #[must_use]
+    pub fn with_deadline(&self, deadline: Duration) -> Self {
+        Self {
+            deadline,
+            ..self.clone()
+        }
+    }
 }
 
 fn serve(queue: &Receiver<Job>, lookup: &Lookup, now: &Now) {

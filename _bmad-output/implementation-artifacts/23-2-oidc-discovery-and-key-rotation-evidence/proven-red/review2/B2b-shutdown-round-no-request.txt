@@ -1,0 +1,5 @@
+B2b (marker E232-PLANT-r2-B2b) — lane B
+Plant: discovery.rs `begin`: `if state.shutdown || state.abandoned == Some(id) {` -> `if state.abandoned == Some(id) {` (a round keeps requesting after the verifier shut down).
+Test: `... --test oidc_discovery_23_2 outlives` -> a_round_that_outlives_its_verifier_makes_no_further_request (waits for the fetcher's last owner to drop = worker ended; no sleep).
+Failing assertion: oidc_discovery_23_2.rs:1428 `assert_eq!(key_requests.load(..), 0, "no key-set request after the verifier shut down")` left: 1.
+Plant removed.

@@ -784,10 +784,16 @@ impl Host {
     }
 
     /// Files under the Host's scratch tree (its home, the audit store and its WAL, the
-    /// stderr log, the journals) whose raw bytes carry `needle`. The assertion files the test
-    /// itself wrote (`*.jwt`) are the one thing it leaves out.
-    fn files_containing(&self, needle: &str) -> Vec<PathBuf> {
-        fn walk(dir: &std::path::Path, needle: &[u8], found: &mut Vec<PathBuf>) {
+    /// stderr log, the journals) whose raw bytes carry `needle`. Only the exact input fixture
+    /// `input` (the assertion file the test itself wrote) is left out: any other file, a `.jwt`
+    /// included, that carries the needle is reported (Story 23-2 round 2, C3).
+    fn files_containing(&self, needle: &str, input: &str) -> Vec<PathBuf> {
+        fn walk(
+            dir: &std::path::Path,
+            needle: &[u8],
+            input: &std::path::Path,
+            found: &mut Vec<PathBuf>,
+        ) {
             let Ok(entries) = std::fs::read_dir(dir) else {
                 return;
             };
@@ -797,9 +803,9 @@ impl Host {
                     continue;
                 };
                 if meta.is_dir() {
-                    walk(&path, needle, found);
+                    walk(&path, needle, input, found);
                 } else if meta.is_file()
-                    && path.extension().and_then(|e| e.to_str()) != Some("jwt")
+                    && path != input
                     && std::fs::read(&path)
                         .is_ok_and(|bytes| bytes.windows(needle.len()).any(|w| w == needle))
                 {
@@ -808,7 +814,12 @@ impl Host {
             }
         }
         let mut found = Vec::new();
-        walk(&self.scratch.0, needle.as_bytes(), &mut found);
+        walk(
+            &self.scratch.0,
+            needle.as_bytes(),
+            std::path::Path::new(input),
+            &mut found,
+        );
         found
     }
 
@@ -824,20 +835,48 @@ impl Host {
 /// `identity.asserted` rows carry its `sub` and `iss`; the next task of another principal, and
 /// the next without any assertion, each mint under their own principal and nobody else's.
 ///
-/// There is no mint to observe OUTSIDE a door turn on this Host: the probe mints only while a
-/// frame is processed (a Host at rest has no `identity.asserted` row; the check below holds if
-/// one ever appears). The environment fallback outside a turn is proven at the seam, in-process
-/// (`assertion_scope_23_2`, `spirit_session::shell_turn_tests`).
+/// Outside a door turn (Story 23-2 round 2, C2) the same Host takes ONE real mint: a Butler
+/// loaded over the door runs an idle pass (`MAOS_IDLE_FAST`), whose `ProviderInfer` token is
+/// minted through the root's governed issuance for Butler's own pid while no task is running.
+/// That mint resolves the ENVIRONMENT assertion, and its `identity.asserted` row must name the
+/// environment principal: a regression that refused every mint outside a directed turn leaves
+/// no row and fails the wait.
 #[test]
 fn an_ask_with_its_own_assertion_mints_under_that_principal() {
     let mut host = Host::new(false).with_sso();
+    host.serve_env.push(("MAOS_IDLE_FAST", "1".to_owned()));
     host.boot();
-    for (_, subject, _) in host.identities() {
+    assert!(
+        host.identities().is_empty(),
+        "a Host at rest has minted nothing"
+    );
+    for args in [
+        &["load", "spirits/butler/manifest.toml"][..],
+        &["start", "butler"][..],
+    ] {
+        let out = host.ctl(args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}: {}", text(&out));
+    }
+    let until = Instant::now() + WAIT;
+    let outside = loop {
+        let rows = host.identities();
+        if !rows.is_empty() {
+            break rows;
+        }
+        assert!(
+            Instant::now() < until,
+            "no mint outside a directed turn produced an identity.asserted row\n{}",
+            host.stderr()
+        );
+        std::thread::sleep(Duration::from_millis(50));
+    };
+    for (_, subject, issuer) in &outside {
         assert_eq!(
             subject,
             sso::SUB_ENV,
-            "a Host at rest mints as the environment"
+            "a mint outside a turn is the environment's: {outside:?}"
         );
+        assert_eq!(issuer, sso::ISS);
     }
     let alice = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
     let bob = host.assertion_file("bob.jwt", sso::TOKEN_BOB);
@@ -969,12 +1008,13 @@ fn an_asks_assertion_appears_in_no_row_reply_or_error() {
         }
     }
     // No file the Host left behind (the audit store and its WAL, the journals, the stderr log,
-    // anything under its home) carries it in any byte.
+    // anything under its home, any other `.jwt`) carries it in any byte; only the exact input
+    // fixture is excluded.
     for needle in [sso::TOKEN_ALICE, parts[1], parts[2]] {
         assert!(
-            host.files_containing(needle).is_empty(),
+            host.files_containing(needle, &file).is_empty(),
             "a file under the Host's tree carries the assertion: {:?}",
-            host.files_containing(needle)
+            host.files_containing(needle, &file)
         );
     }
     host.stop("-TERM");

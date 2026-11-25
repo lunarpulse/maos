@@ -1,0 +1,5 @@
+B2a (marker E232-PLANT-r2-B2a) — lane B
+Plant: discovery.rs `begin`: `if state.shutdown || state.abandoned == Some(id) {` -> `if state.shutdown {` (an abandoned round may still start its next request).
+Test: `... --test oidc_discovery_23_2 abandoned` -> an_abandoned_round_never_starts_another_request
+Failing assertion: oidc_discovery_23_2.rs:1372 `assert_eq!(script.count(JWKS_URL), key_requests, "the abandoned round did not start the key-set request")` left: 2, right: 1.
+Plant removed.

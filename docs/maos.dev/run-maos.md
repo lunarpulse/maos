@@ -227,8 +227,13 @@ leaves SSO configured-down, which denies issuance and never falls open.
 `MAOS_SSO_ISSUERS` must then hold exactly the discovery issuer.
 `MAOS_SSO_JWKS_TTL_SECS` (default 3600, 1 to 604800) is how long a discovered key
 set is trusted, and `MAOS_SSO_JWKS_MIN_REFRESH_SECS` (default 30, at most the TTL)
-is the minimum time between refreshes. A key the issuer withdrew can verify for up
-to half the TTL plus the idle tick: 3.5 days at the maximum TTL. A fetch that does
+is the minimum time between refreshes. A key the issuer withdrew verifies until the next
+successful refresh and never past the TTL (counted from the completion of the last
+successful fetch: at most 7 days at the maximum TTL, in monotonic time, plus any time the
+host is suspended). Only when refreshes succeed and the minimum refresh is at most half the
+TTL is that about half the TTL plus the idle tick; anyone who can block the fetch (without
+breaking TLS) can keep a withdrawn key valid for the full TTL. A key set that is malformed
+(as opposed to validly empty) keeps the old keys. A fetch that does
 not answer within 30 s is abandoned; an issuer that never answers at all leaves
 discovery down until it does. A `MAOS_SSO_*` variable that is not valid UTF-8
 leaves SSO configured-down (`sso_env_not_unicode: <NAME>`). The principal is

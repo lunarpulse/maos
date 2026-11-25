@@ -210,7 +210,14 @@ fn jobs_that_expired_in_the_queue_never_run_late() {
         assert_eq!(waiter.join().unwrap(), Err(ResolveFailed));
     }
     gate.release();
-    assert_eq!(resolver.resolve("h.example", 443), Ok(vec![ip(9)]));
+    // The fresh call's own deadline is the safety limit, not a 50 ms scheduling bet: it waits
+    // for the worker to skip the expired jobs, however loaded the host is.
+    assert_eq!(
+        resolver
+            .with_deadline(GATE_SAFETY)
+            .resolve("h.example", 443),
+        Ok(vec![ip(9)])
+    );
     assert_eq!(
         calls.load(Ordering::SeqCst),
         2,

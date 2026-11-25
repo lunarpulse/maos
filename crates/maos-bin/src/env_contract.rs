@@ -605,7 +605,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_SSO_JWKS_TTL_SECS",
-        purpose: "Seconds a discovered key set is trusted (default 3600, 1..=604800); past it assertions fail closed until a refresh succeeds; only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
+        purpose: "Seconds a discovered key set is trusted (default 3600, 1..=604800); past it assertions fail closed; a withdrawn key verifies until the next successful refresh, never past the TTL; only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

@@ -163,6 +163,9 @@ pub struct EnterpriseRuntime {
     /// Why SSO was demoted to `ConfiguredDown` at build time (Story 23-2), so
     /// a denial can say which rule refused the configuration.
     sso_down_reason: Option<SsoDownReason>,
+    /// The typed reason discovery last failed, named in an issuance denial while the verifier
+    /// is unhealthy (Story 23-2 round 2, C8).
+    sso_diagnostic: Option<SsoDiagnostic>,
 }
 
 impl EnterpriseRuntime {
@@ -181,6 +184,7 @@ impl EnterpriseRuntime {
             boot_nonce: 0,
             kms_probe: None,
             sso_down_reason: None,
+            sso_diagnostic: None,
         })
     }
 
@@ -228,13 +232,17 @@ impl EnterpriseRuntime {
         }
         let mut identity_port: Option<Arc<dyn IdentityAssertionPort>> = None;
         let mut sso_down_reason: Option<SsoDownReason> = None;
+        let mut sso_diagnostic: Option<SsoDiagnostic> = None;
         let mut kms_port: Option<Arc<dyn KeyManagementPort>> = None;
         let mut siem_port: Option<Arc<dyn SiemProjectionPort>> = None;
         let mut siem_sink_path: Option<PathBuf> = None;
 
         if config.sso_configured() {
-            match build_sso_identity(sso_env, discovery) {
-                Ok(port) => identity_port = Some(port),
+            match build_sso_wired(sso_env, discovery) {
+                Ok((port, diagnostic)) => {
+                    identity_port = Some(port);
+                    sso_diagnostic = diagnostic;
+                }
                 Err(reason) => {
                     eprintln!("maos: SSO is configured but down: {reason}");
                     sso_down_reason = Some(reason);
@@ -274,6 +282,7 @@ impl EnterpriseRuntime {
             boot_nonce,
         );
         runtime.sso_down_reason = sso_down_reason;
+        runtime.sso_diagnostic = sso_diagnostic;
         Ok(match kms.and_then(ConfiguredKms::probe) {
             Some(probe) => runtime.with_kms_probe(probe),
             None => runtime,
@@ -307,6 +316,7 @@ impl EnterpriseRuntime {
             boot_nonce,
             kms_probe: None,
             sso_down_reason: None,
+            sso_diagnostic: None,
         }
     }
 
@@ -404,11 +414,17 @@ impl EnterpriseRuntime {
                 let port = match &self.identity_port {
                     Some(p) if p.is_healthy() => p,
                     _ => {
+                        let typed = self.sso_diagnostic.as_ref().and_then(|last| last());
                         return Err(EnterpriseFailure::SsoIssuanceDenied {
                             spirit_pid,
-                            reason: "MAOS_SSO_* configured but identity provider is unavailable"
-                                .to_string(),
-                        })
+                            reason: match typed {
+                                Some(code) => format!(
+                                    "MAOS_SSO_* configured but identity provider is unavailable: {code}"
+                                ),
+                                None => "MAOS_SSO_* configured but identity provider is unavailable"
+                                    .to_string(),
+                            },
+                        });
                     }
                 };
                 port.verify(assertion)
@@ -429,6 +445,27 @@ impl EnterpriseRuntime {
                     }
                 },
             }),
+        }
+    }
+
+    /// Story 23-2 (round 2) — [`Self::verify_principal_for_issuance`] for a commit point that
+    /// holds a lock: the same verdicts, but answered from the keys already held (never waits
+    /// on discovery), so a key retired or expired since the first verification refuses.
+    pub fn reverify_principal_no_wait(
+        &self,
+        spirit_pid: u32,
+        assertion: &str,
+    ) -> Result<Option<AuthenticatedPrincipal>, EnterpriseFailure> {
+        let denied = |reason: String| EnterpriseFailure::SsoIssuanceDenied { spirit_pid, reason };
+        match (self.config.sso, &self.identity_port) {
+            (SubsystemState::Disabled, _) => Ok(None),
+            (SubsystemState::Available, Some(port)) if port.is_healthy() => port
+                .verify_without_refresh(assertion)
+                .map(Some)
+                .map_err(|e| denied(e.to_string())),
+            _ => Err(denied(
+                "MAOS_SSO_* configured but identity provider is unavailable".to_string(),
+            )),
         }
     }
 
@@ -1178,6 +1215,20 @@ pub fn build_sso_identity(
     env: &SsoEnv,
     discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
 ) -> Result<Arc<dyn IdentityAssertionPort>, SsoDownReason> {
+    build_sso_wired(env, discovery).map(|(port, _)| port)
+}
+
+/// The typed reason discovery last failed (`sso_discovery_*`), when there is one. Fixed codes
+/// only: no URL, userinfo or body.
+pub type SsoDiagnostic = Arc<dyn Fn() -> Option<String> + Send + Sync>;
+
+type SsoWired = (Arc<dyn IdentityAssertionPort>, Option<SsoDiagnostic>);
+
+/// [`build_sso_identity`] plus the discovery diagnostic the runtime names in its denials.
+fn build_sso_wired(
+    env: &SsoEnv,
+    discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
+) -> Result<SsoWired, SsoDownReason> {
     if let Some(name) = env.invalid {
         return Err(SsoDownReason::EnvNotUnicode(name));
     }
@@ -1229,7 +1280,8 @@ pub fn build_sso_identity(
             if !verifier.is_healthy() {
                 return Err(SsoDownReason::Unhealthy);
             }
-            Ok(Arc::new(verifier))
+            let port: Arc<dyn IdentityAssertionPort> = Arc::new(verifier);
+            Ok((port, None))
         }
         (None, Some(issuer)) => {
             start_discovering(env, issuer, &algs, &issuers, audience, discovery)
@@ -1246,7 +1298,7 @@ fn start_discovering(
     issuers: &[&str],
     audience: &str,
     discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
-) -> Result<Arc<dyn IdentityAssertionPort>, SsoDownReason> {
+) -> Result<SsoWired, SsoDownReason> {
     use maos_sso::discovery::{DiscoveringVerifier, DiscoveryConfig};
 
     let seconds = |raw: &str, name: &'static str| {
@@ -1271,7 +1323,11 @@ fn start_discovering(
         wiring.clock,
     )
     .map_err(SsoDownReason::Discovery)?;
-    Ok(Arc::new(verifier))
+    let verifier = Arc::new(verifier);
+    let probe = Arc::clone(&verifier);
+    let port: Arc<dyn IdentityAssertionPort> = verifier;
+    let diagnostic: SsoDiagnostic = Arc::new(move || probe.last_error().map(|e| e.to_string()));
+    Ok((port, Some(diagnostic)))
 }
 
 #[cfg(not(feature = "online-adapters"))]
@@ -1282,7 +1338,7 @@ fn start_discovering(
     _issuers: &[&str],
     _audience: &str,
     _discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
-) -> Result<Arc<dyn IdentityAssertionPort>, SsoDownReason> {
+) -> Result<SsoWired, SsoDownReason> {
     Err(SsoDownReason::DiscoveryUnsupportedBuild)
 }
 
@@ -1500,6 +1556,7 @@ mod available_arm_tests {
             boot_nonce: 7,
             kms_probe: None,
             sso_down_reason: None,
+            sso_diagnostic: None,
         }
     }
 
@@ -1673,6 +1730,69 @@ mod available_arm_tests {
             other => panic!(
                 "sink-down MUST surface SiemSinkDown with the real buffered count; got {other:?}"
             ),
+        }
+    }
+}
+
+/// Story 23-2 round 2 (C8): a denial while discovery is down names the typed reason the
+/// verifier recorded, and nothing of the issuer URL.
+#[cfg(all(test, feature = "online-adapters"))]
+mod discovery_denial_tests {
+    use super::*;
+    use maos_kernel_core::security::RingCryptoProvider;
+    use maos_sso::discovery::{Clock, FetchError, Fetcher};
+    use std::time::Instant;
+
+    struct Down;
+    impl Fetcher for Down {
+        fn get(&self, _url: &str) -> Result<Vec<u8>, FetchError> {
+            Err(FetchError::Unavailable)
+        }
+    }
+    struct Still;
+    impl Clock for Still {
+        fn now_millis(&self) -> u64 {
+            0
+        }
+    }
+
+    #[test]
+    fn a_denial_while_discovery_is_down_names_the_typed_reason_and_no_url() {
+        const ISSUER: &str = "https://idp-canary.example";
+        let env = SsoEnv {
+            issuers: Some(ISSUER.to_owned()),
+            audience: Some("aud".to_owned()),
+            discovery_issuer: Some(ISSUER.to_owned()),
+            ..SsoEnv::default()
+        };
+        let crypto: Arc<dyn CryptoProvider> = Arc::new(RingCryptoProvider);
+        let runtime = EnterpriseRuntime::from_env_with(
+            &env,
+            &|| Ok(DiscoveryWiring::new(Arc::new(Down), Arc::new(Still))),
+            crypto,
+            std::env::temp_dir().join("maos-23-2-denial-never-written.sqlite"),
+            1,
+            None,
+        )
+        .expect("a runtime builds");
+        // The first refresh runs on the refresher thread: wait for the observable, fail at the
+        // deadline.
+        let until = Instant::now() + Duration::from_secs(30);
+        loop {
+            let Err(EnterpriseFailure::SsoIssuanceDenied { reason, .. }) =
+                runtime.verify_principal_for_issuance(42, "a.b.c")
+            else {
+                panic!("an unhealthy discovery verifier must deny");
+            };
+            if reason.contains("sso_discovery_document_fetch_failed") {
+                assert!(!reason.contains("idp-canary"), "{reason}");
+                return;
+            }
+            assert!(
+                Instant::now() < until,
+                "the typed reason never surfaced: {reason}"
+            );
+            std::thread::sleep(Duration::from_millis(5));
         }
     }
 }

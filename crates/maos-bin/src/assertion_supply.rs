@@ -59,16 +59,23 @@ impl Drop for TurnScope {
     }
 }
 
-/// Enter the scope of a turn running on `pid`. `Ok(None)` when the task carries no assertion:
-/// its mints resolve the environment (D-23-2-05 A).
+/// Enter the scope of a turn running on `pid`. `Ok(None)` when the task carries no assertion and
+/// no other scope holds `pid`: its mints resolve the environment (D-23-2-05 A). A frame that
+/// carries no assertion is refused as well while another scope holds the pid, so it can never
+/// run (and mint) under that scope's principal.
 ///
 /// # Errors
 /// [`ScopeBusy`] when `pid` already has a scope (two turns on one pid would mix principals).
 pub fn enter(pid: u32, assertion: Option<&Assertion>) -> Result<Option<TurnScope>, ScopeBusy> {
+    let mut held = scopes();
     let Some(assertion) = assertion else {
-        return Ok(None);
+        return if held.contains_key(&pid) {
+            Err(ScopeBusy)
+        } else {
+            Ok(None)
+        };
     };
-    match scopes().entry(pid) {
+    match held.entry(pid) {
         Entry::Occupied(_) => Err(ScopeBusy),
         Entry::Vacant(slot) => {
             slot.insert(assertion.clone());

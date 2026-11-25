@@ -53,6 +53,19 @@ pub trait IdentityAssertionPort: Send + Sync {
     /// Whether verifier configuration and key material are loaded. A configured
     /// but unhealthy verifier must fail closed at composition-root call sites.
     fn is_healthy(&self) -> bool;
+
+    /// Class: supervision
+    ///
+    /// As [`Self::verify`], but MUST NOT wait on key discovery or any network refresh: it
+    /// answers from the keys already held, against the verifier's own clock. Used to re-check
+    /// a principal at a commit point that holds a lock. The default is correct ONLY for a
+    /// verifier that never waits; every implementor that can wait MUST override it.
+    fn verify_without_refresh(
+        &self,
+        assertion: &str,
+    ) -> Result<AuthenticatedPrincipal, IdentityError> {
+        self.verify(assertion)
+    }
 }
 
 #[cfg(test)]

@@ -597,9 +597,13 @@ mod shell_turn_tests {
     /// strip the scope from the export still running, and the next task armed on the same pid
     /// does not borrow it: Alice's late mints stay Alice's, never Bob's and never the
     /// environment's; Bob's frame is refused while Alice's export holds the pid and takes force
-    /// only once Alice's export has ended.
+    /// only once Alice's export has ended. In the session loop the claim runs only while no
+    /// turn is active (lines 1829-1849), and an active turn ends at `min(turn budget, the shell
+    /// deadline)` (1872-1876): an overrun returns `Deadline`, the child is killed and reaped and
+    /// the claimed scope is dropped (2118-2124, 2161), so the next task ends `session_ended`;
+    /// it never waits for the overrun export and never runs under it.
     #[test]
-    fn an_overrun_export_keeps_its_own_principal_and_the_next_task_waits_for_it() {
+    fn an_overrun_export_keeps_its_own_principal_and_the_next_frame_is_refused_meanwhile() {
         const ALICE: &str = "alice-h.alice-c.alice-s";
         const BOB: &str = "bob-h.bob-c.bob-s";
         let pid = 920_102;
@@ -633,8 +637,9 @@ mod shell_turn_tests {
             Some(ALICE),
             "the late mints stay Alice's"
         );
-        // The session never dequeues Bob's frame while Alice's export is active; were it to,
-        // the frame is refused rather than run under Alice's principal.
+        // The session never dequeues Bob's frame while Alice's export is active (the claim is
+        // inside `!active`); were it to, the frame is refused rather than run under Alice's
+        // principal, whether or not it carries an assertion of its own.
         assert_eq!(
             port.claim(&request(bob_id, SHELL_REPLY_DESTINATION), pid, 1)
                 .err(),

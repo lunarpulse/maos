@@ -195,6 +195,10 @@ fn a_scope_serves_its_own_pid_only_and_ends_on_every_exit() {
         assertion_supply::enter(pid, Some(&rival)).unwrap_err(),
         ScopeBusy
     );
+    // A frame that carries no assertion is refused too while the pid is held: it must never run,
+    // and mint, under the holder's principal. Another pid is unaffected.
+    assert_eq!(assertion_supply::enter(pid, None).unwrap_err(), ScopeBusy);
+    assert!(assertion_supply::enter(other, None).unwrap().is_none());
     assert_eq!(assertion_supply::supply(pid).as_deref(), Some(CANARY));
     drop(scope);
     assert!(!assertion_supply::is_scoped(pid));

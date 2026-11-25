@@ -1,0 +1,27 @@
+Lane A, review round 2: P1-1 (consent version), P1-2 (stale identity at commit), P1-3 (duplicate off the SSO path)
+Each plant applied ONE AT A TIME, observed red, removed; marker E232-PLANT-r2-<id>. cargo target /mnt/build/cargo-maos-e232a.
+
+A1  crates/maos-sso/src/discovery.rs  verify_without_refresh: key lookup `cached_key` -> `key_for` (asks the refresher, waits)
+    cargo test -p maos-sso --features discovery --test verify_without_refresh_23_2
+    FAILED an_unknown_kid_is_refused_without_asking_the_refresher  verify_without_refresh_23_2.rs:96  "the call must not wait for a refresh" left: 2 right: 1
+    FAILED an_expired_key_set_refuses_without_waiting              verify_without_refresh_23_2.rs:109 (key_for refreshed, call returned Ok instead of Err(JwksUnavailable))
+
+A2  crates/maos-sso/src/discovery.rs  Shared::cached_key: `.filter(|keys| self.fresh(keys, now))` -> `.filter(|_keys| now == now)`
+    FAILED an_expired_key_set_refuses_without_waiting              verify_without_refresh_23_2.rs:109 (expired key set still served)
+
+A3  crates/maos-cohort/src/state.rs  admit_digest_request: stale-version refusal disabled (`if false && expected_version...`)
+    cargo test -p maos-bin --features network --test governed_digest_read_23_2
+    FAILED a_reissue_that_removes_consent_while_the_identity_resolves_refuses_the_admission  governed_digest_read_23_2.rs:491
+    (expect_err: "an admission decided under v1 must not commit under v2")
+
+A4  crates/maos-bin/src/worker_spawn.rs  recheck_enterprise_principal: always Ok(()) (`resolved.filter(|_| false)`)
+    FAILED a_key_retired_while_waiting_behind_another_request_refuses_at_commit        governed_digest_read_23_2.rs:548 (expect_err "a retired key must not mint")
+    FAILED a_key_set_that_expires_while_waiting_behind_another_request_refuses_at_commit governed_digest_read_23_2.rs:560 (expect_err "an expired key set must not mint")
+    (the control a_still_valid_identity_commits_after_waiting_behind_another_request stays green)
+
+A5  crates/maos-bin/src/governed_digest_read.rs  `(!admitted).then(resolve)` -> `(!admitted || admitted).then(resolve)` (duplicates resolve)
+    FAILED a_duplicate_replay_never_resolves_and_never_occupies_an_intake_worker  governed_digest_read_23_2.rs:622  "a duplicate must not resolve the identity" left: 9 right: 1
+    (the 8 concurrent replays also parked in the silent verifier until the 20 s safety timer; the test fails, never passes, on a held fixture)
+
+After the last plant: grep -rn "E232-PLANT-r2" over crates, .github, docs, RELEASE-HOLDS.md, Cargo.lock, xtask -> empty (run by lane A at the end).
+Green after removal: governed_digest_read_23_2 7/7; verify_without_refresh_23_2 2/2; run 10x under 16 busy loops: 10/10 7 passed; maos-cohort 80+25+... ok; enterprise_daemon_seam_13_5a and cohort_daemon_smoke_13_5c ok.

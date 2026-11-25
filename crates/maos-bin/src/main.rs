@@ -13045,15 +13045,22 @@ impl EnterpriseDaemonGovernance {
     /// an ungovernable collective read is refused, never silently served.
     fn govern_collective_read(
         &self,
-        principal: Option<maos_domain::ports::AuthenticatedPrincipal>,
+        resolved: Option<maos_bin::worker_spawn::ResolvedPrincipal>,
         requester: &str,
         request_id: &str,
     ) -> Result<(), String> {
+        // Inside the cohort locks and without waiting: the identity resolved before them
+        // must still verify from the keys held now (Story 23-2 review round 2).
+        maos_bin::worker_spawn::recheck_enterprise_principal(
+            self.enterprise_runtime.as_deref(),
+            self.spirit_pid,
+            resolved.as_ref(),
+        )?;
         let token = issue_enterprise_governed_capability_for_principal(
             self.capability.as_ref(),
             self.enterprise_runtime.as_deref(),
             self.enterprise_pdp_runtime.as_ref(),
-            principal,
+            resolved.map(|resolved| resolved.principal),
             self.spirit_pid,
             Scope::LoomRead,
             DAEMON_GOVERNED_READ_TTL_SECS,
@@ -13124,7 +13131,7 @@ impl EnterpriseDaemonGovernance {
 /// capability and publish the reply obligation.
 #[cfg(feature = "network")]
 impl maos_bin::governed_digest_read::CollectiveReadGovernor for EnterpriseDaemonGovernance {
-    type Resolved = Option<maos_domain::ports::AuthenticatedPrincipal>;
+    type Resolved = Option<maos_bin::worker_spawn::ResolvedPrincipal>;
 
     fn resolve(&self) -> Result<Self::Resolved, String> {
         Ok(maos_bin::worker_spawn::resolve_enterprise_principal(
