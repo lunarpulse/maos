@@ -156,10 +156,16 @@ pub trait TaskRunner: Send + Sync {
     ) -> Result<String, RunFailure>;
 }
 
-/// Story 23-2 (D-23-2-04 A) — verifies a carried assertion at accept. `Err` carries nothing: the
-/// door answers a typed `sso_assertion_invalid` that never echoes the assertion or the reason.
+/// A carried assertion was refused. Carries nothing: the door answers a typed
+/// `sso_assertion_invalid` that never echoes the assertion or the reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AssertionRefused;
+
+/// Story 23-2 (D-23-2-04 A) — verifies a carried assertion at accept.
 pub trait AssertionCheck: Send + Sync {
-    fn check(&self, assertion: &Assertion) -> Result<(), ()>;
+    /// # Errors
+    /// [`AssertionRefused`] for every refusal.
+    fn check(&self, assertion: &Assertion) -> Result<(), AssertionRefused>;
 }
 
 /// What the pump needs to know about a Spirit before it delivers the next task.

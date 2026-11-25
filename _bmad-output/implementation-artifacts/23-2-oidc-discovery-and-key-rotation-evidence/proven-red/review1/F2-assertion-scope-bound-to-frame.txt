@@ -1,0 +1,23 @@
+F2 (review round 1, both reviewers; lane Fix232Scope): the assertion turn scope is bound to the CLAIMED TASK FRAME, not to the caller's wait.
+
+Change: `run_turn` no longer enters a scope. The assertion travels with the queued request (`ShellPort::arm_labelled(.., assertion)` -> `ShellSlot.assertion`). The session gives it force in `ShellPort::claim`, i.e. only when it dequeues THAT exact frame (`assertion_supply::enter` -> `ShellBinding.scope`), and the session ends it when the export completes (the `drop(scope)` before `done.send`) or aborts (`bound` is now declared outside the loop closure and dropped only after the child is stopped and reaped). A claim while another scope holds the pid refuses the frame ("assertion scope already active for this spirit"); `enter` never replaces. `MiraRunner::run` takes a per-runner serial lock before it enters Mira's scope (F2c).
+ (a) an ordinary mailbox turn running or queued ahead of the task frame resolves the environment: the assertion is not in force until the claim.
+ (b) after a deadline overrun the caller's `ShellTurn` is gone but the export is not: the scope stays Alice's until the session ends the export; the next task armed on the same pid (Bob) is refused at claim while Alice's export holds the pid and takes force only on its own claim afterwards. Alice's late mints are never Bob's and never the environment's.
+ (c) Mira's turns are serialised.
+
+Tests (all pass after the change):
+ - maos-bin lib `spirit_session::shell_turn_tests::an_assertion_takes_force_only_when_its_frame_is_claimed` (queued; ordinary frame dequeued first; stale shell-addressed frame; exact frame claimed -> in force; binding dropped -> gone)
+ - maos-bin lib `spirit_session::shell_turn_tests::an_overrun_export_keeps_its_own_principal_and_the_next_task_waits_for_it` (caller dropped = deadline overrun; Bob armed; supply stays Alice; Bob's claim refused; Alice's export ends; Bob's own claim -> Bob)
+ - maos-bin `native_task_22_8::overlapping_mira_turns_are_serialised_and_never_share_a_scope` (6 overlapping turns on one runner, every one Ok, each saw exactly its own assertion, no scope left)
+ - daemon `directed_task_22_4::an_ask_with_its_own_assertion_mints_under_that_principal` now runs alice, bob, none, alice in sequence on one Host: every turn's identity.asserted rows are exactly its own principal; and `a_replay_with_a_different_assertion_returns_the_first_task` keeps the first task QUEUED (a frozen runner holds an earlier environment task) while the replay arrives, then checks the rows are env* then alice* and never bob.
+
+Plants (each one at a time, red; marker removed afterwards and grep-verified):
+ - E232-PLANT-F2a: `std::mem::forget(assertion_supply::enter(pid, assertion))` in `arm_labelled` (scope in force from the arm, not the claim) -> both shell_turn_tests new tests FAILED ("queued: not in force"; 1 passed, 2 failed).
+ - E232-PLANT-F2b: `assertion_supply::enter` REPLACES an occupied scope instead of refusing -> `an_overrun_export_keeps_its_own_principal_and_the_next_task_waits_for_it` FAILED (2 passed, 1 failed).
+ - E232-PLANT-F2c: Mira's serial lock replaced by a fresh local mutex -> `overlapping_mira_turns_are_serialised_and_never_share_a_scope` FAILED (one Ok, five `dispatch_refused`).
+ - E232-PLANT-F2d: `std::mem::forget(scope)` instead of `drop(scope)` at the export end in the session loop -> daemon `an_ask_with_its_own_assertion_mints_under_that_principal` FAILED (bob's task ended `failed`/`session_ended`: the leaked Alice scope refused his frame).
+
+Limits (not closed here):
+ 1. The seam still sees a pid, not a caller: a lifecycle hook, or Mira's own background work, that mints for the same pid while the pid's export is running uses that task's assertion (module doc of `assertion_supply.rs`, RELEASE-HOLDS 23-2.c).
+ 2. There is no daemon-reachable ordinary (non-door) mailbox turn on a probe Host (the only frame ingress is the door), so the "ordinary turn ahead of the task keeps the environment" case is proven at the layer that owns it (ShellPort claim, unit test), not end to end. A Host at rest mints nothing for the probe, so there is no daemon-observable mint outside a door turn either; the attribution test asserts the at-rest rows (if any) are the environment's.
+ 3. `ShellPort::arm_labelled` still does not refuse a new request while a CLAIMED turn is running (the Busy check sees the slot only); the new request waits in the mailbox and its claim is refused while the earlier export holds the pid. A session whose overrun export keeps going is stopped by the session's own wall (the export wall equals the shell deadline), so the window is the poll tick.

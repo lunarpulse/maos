@@ -600,7 +600,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_SSO_DISCOVERY_ISSUER",
-        purpose: "OIDC issuer URL (https, no userinfo/query/fragment) whose discovery document and rotating keys the verifier follows instead of MAOS_SSO_JWKS; must also be listed in MAOS_SSO_ISSUERS; setting it together with MAOS_SSO_JWKS leaves SSO configured-down; needs the online-adapters build (Story 23-2)",
+        purpose: "OIDC issuer URL (https, no userinfo/query/fragment) whose discovery document and rotating keys the verifier follows instead of MAOS_SSO_JWKS; MAOS_SSO_ISSUERS must hold exactly this one issuer; setting it together with MAOS_SSO_JWKS leaves SSO configured-down; needs the online-adapters build (Story 23-2)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

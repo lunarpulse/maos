@@ -58,8 +58,8 @@ use maos_bin::enterprise_pdp_runtime;
 use maos_bin::inference_mode::{InferenceModeError, ResolvedInferenceMode};
 #[cfg(feature = "network")]
 use maos_bin::worker_spawn::{
-    issue_enterprise_governed_capability, issue_governed_mcp_capability, parse_run_args,
-    resolve_cli_binary, run_cli_wrapper_manifest,
+    issue_enterprise_governed_capability, issue_enterprise_governed_capability_for_principal,
+    issue_governed_mcp_capability, parse_run_args, resolve_cli_binary, run_cli_wrapper_manifest,
 };
 
 use std::sync::Arc;
@@ -13043,11 +13043,17 @@ impl EnterpriseDaemonGovernance {
     ///
     /// Fails CLOSED at every stage — the caller turns an `Err` into a NACK, so
     /// an ungovernable collective read is refused, never silently served.
-    fn govern_collective_read(&self, requester: &str, request_id: &str) -> Result<(), String> {
-        let token = issue_enterprise_governed_capability(
+    fn govern_collective_read(
+        &self,
+        principal: Option<maos_domain::ports::AuthenticatedPrincipal>,
+        requester: &str,
+        request_id: &str,
+    ) -> Result<(), String> {
+        let token = issue_enterprise_governed_capability_for_principal(
             self.capability.as_ref(),
             self.enterprise_runtime.as_deref(),
             self.enterprise_pdp_runtime.as_ref(),
+            principal,
             self.spirit_pid,
             Scope::LoomRead,
             DAEMON_GOVERNED_READ_TTL_SECS,
@@ -13109,55 +13115,32 @@ impl EnterpriseDaemonGovernance {
     }
 }
 
-/// Story 13.5a — the governed decorator over the daemon's collective-serve
-/// seam.
-///
-/// `note_admitted_request` is the daemon's collective-operation chokepoint.
-/// The inner state atomically rejects malformed, duplicate, and over-capacity
-/// requests before running the governance guard; only a new admissible request
-/// may mint a capability and publish the reply obligation.
+/// Story 13.5a — the governed decorator over the daemon's collective-serve seam is
+/// `maos_bin::governed_digest_read::GovernedDigestReadPort`: it resolves the SSO identity
+/// ([`maos_bin::governed_digest_read::CollectiveReadGovernor::resolve`]) BEFORE the cohort state
+/// takes its admitted-read and pending-reply mutexes, then runs `govern_collective_read` inside
+/// the guard (Story 23-2 F4). The inner state atomically rejects malformed, duplicate, and
+/// over-capacity requests before running the guard; only a new admissible request may mint a
+/// capability and publish the reply obligation.
 #[cfg(feature = "network")]
-struct EnterpriseGovernedDigestReadPort {
-    inner: Arc<dyn maos_a2a_core::DigestReadPort>,
-    governance: Arc<EnterpriseDaemonGovernance>,
-}
+impl maos_bin::governed_digest_read::CollectiveReadGovernor for EnterpriseDaemonGovernance {
+    type Resolved = Option<maos_domain::ports::AuthenticatedPrincipal>;
 
-#[cfg(feature = "network")]
-impl maos_a2a_core::DigestReadPort for EnterpriseGovernedDigestReadPort {
-    fn classify(&self, frame: &maos_domain::frame::IacFrame) -> maos_a2a_core::DigestFrameClass {
-        self.inner.classify(frame)
+    fn resolve(&self) -> Result<Self::Resolved, String> {
+        Ok(maos_bin::worker_spawn::resolve_enterprise_principal(
+            self.enterprise_runtime.as_deref(),
+            self.spirit_pid,
+            maos_domain::ports::policy_decision::scope_action_key(&Scope::LoomRead),
+        )?)
     }
 
-    fn note_admitted_request_guarded(
+    fn govern(
         &self,
-        requester: &maos_spirit_abi::identity::HostId,
+        principal: Self::Resolved,
+        requester: &str,
         request_id: &str,
-        frame: &maos_domain::frame::IacFrame,
-        before_commit: &mut dyn FnMut() -> Result<(), String>,
     ) -> Result<(), String> {
-        self.inner
-            .note_admitted_request_guarded(requester, request_id, frame, &mut || {
-                before_commit()?;
-                self.governance
-                    .govern_collective_read(requester.as_str(), request_id)
-            })
-    }
-
-    fn authorize_reply_send(
-        &self,
-        peer: &maos_spirit_abi::identity::HostId,
-        request_id: &str,
-    ) -> bool {
-        self.inner.authorize_reply_send(peer, request_id)
-    }
-
-    fn observe_reply_guarded(
-        &self,
-        peer: &maos_spirit_abi::identity::HostId,
-        frame: &maos_domain::frame::IacFrame,
-        before_commit: &mut dyn FnMut() -> Result<(), String>,
-    ) -> Result<maos_a2a_core::DigestReplyObservation, String> {
-        self.inner.observe_reply_guarded(peer, frame, before_commit)
+        self.govern_collective_read(principal, requester, request_id)
     }
 }
 
@@ -13756,7 +13739,7 @@ struct CohortDaemonRuntime {
     /// Story 13.5a — the collective-serve port this boot actually installed
     /// into the router. Retained (not rebuilt) so the daemon's governance
     /// posture is observable from the booted runtime: under an enterprise
-    /// posture this is the `EnterpriseGovernedDigestReadPort`, otherwise the
+    /// posture this is the `GovernedDigestReadPort`, otherwise the
     /// bare `CohortManifestState`. It is the SAME `Arc` handed to
     /// `bind_with_cohort_wiring_and_digest`.
     digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort>,
@@ -14027,10 +14010,12 @@ async fn build_cohort_a2a_daemon_runtime(
     // is the bare state, byte-for-byte the pre-13.5a wiring.
     let digest_port: std::sync::Arc<dyn maos_a2a_core::DigestReadPort> =
         match enterprise_daemon_governance {
-            Some(governance) => std::sync::Arc::new(EnterpriseGovernedDigestReadPort {
-                inner: state.clone(),
-                governance,
-            }),
+            Some(governance) => {
+                std::sync::Arc::new(maos_bin::governed_digest_read::GovernedDigestReadPort::new(
+                    state.clone(),
+                    governance,
+                ))
+            }
             None => state.clone(),
         };
     // Story 13.5c — the rupture journal writes to the PRIMARY Transparency Log

@@ -1809,19 +1809,17 @@ fn spirit_command<S: SandboxReportSource>(
                 Ok(None) => None,
                 Err(response) => return response,
             };
-            let assertion = match optional_str(&body, "assertion") {
-                Ok(Some(raw)) => match Assertion::parse(&raw) {
+            // Story 23-2: an assertion that is SUPPLIED (anything but absent or `null`) and is
+            // not one admissible compact JWT (alphabet, empty, oversize, not a string) is the
+            // same typed refusal as one that fails verification, `sso_assertion_invalid`, and
+            // never `bad_request`: the client cannot tell the two apart, and neither echoes it.
+            let assertion = match body.get("assertion") {
+                None | Some(serde_json::Value::Null) => None,
+                Some(serde_json::Value::String(raw)) => match Assertion::parse(raw) {
                     Some(assertion) => Some(assertion),
-                    None => {
-                        return Response::error(
-                            400,
-                            "bad_request",
-                            "field `assertion` must be a compact JWT (A-Z a-z 0-9 . _ -) of at most 16384 bytes",
-                        )
-                    }
+                    None => return malformed_assertion(),
                 },
-                Ok(None) => None,
-                Err(response) => return response,
+                Some(_) => return malformed_assertion(),
             };
             OperatorCommand::Ask {
                 spirit_id,
@@ -2021,6 +2019,16 @@ fn required_str(body: &serde_json::Value, key: &str) -> Result<String, Response>
             &format!("field `{key}` must be a non-empty string"),
         )),
     }
+}
+
+/// The typed 400 for a supplied `assertion` that is not one admissible compact JWT. The text is
+/// fixed: it never carries the value or which rule it broke.
+fn malformed_assertion() -> Response {
+    Response::error(
+        400,
+        "sso_assertion_invalid",
+        "the carried assertion is not one compact JWT (A-Z a-z 0-9 . _ -, at most 16384 bytes); nothing was queued",
+    )
 }
 
 fn optional_str(body: &serde_json::Value, key: &str) -> Result<Option<String>, Response> {

@@ -328,11 +328,14 @@ impl EnterpriseRuntime {
     /// refuses it (nothing could ever use it). Carries no reason: the door never echoes one.
     ///
     /// # Errors
-    /// `()` for every refusal.
-    pub fn check_carried_assertion(&self, assertion: &str) -> Result<(), ()> {
+    /// [`crate::directed_task::AssertionRefused`] for every refusal.
+    pub fn check_carried_assertion(
+        &self,
+        assertion: &str,
+    ) -> Result<(), crate::directed_task::AssertionRefused> {
         match self.verify_principal_for_issuance(0, assertion) {
             Ok(Some(_)) => Ok(()),
-            _ => Err(()),
+            _ => Err(crate::directed_task::AssertionRefused),
         }
     }
 
@@ -615,7 +618,10 @@ impl EnterpriseRuntime {
 struct RuntimeAssertionCheck(Arc<EnterpriseRuntime>);
 
 impl crate::directed_task::AssertionCheck for RuntimeAssertionCheck {
-    fn check(&self, assertion: &maos_control::Assertion) -> Result<(), ()> {
+    fn check(
+        &self,
+        assertion: &maos_control::Assertion,
+    ) -> Result<(), crate::directed_task::AssertionRefused> {
         self.0.check_carried_assertion(assertion.expose())
     }
 }
@@ -1027,24 +1033,50 @@ pub struct SsoEnv {
     pub discovery_issuer: Option<String>,
     pub jwks_ttl_secs: Option<String>,
     pub jwks_min_refresh_secs: Option<String>,
+    /// The first `MAOS_SSO_*` variable that is PRESENT but not valid UTF-8 (Story 23-2 F13). Such
+    /// a variable is configuration the operator meant: it is never read as absent (that would
+    /// silently turn SSO off, or drop a tuning knob), so it makes the SSO configuration down.
+    /// Only the variable's name is kept, never its value.
+    pub invalid: Option<&'static str>,
 }
 
 impl SsoEnv {
     #[must_use]
     pub fn from_process() -> Self {
-        let var = |name: &str| std::env::var(name).ok();
+        Self::from_lookup(|name| std::env::var_os(name))
+    }
+
+    /// [`Self::from_process`] over any lookup (a test drives it without the process environment).
+    #[must_use]
+    pub fn from_lookup(get: impl Fn(&str) -> Option<std::ffi::OsString>) -> Self {
+        let mut invalid = None;
+        let mut var = |name: &'static str| match get(name)?.into_string() {
+            Ok(value) => Some(value),
+            Err(_) => {
+                invalid.get_or_insert(name);
+                None
+            }
+        };
+        let jwks = var("MAOS_SSO_JWKS");
+        let issuers = var("MAOS_SSO_ISSUERS");
+        let audience = var("MAOS_SSO_AUDIENCE");
+        let algs = var("MAOS_SSO_ALGS");
+        let discovery_issuer = var("MAOS_SSO_DISCOVERY_ISSUER");
+        let jwks_ttl_secs = var("MAOS_SSO_JWKS_TTL_SECS");
+        let jwks_min_refresh_secs = var("MAOS_SSO_JWKS_MIN_REFRESH_SECS");
         Self {
-            jwks: var("MAOS_SSO_JWKS"),
-            issuers: var("MAOS_SSO_ISSUERS"),
-            audience: var("MAOS_SSO_AUDIENCE"),
-            algs: var("MAOS_SSO_ALGS"),
-            discovery_issuer: var("MAOS_SSO_DISCOVERY_ISSUER"),
-            jwks_ttl_secs: var("MAOS_SSO_JWKS_TTL_SECS"),
-            jwks_min_refresh_secs: var("MAOS_SSO_JWKS_MIN_REFRESH_SECS"),
+            jwks,
+            issuers,
+            audience,
+            algs,
+            discovery_issuer,
+            jwks_ttl_secs,
+            jwks_min_refresh_secs,
+            invalid,
         }
     }
 
-    /// Whether any configuration value is present.
+    /// Whether any configuration value is present (a present but invalid one counts).
     #[must_use]
     pub fn any(&self) -> bool {
         self.jwks.is_some()
@@ -1052,6 +1084,7 @@ impl SsoEnv {
             || self.audience.is_some()
             || self.algs.is_some()
             || self.discovery_issuer.is_some()
+            || self.invalid.is_some()
             || self.tuning_set()
     }
 
@@ -1084,6 +1117,10 @@ pub enum SsoDownReason {
     /// The outbound policy could not be armed (the port does not declare no-follow).
     #[error("sso_discovery_outbound_unavailable: {0}")]
     Outbound(&'static str),
+    /// A `MAOS_SSO_*` variable is set to bytes that are not valid UTF-8. Names the variable
+    /// only, never the value.
+    #[error("sso_env_not_unicode: {0}")]
+    EnvNotUnicode(&'static str),
     #[cfg(feature = "online-adapters")]
     #[error("{0}")]
     Discovery(maos_sso::discovery::DiscoveryError),
@@ -1141,6 +1178,9 @@ pub fn build_sso_identity(
     env: &SsoEnv,
     discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
 ) -> Result<Arc<dyn IdentityAssertionPort>, SsoDownReason> {
+    if let Some(name) = env.invalid {
+        return Err(SsoDownReason::EnvNotUnicode(name));
+    }
     if env.jwks.is_some() && env.discovery_issuer.is_some() {
         return Err(SsoDownReason::KeySourcesConflict);
     }

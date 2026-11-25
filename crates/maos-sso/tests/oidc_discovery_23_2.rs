@@ -2,11 +2,13 @@
 
 //! Story 23-2 AC1 and AC2 - OIDC discovery, key rotation and the trust rules.
 //!
-//! Hermetic: an injected `Fetcher` and an injected clock. No socket, no sleep,
-//! no wall-clock measurement. The only real-time quantity is the bounded wait
-//! of `verify` (a few tens of milliseconds in the hung-fetch test), and no
-//! test asserts an elapsed time: it asserts the verdict while a gate is still
-//! held. A gate that is never released fails CLOSED (the fetch errors).
+//! Hermetic: an injected `Fetcher` and an injected clock. No socket, no wall-clock
+//! measurement, and no test asserts an elapsed time: the bounded-wait tests collect
+//! the verdict while a gate is still held (and require the gate's safety timer not to
+//! have fired). The only real-time quantities are the bounded wait of `verify` (tens
+//! of milliseconds), a 1 ms poll for an event that must happen, and short negative
+//! windows ("no third fetch started") that can only make a test stricter.
+//! A gate that is never released fails CLOSED (the fetch errors).
 
 #[path = "fixtures.rs"]
 mod fixtures;
@@ -31,6 +33,11 @@ const JWKS_URL: &str = "https://keys.maos.example/jwks";
 /// Safety net for every gate: a fixture that waits this long fails closed.
 const GATE_SAFETY: Duration = Duration::from_secs(30);
 
+/// An ES256 key (P-256, public half only) and an assertion it signed, with the claims of the
+/// RS256 fixtures (generated offline with `openssl`; no private key is kept).
+const JWKS_KEY_ES256: &str = "{\"keys\":[{\"kty\":\"EC\",\"use\":\"sig\",\"alg\":\"ES256\",\"kid\":\"key-es\",\"crv\":\"P-256\",\"x\":\"5c4IKQSiIVygYoSsDihGEQiPd82EHle2tU1ERiBY0QE\",\"y\":\"8FVQQagaI23r7lhVb7udfDUMZbutEACebVLAejfr6OQ\"}]}";
+const TOKEN_ES256: &str = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImtleS1lcyJ9.eyJzdWIiOiJyZXphQG1hb3MuZXhhbXBsZSIsImlzcyI6Imh0dHBzOi8vaWRwLm1hb3MuZXhhbXBsZSIsImF1ZCI6Im1hb3MtZGVwbG95LWFscGhhIiwiZXhwIjo5OTk5OTk5OTk5LCJuYmYiOjAsImlhdCI6MTcwMDAwMDAwMCwibmFtZSI6IlJlemEgQ29ydGV4IiwiZW1haWwiOiJyZXphQG1hb3MuZXhhbXBsZSJ9.SlN3MshXGc-bskFOZFrbLwA24a13kIk2FPo3bcpU8ySNtOazXBwu3syefQ5VWYEXczZpMgd0rKwVL6lU2jikKw";
+/// A clock the test sets by hand; it reads in milliseconds so sub-second limits are testable.
 struct ManualClock(AtomicU64);
 
 impl ManualClock {
@@ -38,12 +45,18 @@ impl ManualClock {
         Arc::new(Self(AtomicU64::new(0)))
     }
     fn set(&self, secs: u64) {
-        self.0.store(secs, Ordering::SeqCst);
+        self.0.store(secs * 1_000, Ordering::SeqCst);
+    }
+    fn set_millis(&self, millis: u64) {
+        self.0.store(millis, Ordering::SeqCst);
     }
 }
 
 impl Clock for ManualClock {
     fn now_secs(&self) -> u64 {
+        self.0.load(Ordering::SeqCst) / 1_000
+    }
+    fn now_millis(&self) -> u64 {
         self.0.load(Ordering::SeqCst)
     }
 }
@@ -51,7 +64,7 @@ impl Clock for ManualClock {
 /// A gate that holds a fetch until released, and records that it was entered.
 #[derive(Default)]
 struct Gate {
-    state: Mutex<(bool, bool)>, // (entered, released)
+    state: Mutex<(bool, bool, bool)>, // (entered, released, safety timer fired)
     changed: Condvar,
 }
 
@@ -60,10 +73,13 @@ impl Gate {
         let mut state = self.state.lock().unwrap();
         state.0 = true;
         self.changed.notify_all();
-        let (state, timeout) = self
+        let (mut state, timeout) = self
             .changed
             .wait_timeout_while(state, GATE_SAFETY, |state| !state.1)
             .unwrap();
+        if timeout.timed_out() && !state.1 {
+            state.2 = true;
+        }
         !timeout.timed_out() && state.1
     }
     fn wait_entered(&self) {
@@ -76,6 +92,13 @@ impl Gate {
     }
     fn held(&self) -> bool {
         !self.state.lock().unwrap().1
+    }
+    fn released(&self) -> bool {
+        self.state.lock().unwrap().1
+    }
+    /// The safety timer ran out before anyone released the gate.
+    fn expired(&self) -> bool {
+        self.state.lock().unwrap().2
     }
     fn release(&self) {
         self.state.lock().unwrap().1 = true;
@@ -325,35 +348,73 @@ fn past_the_ttl_every_assertion_fails_closed_until_the_fetch_recovers() {
 
 /// AC1 e) a hung fetch delays `verify` by no more than the bounded wait and
 /// then fails `JwksUnavailable`; a caller that arrives while it is still hung
-/// does not queue behind it. The verdict is asserted while the gate is held.
+/// does not wait again.
+///
+/// The verdict is collected from a thread while the fetch is STILL held, and the gate's own
+/// safety timer must not have fired: a verifier that waited for the fetch (no bound) would
+/// deliver nothing until the fetch returned, and this test fails instead of passing on the
+/// fetch's error. The second call is told apart from "waiting again" by the number of waits the
+/// verifier has started, not by a duration.
 #[test]
 fn a_hung_fetch_is_bounded_and_fails_closed() {
     let script = healthy_script();
     let clock = ManualClock::new();
     let verifier = start(&script, &clock, Duration::from_millis(50));
     assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+    let waits_before = verifier.refresh_waits();
 
     let gate = Arc::new(Gate::default());
     *script.gate_on_document.lock().unwrap() = Some(Arc::clone(&gate));
     clock.set(40);
+    let (verdict, delivered) = std::sync::mpsc::channel();
+    let outcome = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            let _ = verdict.send(verifier.verify(fixtures::TOKEN_UNKNOWN_KID));
+        });
+        gate.wait_entered();
+        let first = delivered.recv_timeout(EVENT_BUDGET);
+        let held = gate.held();
+        let expired = gate.expired();
+        let waits_after_first = verifier.refresh_waits();
+        // The stalled refresh is not joined again.
+        let second = verifier.verify(fixtures::TOKEN_UNKNOWN_KID);
+        let waits_after_second = verifier.refresh_waits();
+        // A cached, fresh key is unaffected by a hung refresh of the others.
+        let cached = verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok();
+        let still_held = gate.held();
+        gate.release();
+        (
+            first,
+            held,
+            expired,
+            waits_after_first,
+            second,
+            waits_after_second,
+            cached,
+            still_held,
+        )
+    });
+    let (first, held, expired, waits_after_first, second, waits_after_second, cached, still_held) =
+        outcome;
     assert_eq!(
-        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
-        Err(IdentityError::JwksUnavailable)
+        first,
+        Ok(Err(IdentityError::JwksUnavailable)),
+        "the bounded wait delivered a verdict"
     );
-    gate.wait_entered();
-    assert!(
-        gate.held(),
-        "the verdict came while the fetch was still hung"
-    );
-    // The stalled refresh is not joined again.
+    assert!(held, "the verdict came while the fetch was still hung");
+    assert!(!expired, "the fetch's safety timer had not fired");
     assert_eq!(
-        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
-        Err(IdentityError::JwksUnavailable)
+        waits_after_first,
+        waits_before + 1,
+        "the first call waited once"
     );
-    assert!(gate.held());
-    // A cached, fresh key is unaffected by a hung refresh of the others.
-    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
-    gate.release();
+    assert_eq!(second, Err(IdentityError::JwksUnavailable));
+    assert_eq!(
+        waits_after_second, waits_after_first,
+        "the second call was refused at once, not made to wait again"
+    );
+    assert!(cached);
+    assert!(still_held);
 }
 
 // ---- AC2 -------------------------------------------------------------------
@@ -494,10 +555,12 @@ fn a_jwks_uri_that_is_not_plain_https_is_refused() {
     }
 }
 
+type Routes = Arc<Mutex<HashMap<String, Result<Vec<u8>, IoError>>>>;
+
 /// A policed port over canned routes; records every request that reached it.
 #[derive(Clone, Default)]
 struct FakePort {
-    routes: Arc<Mutex<HashMap<String, Result<Vec<u8>, IoError>>>>,
+    routes: Routes,
     reached: Arc<Mutex<Vec<String>>>,
 }
 
@@ -834,4 +897,427 @@ fn a_mixed_algorithm_allowlist_verifies_an_rs256_assertion() {
         static_verifier.verify(fixtures::TOKEN_HS256_CONFUSION),
         Err(IdentityError::AlgorithmRejected)
     );
+}
+
+/// F1: discovered keys vouch for the discovery issuer only. A second listed issuer is refused
+/// at start, and a token signed by the discovered key but claiming another issuer is refused.
+#[test]
+fn discovered_keys_are_bound_to_the_discovery_issuer() {
+    let two = DiscoveringVerifier::start(
+        DiscoveryConfig::new(fixtures::ISS_GOOD),
+        &[OidcAlgorithm::Rs256],
+        &[fixtures::ISS_GOOD, fixtures::ISS_BAD],
+        fixtures::AUD_EXPECTED,
+        healthy_script() as Arc<dyn Fetcher>,
+        ManualClock::new() as Arc<dyn Clock>,
+    );
+    assert_eq!(two.err(), Some(DiscoveryError::IssuersNotExclusive));
+    let verifier = start(&healthy_script(), &ManualClock::new(), LONG_WAIT);
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_BAD_ISS),
+        Err(IdentityError::IssuerUntrusted),
+        "signed by the discovered key, iss = another issuer"
+    );
+}
+
+/// Whole-test wait budget for an event that must arrive while a fetch is still held.
+const EVENT_BUDGET: Duration = Duration::from_secs(10);
+
+/// Poll `condition` until it holds (the wait is on an event, not a duration: the budget is only
+/// the point where a missing event fails the test).
+fn eventually(what: &str, condition: impl Fn() -> bool) {
+    let deadline = std::time::Instant::now() + GATE_SAFETY;
+    while !condition() {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "never happened: {what}"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
+/// F3: a well-formed key set with no usable key retires the cached keys (the verifier turns
+/// unhealthy at once); a malformed or failed refresh keeps them until the TTL.
+#[test]
+fn an_empty_key_set_retires_the_cached_keys() {
+    let script = healthy_script();
+    let clock = ManualClock::new();
+    let verifier = start(&script, &clock, LONG_WAIT);
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+
+    // A refresh that fails or is malformed keeps the populated cache.
+    script.serve(JWKS_URL, "not json");
+    clock.set(31);
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+        Err(IdentityError::JwksUnavailable)
+    );
+    assert_eq!(verifier.last_error(), Some(DiscoveryError::JwksMalformed));
+    assert!(verifier.is_healthy());
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+
+    // The issuer then publishes a valid, empty set: every cached key is retired.
+    script.serve(JWKS_URL, "{\"keys\":[]}");
+    clock.set(62);
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+        Err(IdentityError::JwksUnavailable)
+    );
+    assert_eq!(verifier.last_error(), Some(DiscoveryError::NoUsableKeys));
+    assert!(!verifier.is_healthy(), "no key survives an empty key set");
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_GOOD_RS256),
+        Err(IdentityError::JwksUnavailable),
+        "a key the issuer withdrew is not served from the cache"
+    );
+
+    // Service resumes when the issuer publishes keys again.
+    script.serve(JWKS_URL, fixtures::JWKS_KEY_A);
+    clock.set(93);
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+    assert!(verifier.is_healthy());
+}
+
+/// The three ways a set can hold keys and still hold none that may verify (F11 feeds F3).
+fn jwks_key_ops_sign_only() -> String {
+    fixtures::JWKS_KEY_A.replace(
+        "\"use\":\"sig\",",
+        "\"use\":\"sig\",\"key_ops\":[\"sign\"],",
+    )
+}
+
+/// F11: a key whose `key_ops` excludes `verify`, an `EC` key off `P-256` or without a curve,
+/// and an entry declaring one key family while carrying the other's material load nothing.
+#[test]
+fn keys_that_may_not_verify_or_declare_the_wrong_family_load_nothing() {
+    let ec_with_rsa_material = fixtures::JWKS_KEY_A.replace("\"kty\":\"RSA\"", "\"kty\":\"EC\"");
+    let ec_p384 = JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-384\"");
+    let ec_no_curve = JWKS_KEY_ES256.replace("\"crv\":\"P-256\",", "");
+    for body in [
+        jwks_key_ops_sign_only(),
+        ec_with_rsa_material,
+        ec_p384,
+        ec_no_curve,
+    ] {
+        let script = Arc::new(Script::default());
+        script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
+        script.serve(JWKS_URL, &body);
+        let verifier = start(&script, &ManualClock::new(), LONG_WAIT);
+        assert_refused(&verifier, DiscoveryError::NoUsableKeys);
+    }
+    // A key that declares `verify` among other operations is still a verification key.
+    let both = fixtures::JWKS_KEY_A.replace(
+        "\"use\":\"sig\",",
+        "\"use\":\"sig\",\"key_ops\":[\"sign\",\"verify\"],",
+    );
+    let script = Arc::new(Script::default());
+    script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
+    script.serve(JWKS_URL, &both);
+    let verifier = start(&script, &ManualClock::new(), LONG_WAIT);
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+}
+
+/// F11 at the verifier (the static source shares it): a key is used only under the algorithm
+/// its declared `kty`/`crv` fits, and one that excludes `verify` is never used.
+#[test]
+fn a_key_is_used_only_under_the_algorithm_its_family_fits() {
+    let verify_with = |jwks: &str, algorithms: &[OidcAlgorithm], token: &str| {
+        maos_sso::OidcVerifier::from_static_jwks(
+            jwks,
+            algorithms,
+            &[fixtures::ISS_GOOD],
+            fixtures::AUD_EXPECTED,
+        )
+        .unwrap()
+        .verify(token)
+    };
+    let rs = [OidcAlgorithm::Rs256];
+    let es = [OidcAlgorithm::Es256];
+    // The honest keys verify.
+    assert!(verify_with(fixtures::JWKS_KEY_A, &rs, fixtures::TOKEN_GOOD_RS256).is_ok());
+    assert!(verify_with(JWKS_KEY_ES256, &es, TOKEN_ES256).is_ok());
+    // RSA material inside an entry that declares `EC`: not read for RS256.
+    let ec_declared = fixtures::JWKS_KEY_A.replace("\"kty\":\"RSA\"", "\"kty\":\"EC\"");
+    assert_eq!(
+        verify_with(&ec_declared, &rs, fixtures::TOKEN_GOOD_RS256),
+        Err(IdentityError::AlgorithmRejected)
+    );
+    // EC material inside an entry that declares `RSA`: not read for ES256.
+    let rsa_declared = JWKS_KEY_ES256.replace("\"kty\":\"EC\"", "\"kty\":\"RSA\"");
+    assert_eq!(
+        verify_with(&rsa_declared, &es, TOKEN_ES256),
+        Err(IdentityError::AlgorithmRejected)
+    );
+    // An EC key off P-256, or without a curve, is not an ES256 key.
+    for bad in [
+        JWKS_KEY_ES256.replace("\"crv\":\"P-256\"", "\"crv\":\"P-384\""),
+        JWKS_KEY_ES256.replace("\"crv\":\"P-256\",", ""),
+    ] {
+        assert_eq!(
+            verify_with(&bad, &es, TOKEN_ES256),
+            Err(IdentityError::AlgorithmRejected)
+        );
+    }
+    // A key whose operations exclude `verify` does not verify.
+    assert_eq!(
+        verify_with(&jwks_key_ops_sign_only(), &rs, fixtures::TOKEN_GOOD_RS256),
+        Err(IdentityError::JwksUnavailable)
+    );
+}
+
+/// F16b: an ES256 assertion verifies through discovery (the `from_ec_components` path), also
+/// beside RS256 in a mixed allowlist, and a tampered one does not.
+#[test]
+fn an_es256_assertion_verifies_through_discovery() {
+    let script = Arc::new(Script::default());
+    script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
+    script.serve(JWKS_URL, JWKS_KEY_ES256);
+    let verifier = DiscoveringVerifier::start(
+        DiscoveryConfig::new(fixtures::ISS_GOOD)
+            .with_verify_wait(LONG_WAIT)
+            .with_idle_tick(Duration::from_secs(3_600)),
+        &[OidcAlgorithm::Rs256, OidcAlgorithm::Es256],
+        &[fixtures::ISS_GOOD],
+        fixtures::AUD_EXPECTED,
+        script as Arc<dyn Fetcher>,
+        ManualClock::new() as Arc<dyn Clock>,
+    )
+    .unwrap();
+    let principal = verifier
+        .verify(TOKEN_ES256)
+        .expect("an ES256 assertion signed by the published P-256 key verifies");
+    assert_eq!(principal.subject, fixtures::PRINCIPAL_SUB);
+    assert_eq!(principal.issuer, fixtures::ISS_GOOD);
+    // One flipped signature byte is refused.
+    let tampered = {
+        let mut text = TOKEN_ES256.to_owned();
+        // Inside the signature (the last character carries unused bits).
+        let index = text.len() - 10;
+        let original = text.remove(index);
+        text.insert(index, if original == 'A' { 'B' } else { 'A' });
+        text
+    };
+    assert_eq!(
+        verifier.verify(&tampered),
+        Err(IdentityError::SignatureInvalid)
+    );
+    // An RS256 assertion cannot be checked against an EC-only key set.
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_GOOD_RS256),
+        Err(IdentityError::JwksUnavailable)
+    );
+}
+
+/// F9: the limiter runs from the moment the previous fetch ACTUALLY began, at millisecond
+/// resolution: a fetch that began at 0.9 s is not 30 s old at 30.0 s.
+#[test]
+fn the_limiter_measures_from_the_actual_fetch_start_at_millisecond_resolution() {
+    let script = Arc::new(Script::default());
+    script.serve(DOC_URL, &document(fixtures::ISS_GOOD, JWKS_URL));
+    script.serve(JWKS_URL, &old_keys());
+    let clock = ManualClock::new();
+    clock.set_millis(900);
+    let verifier = start(&script, &clock, LONG_WAIT);
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+        Err(IdentityError::JwksUnavailable),
+        "joins the boot fetch, which began at 0.9 s"
+    );
+    assert_eq!(script.count(DOC_URL), 1);
+
+    clock.set_millis(30_000);
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+        Err(IdentityError::JwksUnavailable)
+    );
+    assert_eq!(
+        script.count(DOC_URL),
+        1,
+        "29.1 s after the last fetch began is inside the 30 s interval"
+    );
+    clock.set_millis(30_899);
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+        Err(IdentityError::JwksUnavailable)
+    );
+    assert_eq!(script.count(DOC_URL), 1, "29.999 s is still inside it");
+    clock.set_millis(30_900);
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_UNKNOWN_KID),
+        Err(IdentityError::JwksUnavailable)
+    );
+    assert_eq!(script.count(DOC_URL), 2, "30.0 s after it began: one fetch");
+}
+
+/// F10: the TTL starts when the fetch COMPLETES, not when it began.
+#[test]
+fn the_ttl_starts_when_the_fetch_completes() {
+    let script = healthy_script();
+    let gate = Arc::new(Gate::default());
+    *script.gate_on_document.lock().unwrap() = Some(Arc::clone(&gate));
+    let clock = ManualClock::new();
+    let verifier = DiscoveringVerifier::start(
+        DiscoveryConfig::new(fixtures::ISS_GOOD)
+            .with_ttl_secs(100)
+            .with_verify_wait(LONG_WAIT)
+            .with_idle_tick(Duration::from_secs(3_600)),
+        &[OidcAlgorithm::Rs256],
+        &[fixtures::ISS_GOOD],
+        fixtures::AUD_EXPECTED,
+        script as Arc<dyn Fetcher>,
+        Arc::clone(&clock) as Arc<dyn Clock>,
+    )
+    .unwrap();
+    gate.wait_entered();
+    // The fetch began at 0 and finishes at 20 (inside the 30 s fetch bound).
+    clock.set(20);
+    gate.release();
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+    clock.set(119);
+    assert!(
+        verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok(),
+        "99 s after the keys arrived, inside the 100 s TTL"
+    );
+    assert!(verifier.is_healthy());
+    clock.set(120);
+    assert!(!verifier.is_healthy(), "100 s after the keys arrived");
+}
+
+/// A fetcher that never answers the document while `hang` is set, and announces every entry.
+struct Hung {
+    inner: Arc<Script>,
+    hang: std::sync::atomic::AtomicBool,
+    gate: Gate,
+    entered: Mutex<std::sync::mpsc::Sender<()>>,
+    released_keys_served: Mutex<std::sync::mpsc::Sender<()>>,
+}
+
+impl Fetcher for Hung {
+    fn get(&self, url: &str) -> Result<Vec<u8>, FetchError> {
+        if url == DOC_URL {
+            let _ = self.entered.lock().unwrap().send(());
+            if self.hang.load(Ordering::SeqCst) {
+                // Held until the test releases it, then it answers like any other fetch.
+                self.gate.pass();
+                let answer = self.inner.get(url);
+                return answer;
+            }
+        }
+        let answer = self.inner.get(url);
+        if url == JWKS_URL && self.gate.released() {
+            let _ = self.released_keys_served.lock().unwrap().send(());
+        }
+        answer
+    }
+}
+
+fn hung_fetcher(
+    script: &Arc<Script>,
+) -> (
+    Arc<Hung>,
+    std::sync::mpsc::Receiver<()>,
+    std::sync::mpsc::Receiver<()>,
+) {
+    let (entered, entries) = std::sync::mpsc::channel();
+    let (late, late_served) = std::sync::mpsc::channel();
+    let hung = Arc::new(Hung {
+        inner: Arc::clone(script),
+        hang: std::sync::atomic::AtomicBool::new(true),
+        gate: Gate::default(),
+        entered: Mutex::new(entered),
+        released_keys_served: Mutex::new(late),
+    });
+    (hung, entries, late_served)
+}
+
+fn start_hung(hung: &Arc<Hung>, clock: &Arc<ManualClock>) -> DiscoveringVerifier {
+    DiscoveringVerifier::start(
+        DiscoveryConfig::new(fixtures::ISS_GOOD)
+            .with_verify_wait(Duration::from_millis(50))
+            .with_idle_tick(Duration::from_millis(5)),
+        &[OidcAlgorithm::Rs256],
+        &[fixtures::ISS_GOOD],
+        fixtures::AUD_EXPECTED,
+        Arc::clone(hung) as Arc<dyn Fetcher>,
+        Arc::clone(clock) as Arc<dyn Clock>,
+    )
+    .unwrap()
+}
+
+/// F6: a fetch that never answers does not leave discovery down: after the fetch bound the
+/// refresher abandons it, the next refresh runs on a fresh worker and service resumes; the
+/// abandoned worker's late answer changes nothing.
+#[test]
+fn a_fetch_that_never_answers_is_abandoned_and_discovery_recovers() {
+    let script = healthy_script();
+    let (hung, entries, late_served) = hung_fetcher(&script);
+    let clock = ManualClock::new();
+    let verifier = start_hung(&hung, &clock);
+    entries
+        .recv_timeout(EVENT_BUDGET)
+        .expect("boot fetch entered");
+    // The boot fetch never answers: callers fail closed after their bounded wait.
+    assert_eq!(
+        verifier.verify(fixtures::TOKEN_GOOD_RS256),
+        Err(IdentityError::JwksUnavailable)
+    );
+    assert!(!verifier.is_healthy());
+
+    // Inside the fetch bound (30 s) it is still waited for: no second fetch.
+    clock.set(29);
+    assert!(
+        entries.recv_timeout(Duration::from_millis(100)).is_err(),
+        "a fetch younger than the bound is not abandoned"
+    );
+    // Past the bound and the refresh interval: abandoned, replacement starts, and the issuer
+    // (now answering) restores service.
+    hung.hang.store(false, Ordering::SeqCst);
+    clock.set(31);
+    entries
+        .recv_timeout(EVENT_BUDGET)
+        .expect("a replacement fetch started after the bound");
+    eventually("keys installed by the replacement", || {
+        verifier.is_healthy()
+    });
+    assert!(verifier.verify(fixtures::TOKEN_GOOD_RS256).is_ok());
+
+    // The abandoned worker answers late (with keys): the cache is not touched, and no
+    // further refresh result is produced by it.
+    let refreshes = verifier.completed_refreshes();
+    hung.gate.release();
+    late_served
+        .recv_timeout(EVENT_BUDGET)
+        .expect("the abandoned worker finished");
+    assert_eq!(verifier.completed_refreshes(), refreshes);
+    assert!(verifier.is_healthy());
+}
+
+/// F6 limit: at most ONE abandoned worker exists at a time. While the first is still stuck, a
+/// second hung fetch is waited for, not abandoned; once the first returns, the second can be.
+#[test]
+fn at_most_one_abandoned_fetch_worker_exists_at_a_time() {
+    let script = healthy_script();
+    let (hung, entries, _late) = hung_fetcher(&script);
+    let clock = ManualClock::new();
+    let verifier = start_hung(&hung, &clock);
+    entries
+        .recv_timeout(EVENT_BUDGET)
+        .expect("fetch #1 entered");
+
+    clock.set(31); // fetch #1 abandoned, fetch #2 starts (and hangs too)
+    entries
+        .recv_timeout(EVENT_BUDGET)
+        .expect("fetch #2 entered");
+    clock.set(62); // fetch #2 is past the bound but #1 is still stuck: not abandoned
+    assert!(
+        entries.recv_timeout(Duration::from_millis(300)).is_err(),
+        "no third fetch while an abandoned worker is still stuck"
+    );
+    assert_eq!(verifier.completed_refreshes(), 1);
+
+    // Both stuck workers return: the live one (#2) completes normally and service resumes.
+    hung.hang.store(false, Ordering::SeqCst);
+    hung.gate.release();
+    eventually("fetch #2 installs the keys", || verifier.is_healthy());
+    assert_eq!(verifier.completed_refreshes(), 2);
 }

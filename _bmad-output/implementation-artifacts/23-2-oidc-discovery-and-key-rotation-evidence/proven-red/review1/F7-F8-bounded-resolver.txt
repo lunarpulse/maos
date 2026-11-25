@@ -1,0 +1,11 @@
+F7 (review round 1, Fix232Disc): the OS adapter no longer truncates the raw answer at 65 entries before the 16-distinct cap. New `bounded_resolver::distinct_answers` reads at most MAX_RAW_ANSWERS (64) raw entries; reaching the end inside the budget returns the distinct list, more than 16 distinct stops the scan early (the caller's cap refuses), and entries left after the budget was spent are an `InvalidData` error (fail closed). The old comment (`take(MAX_ANSWERS + 1)` over a `MAX_ANSWERS * 4 + 1` bound) is replaced.
+Test: crates/maos-bin/tests/bounded_resolver_23_2.rs::an_answer_longer_than_the_scan_budget_fails_closed (exactly-budget with 16 distinct admitted; one past the budget of duplicates refused; 10 distinct filling the budget with 7 new ones hidden in the tail refused; 17 distinct inside the budget returned for the cap to refuse).
+Plant E232-PLANT-f7 (`raw.next().is_some() && false`): that test FAILED (6 passed, 1 failed). Plant removed.
+
+F8: one absolute deadline (`expires`, fixed when the call starts) covers queueing, execution AND receipt: the caller waits only the time left to `expires`, and an answer that arrives after `expires` (a lookup that was already RUNNING when it passed) is discarded. A resolver takes an injected `Now` (`BoundedResolver::with_lookup_and_clock`; production `Instant::now`).
+Test: ::a_running_lookup_that_finishes_after_the_deadline_is_discarded (the lookup moves the injected clock past the deadline, then answers Ok: the call is `ResolveFailed`; a lookup inside the deadline is accepted).
+Plant E232-PLANT-f8 (post-receipt check `&& false`): that test FAILED (6 passed, 1 failed). Plant removed.
+
+F16b (unplanted resolver cap and deadline):
+Plant E232-PLANT-f16b-cap (`distinct.len() > MAX_ANSWERS && false`): the_answer_count_is_capped_and_never_truncated FAILED (6 passed, 1 failed). Plant removed.
+Plant E232-PLANT-f16b-deadline (caller `recv_timeout(3600 s)` instead of the time left): a_hung_lookup_is_bounded_and_never_multiplies_threads and jobs_that_expired_in_the_queue_never_run_late FAILED (5 passed, 2 failed, 60 s). Plant removed; 7 passed.

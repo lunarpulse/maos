@@ -83,7 +83,7 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
     // port would make the runtime legs green while production stayed dead-wired.
     let builder = block_from(find("async fn build_cohort_a2a_daemon_runtime("));
     assert!(
-        builder.contains("EnterpriseGovernedDigestReadPort {"),
+        builder.contains("GovernedDigestReadPort::new("),
         "the daemon builder must decorate the digest-read port under an enterprise posture"
     );
     assert!(
@@ -112,7 +112,7 @@ fn story_13_5a_cohort_daemon_dispatch_threads_the_enterprise_runtime() {
     );
     let seam = block_from(find("fn govern_collective_read("));
     for required in [
-        "issue_enterprise_governed_capability(",
+        "issue_enterprise_governed_capability_for_principal(",
         "Scope::LoomRead",
         "self.at_rest.seal(",
         "forward_audit_to_siem_once(",

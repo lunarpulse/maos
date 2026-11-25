@@ -172,6 +172,9 @@ pub struct MiraRunner {
     route: Option<Arc<dyn mira::AdvisoryRoute>>,
     log: Arc<TransparencyLogAdapter>,
     pid_of: PidSource,
+    /// One Mira turn at a time (Story 23-2 F2c): the assertion scope is keyed by Mira's pid, so
+    /// two overlapping turns would either be refused or mix principals. A second caller waits.
+    serial: std::sync::Mutex<()>,
 }
 
 impl MiraRunner {
@@ -190,6 +193,7 @@ impl MiraRunner {
             route,
             log,
             pid_of,
+            serial: std::sync::Mutex::new(()),
         }
     }
 }
@@ -201,6 +205,10 @@ impl TaskRunner for MiraRunner {
         text: &str,
         assertion: Option<&maos_control::Assertion>,
     ) -> Result<String, RunFailure> {
+        let _serial = self
+            .serial
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
         let pid = (self.pid_of)().ok_or_else(|| RunFailure {
             reason: "dispatch_refused",
             detail: "Mira has no admitted pid".into(),

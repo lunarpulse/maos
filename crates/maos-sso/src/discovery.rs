@@ -18,21 +18,29 @@
 //!   refused whatever the keys say, and the claim checks are the very code the
 //!   static verifier runs.
 //!
-//! Freshness: keys older than the TTL are never served (D-23-2-02 A). An
-//! unknown `kid`, or stale keys, ask for a refresh at most once per minimum
-//! interval; `verify` never fetches. One refresher thread per verifier owns
-//! every fetch (D-23-2-07 A); `verify` waits for it at most the configured
-//! bound. A refresh that outlives that bound is marked stalled, and later
-//! callers fail at once instead of queueing behind it.
+//! Freshness: keys older than the TTL are never served (D-23-2-02 A); the TTL starts when a
+//! fetch COMPLETES. An unknown `kid`, or stale keys, ask for a refresh at most once per minimum
+//! interval, measured from the moment the previous fetch actually began, at millisecond
+//! resolution; `verify` never fetches. One refresher thread per verifier owns every fetch
+//! (D-23-2-07 A); `verify` waits for it at most the configured bound. A refresh that outlives
+//! that bound is marked stalled, and later callers fail at once instead of queueing behind it.
 //!
-//! Limits (all fail closed): bodies over [`MAX_BODY_BYTES`], more than
-//! [`MAX_KEYS`] keys, a duplicate `kid`, a URL over [`MAX_URL_BYTES`] or a
-//! `kid` over [`MAX_KID_BYTES`] refuse the whole refresh and keep the previous
-//! keys until their TTL ends. A fetch that never returns holds the refresher
-//! (the kernel agent has no read timeout); keys then expire at the TTL.
+//! A fetch that never answers (the kernel agent has no read timeout) is abandoned once it has
+//! run for the fetch bound (default 30 s): the refresher stops waiting, the next refresh runs on
+//! a fresh worker, and the abandoned worker's answer, if it ever arrives, is dropped. At most
+//! ONE abandoned worker exists at a time; while it is stuck a second hung fetch is waited for,
+//! not abandoned, so a peer that never answers costs two threads, never one per refresh.
+//!
+//! Limits (all fail closed): bodies over [`MAX_BODY_BYTES`], more than [`MAX_KEYS`] keys, a
+//! duplicate `kid` or a URL over [`MAX_URL_BYTES`] refuse the whole refresh and keep the
+//! previous keys until their TTL ends. An entry that is not a usable verification key (a `kid`
+//! over [`MAX_KID_BYTES`], `use` other than `sig`, `key_ops` without `verify`, an `EC` key not on
+//! `P-256`, any other `kty`) is skipped; a well-formed set with NO usable key retires the cached
+//! keys (the verifier turns unhealthy).
 
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::sync::mpsc::{RecvTimeoutError, TryRecvError};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -59,11 +67,22 @@ pub const MAX_KEYS: usize = 64;
 pub const MAX_URL_BYTES: usize = 2_048;
 /// The longest `kid` accepted.
 pub const MAX_KID_BYTES: usize = 256;
+/// Default bound on one discovery round (document plus keys) before it is abandoned.
+pub const DEFAULT_FETCH_TIMEOUT_SECS: u64 = 30;
+/// The longest fetch bound the configuration accepts.
+pub const MAX_FETCH_TIMEOUT_SECS: u64 = 300;
 
-/// Monotonic seconds. Injected so TTL, limiter and tests share one notion of
-/// time; it must never go backwards.
+/// Clock readings. Injected so TTL, limiter and tests share one notion of time; it must never
+/// go backwards.
 pub trait Clock: Send + Sync {
     fn now_secs(&self) -> u64;
+
+    /// Milliseconds on the same timeline. The limiter and the TTL compare at this resolution so
+    /// a refresh that began at 0.9 s is not "30 s old" at 30.0 s. The default reads whole
+    /// seconds; a clock with a finer reading overrides it.
+    fn now_millis(&self) -> u64 {
+        self.now_secs().saturating_mul(1_000)
+    }
 }
 
 /// The process clock: monotonic seconds since construction.
@@ -90,6 +109,10 @@ impl Default for MonotonicClock {
 impl Clock for MonotonicClock {
     fn now_secs(&self) -> u64 {
         self.start.elapsed().as_secs()
+    }
+
+    fn now_millis(&self) -> u64 {
+        u64::try_from(self.start.elapsed().as_millis()).unwrap_or(u64::MAX)
     }
 }
 
@@ -160,6 +183,9 @@ pub enum DiscoveryError {
     ConfigInvalid,
     #[error("sso_discovery_issuer_not_trusted")]
     IssuerNotTrusted,
+    /// Discovered keys are bound to the discovery issuer: another listed issuer is refused.
+    #[error("sso_discovery_issuers_not_exclusive")]
+    IssuersNotExclusive,
     #[error("sso_discovery_issuer_not_https")]
     IssuerNotHttps,
     #[error("sso_discovery_issuer_invalid")]
@@ -182,6 +208,10 @@ pub enum DiscoveryError {
     TooLarge,
     #[error("sso_discovery_jwks_no_usable_keys")]
     NoUsableKeys,
+    /// A fetch outlived the fetch bound and was abandoned (its answer, if it ever comes, is
+    /// dropped).
+    #[error("sso_discovery_fetch_abandoned")]
+    FetchAbandoned,
     #[error("sso_discovery_refresher_unavailable")]
     RefresherUnavailable,
 }
@@ -193,6 +223,7 @@ pub struct DiscoveryConfig {
     ttl_secs: u64,
     min_refresh_secs: u64,
     verify_wait: Duration,
+    fetch_timeout_secs: u64,
     idle_tick: Duration,
 }
 
@@ -204,6 +235,7 @@ impl DiscoveryConfig {
             ttl_secs: DEFAULT_TTL_SECS,
             min_refresh_secs: DEFAULT_MIN_REFRESH_SECS,
             verify_wait: DEFAULT_VERIFY_WAIT,
+            fetch_timeout_secs: DEFAULT_FETCH_TIMEOUT_SECS,
             idle_tick: Duration::from_secs(DEFAULT_MIN_REFRESH_SECS),
         }
     }
@@ -236,11 +268,21 @@ impl DiscoveryConfig {
         self
     }
 
+    /// How long one discovery round may run before it is abandoned and a replacement fetch
+    /// may start (the kernel agent has no read timeout of its own).
+    #[must_use]
+    pub fn with_fetch_timeout_secs(mut self, fetch_timeout_secs: u64) -> Self {
+        self.fetch_timeout_secs = fetch_timeout_secs;
+        self
+    }
+
     fn validate(&self) -> Result<(), DiscoveryError> {
         if self.ttl_secs == 0
             || self.ttl_secs > MAX_TTL_SECS
             || self.min_refresh_secs == 0
             || self.min_refresh_secs > self.ttl_secs
+            || self.fetch_timeout_secs == 0
+            || self.fetch_timeout_secs > MAX_FETCH_TIMEOUT_SECS
             || self.idle_tick.is_zero()
         {
             return Err(DiscoveryError::ConfigInvalid);
@@ -327,6 +369,20 @@ fn fetch_keys(
     parse_key_set(&body)
 }
 
+/// A usable verification key: an `RSA` key, or an `EC` key on `P-256` (the curve ES256 names),
+/// not marked for encryption, whose `key_ops` (when declared) names `verify`.
+fn usable(key: &Jwk) -> bool {
+    let family = match key.kty.as_str() {
+        "RSA" => true,
+        "EC" => key.crv.as_deref() == Some("P-256"),
+        _ => false,
+    };
+    family
+        && key.key_use.as_deref().is_none_or(|usage| usage == "sig")
+        && key.allows_verify()
+        && key.kid.len() <= MAX_KID_BYTES
+}
+
 fn parse_key_set(body: &[u8]) -> Result<HashMap<String, Jwk>, DiscoveryError> {
     let set: KeySetBody =
         serde_json::from_slice(body).map_err(|_| DiscoveryError::JwksMalformed)?;
@@ -340,10 +396,7 @@ fn parse_key_set(body: &[u8]) -> Result<HashMap<String, Jwk>, DiscoveryError> {
         let Ok(key) = serde_json::from_value::<Jwk>(value) else {
             continue;
         };
-        if (key.kty != "RSA" && key.kty != "EC")
-            || key.key_use.as_deref().is_some_and(|usage| usage != "sig")
-            || key.kid.len() > MAX_KID_BYTES
-        {
+        if !usable(&key) {
             continue;
         }
         if keys.insert(key.kid.clone(), key).is_some() {
@@ -357,12 +410,14 @@ fn parse_key_set(body: &[u8]) -> Result<HashMap<String, Jwk>, DiscoveryError> {
 }
 
 struct KeySet {
+    /// Clock milliseconds at which the fetch COMPLETED (the TTL starts here).
     fetched_at: u64,
     keys: HashMap<String, Jwk>,
 }
 
 struct State {
     keys: Option<KeySet>,
+    /// Clock milliseconds at which the most recent fetch actually started.
     last_attempt: Option<u64>,
     /// A refresh is requested or running.
     pending: bool,
@@ -372,6 +427,12 @@ struct State {
     generation: u64,
     last_error: Option<DiscoveryError>,
     shutdown: bool,
+    /// Id of the most recently started fetch.
+    last_fetch: u64,
+    /// Calls that started waiting for a refresh.
+    waits: u64,
+    /// The one fetch worker that was abandoned after the fetch bound and has not returned yet.
+    abandoned: Option<u64>,
 }
 
 struct Shared {
@@ -384,27 +445,32 @@ struct Shared {
     refresh_done: Condvar,
 }
 
+type Fetched = Result<HashMap<String, Jwk>, DiscoveryError>;
+
 impl Shared {
     fn lock(&self) -> MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
+    fn ttl_millis(&self) -> u64 {
+        self.config.ttl_secs.saturating_mul(1_000)
+    }
+
     fn fresh(&self, keys: &KeySet, now: u64) -> bool {
-        now.saturating_sub(keys.fetched_at) < self.config.ttl_secs
+        now.saturating_sub(keys.fetched_at) < self.ttl_millis()
     }
 
     fn limiter_open(&self, state: &State, now: u64) -> bool {
-        state
-            .last_attempt
-            .is_none_or(|last| now.saturating_sub(last) >= self.config.min_refresh_secs)
+        state.last_attempt.is_none_or(|last| {
+            now.saturating_sub(last) >= self.config.min_refresh_secs.saturating_mul(1_000)
+        })
     }
 
     /// An idle refresher refreshes when it has no fresh keys, or the keys are
     /// half-way through their life.
     fn due(&self, state: &State, now: u64) -> bool {
         let wanted = state.keys.as_ref().is_none_or(|keys| {
-            now.saturating_sub(keys.fetched_at) >= self.config.ttl_secs / 2
-                || !self.fresh(keys, now)
+            now.saturating_sub(keys.fetched_at) >= self.ttl_millis() / 2 || !self.fresh(keys, now)
         });
         wanted && self.limiter_open(state, now)
     }
@@ -415,7 +481,7 @@ impl Shared {
         let mut state = self.lock();
         let mut asked = false;
         loop {
-            let now = self.clock.now_secs();
+            let now = self.clock.now_millis();
             if let Some(keys) = state.keys.as_ref().filter(|keys| self.fresh(keys, now)) {
                 if let Some(key) = keys.keys.get(kid) {
                     return Some(key.clone());
@@ -430,12 +496,14 @@ impl Shared {
                     return None;
                 }
             } else if self.limiter_open(&state, now) {
-                state.last_attempt = Some(now);
+                // Single flight: `pending` is the flag; the limiter's clock starts when the
+                // refresher actually begins the fetch.
                 state.pending = true;
                 self.wake_refresher.notify_one();
             } else {
                 return None;
             }
+            state.waits += 1;
             let seen = state.generation;
             let (guard, wait) = self
                 .refresh_done
@@ -450,6 +518,61 @@ impl Shared {
         }
     }
 
+    /// Run one discovery round on a worker thread and wait for it, abandoning it when it has
+    /// run longer than the fetch bound (the kernel agent has no read timeout, so a silent peer
+    /// would otherwise hold the refresher for good). At most ONE abandoned worker exists at a
+    /// time: while it is still stuck, the replacement is waited for rather than abandoned, so a
+    /// peer that never answers costs two threads, not one per refresh. A late answer from an
+    /// abandoned worker is dropped with its channel and never touches the cache.
+    fn run_fetch(self: &Arc<Self>, id: u64, started: u64) -> Fetched {
+        let unavailable = || Err(DiscoveryError::DocumentFetch(FetchError::Unavailable));
+        let (reply, answer) = std::sync::mpsc::channel();
+        let worker = Arc::clone(self);
+        let spawned = std::thread::Builder::new()
+            .name("maos-sso-jwks-fetch".to_owned())
+            .spawn(move || {
+                let outcome = catch_unwind(AssertUnwindSafe(|| {
+                    fetch_keys(worker.fetcher.as_ref(), &worker.config)
+                }))
+                .unwrap_or(Err(DiscoveryError::DocumentFetch(FetchError::Unavailable)));
+                let _ = reply.send(outcome);
+                let mut state = worker.lock();
+                if state.abandoned == Some(id) {
+                    state.abandoned = None;
+                }
+            });
+        if spawned.is_err() {
+            return unavailable();
+        }
+        let poll = self.config.idle_tick.min(Duration::from_secs(1));
+        let bound = self.config.fetch_timeout_secs.saturating_mul(1_000);
+        loop {
+            match answer.recv_timeout(poll) {
+                Ok(outcome) => return outcome,
+                Err(RecvTimeoutError::Disconnected) => return unavailable(),
+                Err(RecvTimeoutError::Timeout) => {
+                    let mut state = self.lock();
+                    if state.shutdown {
+                        return unavailable();
+                    }
+                    if self.clock.now_millis().saturating_sub(started) >= bound {
+                        // Under the lock: the worker clears `abandoned` under it too, so an
+                        // answer sent after this check still finds the mark and clears it.
+                        match answer.try_recv() {
+                            Ok(outcome) => return outcome,
+                            Err(TryRecvError::Disconnected) => return unavailable(),
+                            Err(TryRecvError::Empty) => {}
+                        }
+                        if state.abandoned.is_none() {
+                            state.abandoned = Some(id);
+                            return Err(DiscoveryError::FetchAbandoned);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn refresher(self: &Arc<Self>) {
         let mut state = self.lock();
         loop {
@@ -460,9 +583,8 @@ impl Shared {
                     .unwrap_or_else(PoisonError::into_inner);
                 state = guard;
                 if wait.timed_out() && !state.pending && !state.shutdown {
-                    let now = self.clock.now_secs();
+                    let now = self.clock.now_millis();
                     if self.due(&state, now) {
-                        state.last_attempt = Some(now);
                         state.pending = true;
                     }
                 }
@@ -470,20 +592,28 @@ impl Shared {
             if state.shutdown {
                 return;
             }
-            let started = self.clock.now_secs();
+            // The limiter measures from the moment the fetch really begins.
+            let started = self.clock.now_millis();
+            state.last_attempt = Some(started);
+            state.last_fetch += 1;
+            let id = state.last_fetch;
             drop(state);
-            let outcome = catch_unwind(AssertUnwindSafe(|| {
-                fetch_keys(self.fetcher.as_ref(), &self.config)
-            }))
-            .unwrap_or(Err(DiscoveryError::DocumentFetch(FetchError::Unavailable)));
+            let outcome = self.run_fetch(id, started);
             state = self.lock();
             match outcome {
                 Ok(keys) => {
                     state.keys = Some(KeySet {
-                        fetched_at: started,
+                        // The TTL starts when the keys arrived, not when the fetch began.
+                        fetched_at: self.clock.now_millis(),
                         keys,
                     });
                     state.last_error = None;
+                }
+                // A well-formed answer that names no usable key is the issuer withdrawing
+                // every key: the cached keys are retired, not kept until their TTL.
+                Err(DiscoveryError::NoUsableKeys) => {
+                    state.keys = None;
+                    state.last_error = Some(DiscoveryError::NoUsableKeys);
                 }
                 Err(error) => state.last_error = Some(error),
             }
@@ -532,9 +662,16 @@ impl DiscoveringVerifier {
         if !trusted_issuers.contains(&config.issuer.as_str()) {
             return Err(DiscoveryError::IssuerNotTrusted);
         }
+        // A key discovered for issuer A must never vouch for `iss` = B (F1): in discovery mode
+        // the discovery issuer is the only trusted `iss`, so any other listed issuer is refused.
+        if trusted_issuers
+            .iter()
+            .any(|issuer| *issuer != config.issuer)
+        {
+            return Err(DiscoveryError::IssuersNotExclusive);
+        }
         let rules = Rules::new(allowed_algorithms, trusted_issuers, expected_audience)
             .map_err(|_| DiscoveryError::ConfigInvalid)?;
-        let now = clock.now_secs();
         let shared = Arc::new(Shared {
             config,
             rules,
@@ -542,12 +679,15 @@ impl DiscoveringVerifier {
             clock,
             state: Mutex::new(State {
                 keys: None,
-                last_attempt: Some(now),
+                last_attempt: None,
                 pending: true,
                 stalled: false,
                 generation: 0,
                 last_error: None,
                 shutdown: false,
+                last_fetch: 0,
+                waits: 0,
+                abandoned: None,
             }),
             wake_refresher: Condvar::new(),
             refresh_done: Condvar::new(),
@@ -575,6 +715,13 @@ impl DiscoveringVerifier {
     pub fn completed_refreshes(&self) -> u64 {
         self.shared.lock().generation
     }
+
+    /// Times a `verify` call has started waiting for a refresh (a diagnostic: a caller refused
+    /// at once because the refresh is already stalled does not count).
+    #[must_use]
+    pub fn refresh_waits(&self) -> u64 {
+        self.shared.lock().waits
+    }
 }
 
 impl IdentityAssertionPort for DiscoveringVerifier {
@@ -595,7 +742,7 @@ impl IdentityAssertionPort for DiscoveringVerifier {
 
     /// Configuration valid and unexpired keys present.
     fn is_healthy(&self) -> bool {
-        let now = self.shared.clock.now_secs();
+        let now = self.shared.clock.now_millis();
         let state = self.shared.lock();
         self.shared.rules.configured()
             && state

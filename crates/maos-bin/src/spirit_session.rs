@@ -121,6 +121,10 @@ struct ShellSlot {
     deadline: Instant,
     route: maos_iac::adapter::mailbox::ShellReplyRoute,
     done: std::sync::mpsc::SyncSender<()>,
+    /// The asking principal's assertion (Story 23-2). It is NOT in force while the slot waits:
+    /// it takes force only when the session claims this exact frame, and ends when that turn's
+    /// export ends or the session leaves (see [`ShellBinding::scope`]).
+    assertion: Option<maos_control::Assertion>,
 }
 
 /// The session's view of the one bound shell turn.
@@ -130,6 +134,10 @@ struct ShellBinding {
     /// Taken by the first shell-addressed `TaskComplete`; later ones are refused.
     route: Option<maos_iac::adapter::mailbox::ShellReplyRoute>,
     done: std::sync::mpsc::SyncSender<()>,
+    /// The turn scope of the carried assertion, live exactly while this frame's export runs:
+    /// created at the claim, ended by the session when the export completes, aborts or the
+    /// session is reaped, never by the caller's wait (Story 23-2 F2).
+    scope: Option<crate::assertion_supply::TurnScope>,
 }
 
 /// Marks the port ended when the session's worker leaves, whatever the cause.
@@ -222,6 +230,7 @@ impl ShellPort {
             pid,
             generation,
             deadline,
+            None,
         )
     }
 
@@ -234,6 +243,7 @@ impl ShellPort {
         pid: u32,
         generation: u64,
         deadline: Instant,
+        assertion: Option<&maos_control::Assertion>,
     ) -> Result<ShellTurn, TurnError> {
         let mut state = self.lock();
         match state.phase {
@@ -263,6 +273,7 @@ impl ShellPort {
             deadline,
             route,
             done,
+            assertion: assertion.cloned(),
         });
         Ok(ShellTurn {
             port: Arc::clone(self),
@@ -306,11 +317,17 @@ impl ShellPort {
         {
             return Err("shell turn binding mismatch");
         }
+        // The assertion takes force here, at the claim of the matching frame, and nowhere
+        // earlier: an ordinary turn running or queued ahead of this frame resolves the
+        // environment. A scope another claim still holds for this pid refuses the frame.
+        let scope = crate::assertion_supply::enter(pid, slot.assertion.as_ref())
+            .map_err(|_| "assertion scope already active for this spirit")?;
         Ok(Some(ShellBinding {
             id: slot.id,
             deadline: slot.deadline,
             route: Some(slot.route),
             done: slot.done,
+            scope,
         }))
     }
 }
@@ -519,6 +536,127 @@ mod shell_turn_tests {
             port.claim(&request(next, SHELL_REPLY_DESTINATION), 7, 2),
             Ok(Some(binding)) if binding.id == next
         ));
+    }
+
+    fn asserted(text: &str) -> maos_control::Assertion {
+        maos_control::Assertion::parse(text).expect("a compact JWT")
+    }
+
+    /// Story 23-2 F2a: the asking principal's assertion takes force when the session claims
+    /// ITS frame, not while the request waits for the session. A mailbox turn running or queued
+    /// ahead of the task frame, and a stale or foreign frame, resolve the environment.
+    #[test]
+    fn an_assertion_takes_force_only_when_its_frame_is_claimed() {
+        const ALICE: &str = "alice-h.alice-c.alice-s";
+        let pid = 920_101;
+        let budget = Duration::from_secs(30);
+        let port = ShellPort::new(budget);
+        port.ready(pid, 1);
+        let id = [9; 16];
+        let alice = asserted(ALICE);
+        let turn = port
+            .arm_labelled(
+                maos_iac::adapter::mailbox::ReplyLabel::Task,
+                id,
+                "example",
+                pid,
+                1,
+                Instant::now() + budget,
+                Some(&alice),
+            )
+            .unwrap();
+        let alice_in_force = || crate::assertion_supply::supply(pid).as_deref() == Some(ALICE);
+        // Queued, and an ordinary mailbox turn (another sender) is dequeued first.
+        assert!(!alice_in_force(), "queued: not in force");
+        assert!(matches!(
+            port.claim(&request([1; 16], "operator"), pid, 1),
+            Ok(None)
+        ));
+        assert!(
+            !alice_in_force(),
+            "an ordinary turn ahead does not borrow it"
+        );
+        // A shell-addressed frame that is not this request is refused and binds nothing.
+        assert!(port
+            .claim(&request([2; 16], SHELL_REPLY_DESTINATION), pid, 1)
+            .is_err());
+        assert!(!alice_in_force(), "a stale frame does not borrow it");
+        // The exact frame: in force for the export, ended when the session ends the export.
+        let binding = port
+            .claim(&request(id, SHELL_REPLY_DESTINATION), pid, 1)
+            .unwrap()
+            .unwrap();
+        assert!(alice_in_force(), "claimed: in force");
+        drop(binding);
+        assert!(!alice_in_force(), "the export ended: gone");
+        assert!(!crate::assertion_supply::is_scoped(pid));
+        drop(turn);
+    }
+
+    /// Story 23-2 F2b: a caller that gave up at its deadline (its `ShellTurn` dropped) does not
+    /// strip the scope from the export still running, and the next task armed on the same pid
+    /// does not borrow it: Alice's late mints stay Alice's, never Bob's and never the
+    /// environment's; Bob's frame is refused while Alice's export holds the pid and takes force
+    /// only once Alice's export has ended.
+    #[test]
+    fn an_overrun_export_keeps_its_own_principal_and_the_next_task_waits_for_it() {
+        const ALICE: &str = "alice-h.alice-c.alice-s";
+        const BOB: &str = "bob-h.bob-c.bob-s";
+        let pid = 920_102;
+        let budget = Duration::from_secs(30);
+        let port = ShellPort::new(budget);
+        port.ready(pid, 1);
+        let arm = |id: [u8; 16], who: &maos_control::Assertion| {
+            port.arm_labelled(
+                maos_iac::adapter::mailbox::ReplyLabel::Task,
+                id,
+                "example",
+                pid,
+                1,
+                Instant::now() + budget,
+                Some(who),
+            )
+        };
+        let supplied = || crate::assertion_supply::supply(pid);
+
+        let (alice_id, bob_id) = ([7; 16], [8; 16]);
+        let alice_turn = arm(alice_id, &asserted(ALICE)).unwrap();
+        let alice_export = port
+            .claim(&request(alice_id, SHELL_REPLY_DESTINATION), pid, 1)
+            .unwrap()
+            .unwrap();
+        // The caller's deadline passes: its wait is gone, the export is not.
+        drop(alice_turn);
+        let bob_turn = arm(bob_id, &asserted(BOB)).unwrap();
+        assert_eq!(
+            supplied().as_deref(),
+            Some(ALICE),
+            "the late mints stay Alice's"
+        );
+        // The session never dequeues Bob's frame while Alice's export is active; were it to,
+        // the frame is refused rather than run under Alice's principal.
+        assert_eq!(
+            port.claim(&request(bob_id, SHELL_REPLY_DESTINATION), pid, 1)
+                .err(),
+            Some("assertion scope already active for this spirit")
+        );
+        assert_eq!(supplied().as_deref(), Some(ALICE));
+        drop(bob_turn);
+        drop(alice_export);
+        assert_ne!(supplied().as_deref(), Some(ALICE));
+        assert_ne!(supplied().as_deref(), Some(BOB));
+
+        // Once Alice's export has ended, Bob's frame takes force on its own claim.
+        let bob_id = [6; 16];
+        let _bob_turn = arm(bob_id, &asserted(BOB)).unwrap();
+        assert_ne!(supplied().as_deref(), Some(BOB), "queued: not in force");
+        let bob_export = port
+            .claim(&request(bob_id, SHELL_REPLY_DESTINATION), pid, 1)
+            .unwrap()
+            .unwrap();
+        assert_eq!(supplied().as_deref(), Some(BOB));
+        drop(bob_export);
+        assert_ne!(supplied().as_deref(), Some(BOB));
     }
 }
 
@@ -1540,6 +1678,10 @@ async fn run_session(
         let mut pending: Option<Pending> = None;
         let mut turn_budget = launch.turn_budget;
         let mut swapped_at: Option<Instant> = None;
+        // Declared outside the loop: the bound turn's assertion scope outlives the loop's own
+        // return and ends only after the child is stopped and reaped (Story 23-2 F2), so a
+        // guest still working past an overrun is never left on another principal.
+        let mut bound: Option<ShellBinding> = None;
         let result = (|| {
             let writer = live.bridge.take_frame_writer()
                 .map_err(|error| SessionError::Bridge(error.to_string()))?;
@@ -1556,7 +1698,6 @@ async fn run_session(
             let mut seed_id = None;
             let mut turn = TurnState::default();
             let mut generation = 1u64;
-            let mut bound: Option<ShellBinding> = None;
             let mut diagnostics = DiagnosticBudget::default();
             let mut recall = MediatedLogRecall::new(
                 Arc::clone(&deps.log_recall), Arc::clone(&deps.capability),
@@ -1850,8 +1991,10 @@ async fn run_session(
                             }
                             active = false;
                             report.turns += 1;
-                            if let Some(shell_turn) = bound.take() {
-                                let _ = shell_turn.done.send(());
+                            if let Some(ShellBinding { done, scope, .. }) = bound.take() {
+                                // The scope ends with the export, before the caller is told.
+                                drop(scope);
+                                let _ = done.send(());
                             }
                             deadline = None;
                             if launch.once {
@@ -2015,6 +2158,7 @@ async fn run_session(
                 .and_then(|result| result.map_err(|error| SessionError::Bridge(error.to_string()))),
             None => Ok(()),
         };
+        drop(bound);
         live.binding.finish(&exit);
         deps.supervisor.before_session_release(admitted.pid);
         if let Err(error) = result {

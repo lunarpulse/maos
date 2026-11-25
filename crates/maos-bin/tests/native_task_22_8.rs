@@ -436,3 +436,93 @@ fn the_default_cast_boots_keyless_in_deterministic_mode() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
+
+/// Story 23-2 F2c: Mira's turns are serialised. Overlapping callers of one runner each wait for
+/// the turn before them; none is refused with a busy scope, none mints under another's
+/// assertion, and no scope outlives its turn.
+struct ScopeProbe {
+    seen: Mutex<Vec<Option<String>>>,
+}
+
+impl InferencePort for ScopeProbe {
+    fn complete(&self, _request: InferenceRequest) -> Result<InferenceResponse, InferenceError> {
+        let seen = maos_bin::assertion_supply::supply(PID);
+        // Hold the turn open so that an unserialised neighbour overlaps it.
+        std::thread::sleep(Duration::from_millis(40));
+        self.seen.lock().unwrap().push(seen);
+        Ok(InferenceResponse {
+            text: KNOWN.into(),
+            stop_reason: StopReason::StopSequence,
+            usage: TokenUsage {
+                input_tokens: 1,
+                output_tokens: 1,
+            },
+            provider_attribution: ProviderAttribution {
+                provider_id: "fake".into(),
+                endpoint_url: "fake://".into(),
+                model_id: None,
+            },
+        })
+    }
+}
+
+#[test]
+fn overlapping_mira_turns_are_serialised_and_never_share_a_scope() {
+    use maos_bin::directed_task::TaskRunner;
+    let kernel = Kernel::new();
+    let probe = Arc::new(ScopeProbe {
+        seen: Mutex::new(Vec::new()),
+    });
+    let runner = kernel.mira_runner(Some(probe.clone()));
+    let tokens: Vec<String> = (0..6)
+        .map(|n| format!("t{n}-head.t{n}-claims.t{n}-sig"))
+        .collect();
+    let results: Vec<Result<String, &'static str>> = std::thread::scope(|scope| {
+        let workers: Vec<_> = tokens
+            .iter()
+            .enumerate()
+            .map(|(n, token)| {
+                let runner = &runner;
+                scope.spawn(move || {
+                    let assertion = maos_control::Assertion::parse(token).unwrap();
+                    runner
+                        .run(
+                            [n as u8 + 1; 16],
+                            "payments-api is throwing errors since the deploy",
+                            Some(&assertion),
+                        )
+                        .map_err(|failure| failure.reason)
+                })
+            })
+            .collect();
+        workers.into_iter().map(|w| w.join().unwrap()).collect()
+    });
+    for result in &results {
+        assert!(
+            result.is_ok(),
+            "no overlapping turn is refused: {results:?}"
+        );
+    }
+    let mut seen: Vec<String> = probe
+        .seen
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|supplied| {
+            supplied
+                .clone()
+                .expect("every turn minted under its own scope")
+        })
+        .collect();
+    seen.sort();
+    let mut want = tokens.clone();
+    want.sort();
+    assert_eq!(
+        seen, want,
+        "each turn minted under exactly its own assertion"
+    );
+    assert!(
+        !maos_bin::assertion_supply::is_scoped(PID),
+        "no scope outlives its turns"
+    );
+}

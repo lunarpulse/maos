@@ -297,15 +297,35 @@ fn a_malformed_assertion_is_refused_without_echo() {
         r#""caf\u00e9.x.y""#.to_owned(),
         r#""bad/slash""#.to_owned(),
         r#""""#.to_owned(),
+        r#""   ""#.to_owned(),
         "7".to_owned(),
+        "true".to_owned(),
+        "[]".to_owned(),
+        r#"{"a":"b"}"#.to_owned(),
         format!("\"{oversize}\""),
     ] {
         let body = format!(r#"{{"text":"x","assertion":{value}}}"#);
         let response = request(&server, "POST", "/v1/spirits/probe/ask", Some(TOKEN), &body);
+        // Story 23-2 F14: the same typed refusal a failed verification is, never `bad_request`.
         assert_eq!(status_of(&response), 400, "{response}");
-        assert!(!response.contains("has space") && !response.contains("bad/slash"));
+        assert_eq!(
+            json_of(&response)["error"],
+            "sso_assertion_invalid",
+            "{response}"
+        );
+        assert!(
+            !response.contains("has space")
+                && !response.contains("bad/slash")
+                && !response.contains("aaaaaaaa"),
+            "{response}"
+        );
     }
     assert!(port.submitted.lock().unwrap().is_empty());
+    // An absent or `null` assertion is no assertion: the ask is accepted.
+    for body in [r#"{"text":"x"}"#, r#"{"text":"x","assertion":null}"#] {
+        let response = request(&server, "POST", "/v1/spirits/probe/ask", Some(TOKEN), body);
+        assert_eq!(status_of(&response), 200, "{body}: {response}");
+    }
 }
 
 #[test]

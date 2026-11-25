@@ -13,13 +13,17 @@ use std::time::{Duration, Instant};
 
 use maos_bin::assertion_supply::{self, ScopeBusy};
 use maos_bin::directed_task::{
-    AcceptError, AssertionCheck, DirectedTasks, RunFailure, SpiritRunState, TaskHalt, TaskHost,
-    TaskLimits, TaskRecord, TaskRunner, TaskState,
+    AcceptError, AssertionCheck, AssertionRefused, DirectedTasks, RunFailure, SpiritRunState,
+    TaskHalt, TaskHost, TaskLimits, TaskRecord, TaskRunner, TaskState,
 };
 use maos_control::Assertion;
 
 const CANARY: &str = "canary-head.canary-claims.canary-signature";
 const OTHER: &str = "other-head.other-claims.other-signature";
+
+/// What a turn observed: (assertion handed to the runner, assertion the seam supplies for the
+/// turn's pid, assertion it supplies for the neighbour's pid).
+type Observed = (Option<String>, Option<String>, Option<String>);
 
 fn assertion(text: &str) -> Assertion {
     Assertion::parse(text).expect("a compact JWT")
@@ -86,7 +90,7 @@ struct Turn {
     neighbour: u32,
     journal: Arc<Journal>,
     /// (assertion handed to the runner, assertion the seam supplies for `pid`, for `neighbour`).
-    seen: Mutex<Vec<(Option<String>, Option<String>, Option<String>)>>,
+    seen: Mutex<Vec<Observed>>,
     /// Panic inside the turn, after entering the scope.
     panics: bool,
 }
@@ -125,12 +129,12 @@ struct Verifier {
 }
 
 impl AssertionCheck for Verifier {
-    fn check(&self, assertion: &Assertion) -> Result<(), ()> {
+    fn check(&self, assertion: &Assertion) -> Result<(), AssertionRefused> {
         self.valid
             .iter()
             .any(|valid| *valid == assertion.expose())
             .then_some(())
-            .ok_or(())
+            .ok_or(AssertionRefused)
     }
 }
 
@@ -176,7 +180,7 @@ fn finished(tasks: &Arc<DirectedTasks>, id: &str) -> TaskRecord {
 fn a_scope_serves_its_own_pid_only_and_ends_on_every_exit() {
     let (pid, other) = (910_001, 910_002);
     let carried = assertion(CANARY);
-    assert_eq!(assertion_supply::enter(pid, None).unwrap().is_none(), true);
+    assert!(assertion_supply::enter(pid, None).unwrap().is_none());
     assert_eq!(assertion_supply::supply(pid).as_deref(), None);
 
     let scope = assertion_supply::enter(pid, Some(&carried))

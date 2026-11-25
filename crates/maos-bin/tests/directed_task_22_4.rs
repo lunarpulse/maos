@@ -744,15 +744,72 @@ impl Host {
         shown
     }
 
-    /// Rows of the audit store whose text columns contain `needle`.
+    /// Rows of the audit store that carry `needle` in ANY column: every column of every table of
+    /// the store, text or blob, compared as bytes (Story 23-2 F16a). A schema that grows a column
+    /// is searched without a test edit.
     fn rows_containing(&self, needle: &str) -> i64 {
-        self.count(
-            "SELECT COUNT(*) FROM transparency_log WHERE \
-             instr(CAST(payload_redacted AS TEXT), ?1) > 0 OR instr(intent, ?1) > 0 \
-             OR instr(COALESCE(correlation_id, ''), ?1) > 0 \
-             OR instr(CAST(capability_token AS TEXT), ?1) > 0",
-            [needle],
-        )
+        let conn = self.journal();
+        let tables: Vec<String> = conn
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            )
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        let mut total = 0;
+        for table in tables {
+            let columns: Vec<String> = conn
+                .prepare(&format!("PRAGMA table_info(\"{table}\")"))
+                .unwrap()
+                .query_map([], |row| row.get(1))
+                .unwrap()
+                .map(Result::unwrap)
+                .collect();
+            for column in columns {
+                total += conn
+                    .query_row(
+                        &format!(
+                            "SELECT COUNT(*) FROM \"{table}\" \
+                             WHERE instr(CAST(\"{column}\" AS BLOB), CAST(?1 AS BLOB)) > 0"
+                        ),
+                        [needle],
+                        |row| row.get::<_, i64>(0),
+                    )
+                    .unwrap();
+            }
+        }
+        total
+    }
+
+    /// Files under the Host's scratch tree (its home, the audit store and its WAL, the
+    /// stderr log, the journals) whose raw bytes carry `needle`. The assertion files the test
+    /// itself wrote (`*.jwt`) are the one thing it leaves out.
+    fn files_containing(&self, needle: &str) -> Vec<PathBuf> {
+        fn walk(dir: &std::path::Path, needle: &[u8], found: &mut Vec<PathBuf>) {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                    continue;
+                };
+                if meta.is_dir() {
+                    walk(&path, needle, found);
+                } else if meta.is_file()
+                    && path.extension().and_then(|e| e.to_str()) != Some("jwt")
+                    && std::fs::read(&path)
+                        .is_ok_and(|bytes| bytes.windows(needle.len()).any(|w| w == needle))
+                {
+                    found.push(path);
+                }
+            }
+        }
+        let mut found = Vec::new();
+        walk(&self.scratch.0, needle.as_bytes(), &mut found);
+        found
     }
 
     fn accepted_rows(&self) -> i64 {
@@ -764,32 +821,49 @@ impl Host {
 }
 
 /// AC3 attribution: the mints of a task's turn verify THAT task's assertion and their
-/// `identity.asserted` rows carry its `sub` and `iss`.
+/// `identity.asserted` rows carry its `sub` and `iss`; the next task of another principal, and
+/// the next without any assertion, each mint under their own principal and nobody else's.
+///
+/// There is no mint to observe OUTSIDE a door turn on this Host: the probe mints only while a
+/// frame is processed (a Host at rest has no `identity.asserted` row; the check below holds if
+/// one ever appears). The environment fallback outside a turn is proven at the seam, in-process
+/// (`assertion_scope_23_2`, `spirit_session::shell_turn_tests`).
 #[test]
 fn an_ask_with_its_own_assertion_mints_under_that_principal() {
     let mut host = Host::new(false).with_sso();
     host.boot();
-    let before = host.identities().len();
-    let file = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
-    host.ask_completed(&["on my behalf", "--assertion-file", &file]);
-    let rows = host.identities();
-    let turn = &rows[before..];
-    assert!(
-        !turn.is_empty(),
-        "the turn minted at least once\n{}",
-        host.stderr()
-    );
-    for (_, subject, issuer) in turn {
-        assert_eq!(subject, sso::SUB_ALICE, "{rows:?}");
-        assert_eq!(issuer, sso::ISS);
+    for (_, subject, _) in host.identities() {
+        assert_eq!(
+            subject,
+            sso::SUB_ENV,
+            "a Host at rest mints as the environment"
+        );
     }
-    // A mint outside that turn, on the same Host, is the environment's principal again.
-    let after = host.identities().len();
-    host.ask_completed(&["on the Host's behalf"]);
-    let rows = host.identities();
-    assert!(rows.len() > after, "the second turn minted too");
-    for (_, subject, _) in &rows[after..] {
-        assert_eq!(subject, sso::SUB_ENV, "{rows:?}");
+    let alice = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
+    let bob = host.assertion_file("bob.jwt", sso::TOKEN_BOB);
+    let mut seen = host.identities().len();
+    for (words, flag, want) in [
+        ("on alice's behalf", Some(&alice), sso::SUB_ALICE),
+        ("on bob's behalf", Some(&bob), sso::SUB_BOB),
+        ("on the Host's behalf", None, sso::SUB_ENV),
+        ("on alice's behalf again", Some(&alice), sso::SUB_ALICE),
+    ] {
+        match flag {
+            Some(file) => host.ask_completed(&[words, "--assertion-file", file]),
+            None => host.ask_completed(&[words]),
+        };
+        let rows = host.identities();
+        let turn = &rows[seen..];
+        assert!(
+            !turn.is_empty(),
+            "{words}: the turn minted at least once\n{}",
+            host.stderr()
+        );
+        for (_, subject, issuer) in turn {
+            assert_eq!(subject, want, "{words}: {rows:?}");
+            assert_eq!(issuer, sso::ISS);
+        }
+        seen = rows.len();
     }
     host.stop("-TERM");
 }
@@ -894,30 +968,75 @@ fn an_asks_assertion_appears_in_no_row_reply_or_error() {
             assert!(!surface.contains(needle), "{surface}");
         }
     }
+    // No file the Host left behind (the audit store and its WAL, the journals, the stderr log,
+    // anything under its home) carries it in any byte.
+    for needle in [sso::TOKEN_ALICE, parts[1], parts[2]] {
+        assert!(
+            host.files_containing(needle).is_empty(),
+            "a file under the Host's tree carries the assertion: {:?}",
+            host.files_containing(needle)
+        );
+    }
     host.stop("-TERM");
 }
 
 /// AC3 replay: an idempotent replay with a different assertion returns the first task and does
-/// not re-bind it.
+/// not re-bind it. The first task is still QUEUED (the Spirit is held by an earlier task of the
+/// environment's principal) when the replay arrives, which is the state in which a replay could
+/// re-bind a task that has not started: it must not, and the earlier task's turn must not run
+/// under either asker.
 #[test]
 fn a_replay_with_a_different_assertion_returns_the_first_task() {
     let mut host = Host::new(false).with_sso();
     host.boot();
     let alice = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
     let bob = host.assertion_file("bob.jwt", sso::TOKEN_BOB);
+    // The session must be ready (probe answered) before it is frozen.
+    let warm = host.ask(&["warm the session"]);
+    assert_eq!(host.finished(&warm).1["state"], "completed");
+    let runners = host.runners();
+    assert!(!runners.is_empty(), "no runner under the Host");
+    Host::signal_pids(&runners, "-STOP");
+
+    // The environment's task holds the Spirit: running, its turn frozen mid-flight.
+    let holder = host.ask(&["holds the Spirit"]);
+    let until = Instant::now() + WAIT;
+    while host.show(&holder).2["state"] != "running" {
+        assert!(Instant::now() < until, "the holding task never ran");
+        std::thread::sleep(Duration::from_millis(50));
+    }
     let before = host.identities().len();
+
     let first = host.ask(&["once", "--key", "replay-23-2", "--assertion-file", &alice]);
+    assert_eq!(host.show(&first).2["state"], "queued", "behind the holder");
     let second = host.ask(&["once", "--key", "replay-23-2", "--assertion-file", &bob]);
     assert_eq!(first, second, "the replay returns the first task");
-    host.finished(&first);
+    assert_eq!(
+        host.show(&first).2["state"],
+        "queued",
+        "the replay arrived while the first task had not started"
+    );
+
+    Host::signal_pids(&runners, "-CONT");
+    assert_eq!(host.finished(&holder).1["state"], "completed");
+    assert_eq!(host.finished(&first).1["state"], "completed");
     let rows = host.identities();
-    assert!(rows.len() > before);
-    for (_, subject, _) in &rows[before..] {
-        assert_eq!(
-            subject,
-            sso::SUB_ALICE,
-            "bob never bound the task: {rows:?}"
-        );
-    }
+    let turns = &rows[before..];
+    assert!(!turns.is_empty(), "the turns minted");
+    // The holder's turn precedes the first task's; neither bleeds into the other, and bob
+    // never bound the task.
+    let subjects: Vec<&str> = turns.iter().map(|(_, s, _)| s.as_str()).collect();
+    let switch = subjects
+        .iter()
+        .position(|s| *s == sso::SUB_ALICE)
+        .expect("alice's task minted under alice");
+    assert!(
+        subjects[..switch].iter().all(|s| *s == sso::SUB_ENV) && switch > 0,
+        "the holder minted as the environment first: {subjects:?}"
+    );
+    assert!(
+        subjects[switch..].iter().all(|s| *s == sso::SUB_ALICE),
+        "bob never bound the task and alice's rows are not interleaved: {subjects:?}"
+    );
     host.stop("-TERM");
 }

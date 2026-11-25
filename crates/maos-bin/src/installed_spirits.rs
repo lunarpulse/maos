@@ -351,16 +351,15 @@ pub fn run_turn(
     use crate::spirit_session::TurnError;
     let _serial = port.serialize();
     let (pid, generation) = port.await_ready().map_err(TurnFailure::Turn)?;
-    // The task's assertion governs the mints for this pid for exactly this turn (Story 23-2,
-    // D-23-2-04 A): `_scope` is dropped on every exit path below.
-    let _scope = crate::assertion_supply::enter(pid, assertion).map_err(|_| {
-        TurnFailure::DispatchRefused(
-            "an assertion scope is already active for this Spirit".to_owned(),
-        )
-    })?;
+    // The task's assertion governs the mints for this pid for exactly this turn's export
+    // (Story 23-2, D-23-2-04 A), but it is the SESSION that gives it force: it is queued with
+    // the request, takes effect when the session claims this exact frame and ends when that
+    // export ends or aborts. Nothing here scopes it, so a turn already running or queued ahead
+    // of this frame never sees it, and this caller's deadline cannot strip it from a guest that
+    // is still working (`ShellPort::claim`, the session loop).
     let deadline = std::time::Instant::now() + port.turn_budget();
     let turn = port
-        .arm_labelled(label, frame_id, name, pid, generation, deadline)
+        .arm_labelled(label, frame_id, name, pid, generation, deadline, assertion)
         .map_err(TurnFailure::Turn)?;
     let frame = maos_domain::frame::IacFrame {
         frame_id,

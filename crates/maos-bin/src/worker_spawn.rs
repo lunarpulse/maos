@@ -403,6 +403,32 @@ impl From<GovernedMintError> for String {
     }
 }
 
+/// Resolve the SSO principal a mint for `spirit_pid` will be issued under (`Ok(None)` when SSO
+/// is not configured). This is the only step of a governed mint that can WAIT on the identity
+/// provider (a discovery refresh, bounded by `verify_wait`), so a caller that holds a lock for
+/// the commit resolves it BEFORE taking the lock and hands the result to
+/// [`issue_enterprise_governed_capability_for_principal`] inside it (Story 23-2 F4).
+#[cfg(feature = "network")]
+pub fn resolve_enterprise_principal(
+    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+    spirit_pid: u32,
+    capability_key: &str,
+) -> Result<Option<maos_domain::ports::AuthenticatedPrincipal>, GovernedMintError> {
+    match enterprise_runtime {
+        Some(runtime) if runtime.sso_configured() => {
+            let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
+                GovernedMintError::SsoAssertionMissing(format!(
+                    "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
+                ))
+            })?;
+            runtime
+                .verify_principal_for_issuance(spirit_pid, &assertion)
+                .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))
+        }
+        _ => Ok(None),
+    }
+}
+
 #[cfg(feature = "network")]
 pub fn issue_enterprise_governed_capability(
     capability: &CapabilityRegistryAdapter,
@@ -414,21 +440,38 @@ pub fn issue_enterprise_governed_capability(
     posture_hash: [u8; 32],
     intent_class: IntentClass,
 ) -> Result<CapabilityToken, GovernedMintError> {
-    let capability_key = scope_action_key(&scope).to_string();
-    let principal = match enterprise_runtime {
-        Some(runtime) if runtime.sso_configured() => {
-            let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
-                GovernedMintError::SsoAssertionMissing(format!(
-                    "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
-                ))
-            })?;
-            runtime
-                .verify_principal_for_issuance(spirit_pid, &assertion)
-                .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string()))?
-        }
-        _ => None,
-    };
+    let principal =
+        resolve_enterprise_principal(enterprise_runtime, spirit_pid, scope_action_key(&scope))?;
+    issue_enterprise_governed_capability_for_principal(
+        capability,
+        enterprise_runtime,
+        enterprise_pdp_runtime,
+        principal,
+        spirit_pid,
+        scope,
+        ttl_secs,
+        posture_hash,
+        intent_class,
+    )
+}
 
+/// The governed mint with the principal already resolved by
+/// [`resolve_enterprise_principal`]: PDP, kernel mint and `identity.asserted` persist only, so
+/// it never waits on the identity provider.
+#[cfg(feature = "network")]
+#[allow(clippy::too_many_arguments)]
+pub fn issue_enterprise_governed_capability_for_principal(
+    capability: &CapabilityRegistryAdapter,
+    enterprise_runtime: Option<&enterprise_identity::EnterpriseRuntime>,
+    enterprise_pdp_runtime: Option<&enterprise_pdp_runtime::EnterprisePdpRuntime>,
+    principal: Option<maos_domain::ports::AuthenticatedPrincipal>,
+    spirit_pid: u32,
+    scope: Scope,
+    ttl_secs: u32,
+    posture_hash: [u8; 32],
+    intent_class: IntentClass,
+) -> Result<CapabilityToken, GovernedMintError> {
+    let capability_key = scope_action_key(&scope).to_string();
     if let Some(pdp) = enterprise_pdp_runtime {
         let principal_attributes = principal.as_ref().map(principal_attributes_for_pdp);
         match pdp

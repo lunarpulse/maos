@@ -130,6 +130,23 @@ speaks MCP 2026-07-28 first and falls back to the `initialize` handshake and
 `Mcp-Session-Id` of a 2025-11-25 server. `maos purge` removes the bearer entries
 with the provider keys.
 
+### Enterprise identity (SSO) key sources
+
+`MAOS_SSO_JWKS` (a static JWKS, the air-gap key source) or, with the
+`online-adapters` build, `MAOS_SSO_DISCOVERY_ISSUER` (an https OIDC issuer whose
+rotating keys the Host follows) supplies the verification keys; setting both
+leaves SSO configured-down, which denies issuance and never falls open.
+`MAOS_SSO_ISSUERS` must then hold exactly the discovery issuer.
+`MAOS_SSO_JWKS_TTL_SECS` (default 3600, 1 to 604800) is how long a discovered key
+set is trusted, and `MAOS_SSO_JWKS_MIN_REFRESH_SECS` (default 30, at most the TTL)
+is the minimum time between refreshes. A key the issuer withdrew can verify for up
+to half the TTL plus the idle tick: 3.5 days at the maximum TTL. A fetch that does
+not answer within 30 s is abandoned; an issuer that never answers at all leaves
+discovery down until it does. A `MAOS_SSO_*` variable that is not valid UTF-8
+leaves SSO configured-down (`sso_env_not_unicode: <NAME>`). The principal is
+asserted, not authenticated, at the door. Every variable and typed reason is in
+`docs/runbooks/ent-1-enterprise-daemon-posture.md` in the source tree.
+
 ### Remove MAOS state
 
 `maos purge` is a dry run unless `--yes` is present. It names each MAOS-owned

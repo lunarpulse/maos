@@ -313,6 +313,76 @@ fn a_tuning_knob_alone_is_configured_down() {
     }
 }
 
+/// Story 23-2 F13: a `MAOS_SSO_*` variable that is PRESENT but not valid UTF-8 is never read as
+/// absent. Whichever of the seven it is, and whether or not anything else is configured, SSO is
+/// configured-down with a typed reason that names the variable and never echoes the value.
+#[cfg(unix)]
+#[test]
+fn a_non_utf8_sso_variable_is_configured_down_never_absent() {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+    const NAMES: [&str; 7] = [
+        "MAOS_SSO_JWKS",
+        "MAOS_SSO_ISSUERS",
+        "MAOS_SSO_AUDIENCE",
+        "MAOS_SSO_ALGS",
+        "MAOS_SSO_DISCOVERY_ISSUER",
+        "MAOS_SSO_JWKS_TTL_SECS",
+        "MAOS_SSO_JWKS_MIN_REFRESH_SECS",
+    ];
+    let bad = || OsString::from_vec(b"canary-value-\xff\xfe".to_vec());
+    let good = |name: &str| -> Option<OsString> {
+        Some(OsString::from(match name {
+            "MAOS_SSO_JWKS" => sso_fixtures::JWKS_KEY_A,
+            "MAOS_SSO_ISSUERS" => sso_fixtures::ISS_GOOD,
+            "MAOS_SSO_AUDIENCE" => sso_fixtures::AUD_EXPECTED,
+            _ => return None,
+        }))
+    };
+    for name in NAMES {
+        // Beside an otherwise valid static configuration, and entirely alone.
+        type Lookup = Box<dyn Fn(&str) -> Option<OsString>>;
+        let surroundings: [(&str, Lookup); 2] = [
+            ("beside a valid configuration", Box::new(good)),
+            ("alone", Box::new(|_| None)),
+        ];
+        for (label, others) in surroundings {
+            let env = SsoEnv::from_lookup(|asked| {
+                if asked == name {
+                    Some(bad())
+                } else {
+                    others(asked)
+                }
+            });
+            assert_eq!(env.invalid, Some(name), "{name} {label}");
+            assert!(env.any(), "{name} {label}: present counts as configured");
+
+            let touched = AtomicBool::new(false);
+            let runtime = sso_runtime(&env, &|| {
+                touched.store(true, Ordering::SeqCst);
+                Err(SsoDownReason::DiscoveryUnsupportedBuild)
+            });
+            assert!(runtime.sso_configured(), "{name} {label}");
+            assert_eq!(
+                runtime.sso_down_reason(),
+                Some(&SsoDownReason::EnvNotUnicode(name)),
+                "{name} {label}"
+            );
+            assert_denied_with(&runtime, &format!("sso_env_not_unicode: {name}"));
+            let shown = format!("{:?} {env:?}", runtime.sso_down_reason());
+            assert!(!shown.contains("canary"), "{name} {label}: {shown}");
+            assert!(!touched.load(Ordering::SeqCst), "{name} {label}");
+        }
+    }
+    // The valid configuration without the bad variable is unharmed.
+    let env = SsoEnv::from_lookup(good);
+    assert_eq!(env.invalid, None);
+    assert_eq!(
+        sso_runtime(&env, &|| unreachable!()).sso_down_reason(),
+        None
+    );
+}
+
 #[cfg(feature = "online-adapters")]
 mod discovery_mode {
     use super::*;

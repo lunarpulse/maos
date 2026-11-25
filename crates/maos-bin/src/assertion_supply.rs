@@ -7,13 +7,26 @@
 //! 2. the process environment's `MAOS_SSO_ASSERTION` (the static, air-gap source; also what a
 //!    task that carried no assertion uses).
 //!
-//! A scope exists for exactly one turn: the runner enters it after it knows the Spirit's pid and
-//! drops it on every exit path (the guard is released by `Drop`, including a panic unwinding
-//! through the turn). It is keyed by pid, so a mint for any other Spirit, and any mint outside the
-//! turn, still resolves the environment. Every mint verifies the assertion it was given.
+//! A scope exists for exactly one turn EXPORT, and the session owns it, not the caller waiting
+//! on the answer (Story 23-2 F2):
+//!
+//! * an installed Spirit's task travels with its request (`ShellPort::arm_labelled`); the session
+//!   [`enter`]s the scope when it CLAIMS that exact frame and drops it when the export completes,
+//!   when the session loop aborts or, at the latest, after the child is stopped and reaped. A
+//!   mailbox turn running or queued ahead of the frame resolves the environment, and a caller
+//!   that gave up at its deadline cannot strip the scope from a guest still working: that
+//!   guest's late mints stay on the principal that asked, never on the next task's and never on
+//!   the environment's;
+//! * Mira (in-process) enters it around her own handler, under a per-runner serial lock.
+//!
+//! The guard is released by `Drop`, including a panic unwinding through the turn. It is keyed by
+//! pid, so a mint for any other Spirit, and any mint outside the turn, still resolves the
+//! environment. Every mint verifies the assertion it was given.
 //!
 //! Hook boundary (RELEASE-HOLDS 23-2.c): a lifecycle hook that mints for the same pid while the
-//! turn runs uses the task's assertion, because the seam sees a pid, not a caller.
+//! turn runs uses the task's assertion, because the seam sees a pid, not a caller. The same holds
+//! for Mira's own background work that mints for her pid while her task runs: the seam cannot
+//! tell callers apart.
 //!
 //! The registry is bounded by the number of running turns (one per Spirit pid): a second scope for
 //! a pid that already has one is refused, never replaced.

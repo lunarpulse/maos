@@ -120,6 +120,9 @@ impl Rules {
                 return Err(IdentityError::AlgorithmRejected);
             }
         }
+        if !jwk.allows_verify() {
+            return Err(IdentityError::JwksUnavailable);
+        }
 
         let decoding_key = decoding_key_for(&jwk, algorithm)?;
         let mut validation = Validation::new(algorithm.jwt_alg());
@@ -298,7 +301,9 @@ struct Jwks {
 struct Jwk {
     kty: String,
     kid: String,
-    /// RFC 7517 `use`; the discovery path drops a key marked for encryption.
+    /// RFC 7517 `use`; only the discovery path (feature `discovery`) drops a key marked for
+    /// encryption, so the field is unread without that feature.
+    #[cfg_attr(not(feature = "discovery"), allow(dead_code))]
     #[serde(default, rename = "use")]
     key_use: Option<String>,
     #[serde(default)]
@@ -311,6 +316,21 @@ struct Jwk {
     x: Option<String>,
     #[serde(default)]
     y: Option<String>,
+    /// RFC 7518 `crv` of an `EC` key.
+    #[serde(default)]
+    crv: Option<String>,
+    /// RFC 7517 `key_ops`; when present it must name `verify`.
+    #[serde(default)]
+    key_ops: Option<Vec<String>>,
+}
+
+impl Jwk {
+    /// A key whose `key_ops` is declared and excludes `verify` is not a verification key.
+    fn allows_verify(&self) -> bool {
+        self.key_ops
+            .as_ref()
+            .is_none_or(|ops| ops.iter().any(|op| op == "verify"))
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -443,14 +463,23 @@ fn decode_segment(segment: &str) -> Result<Vec<u8>, IdentityError> {
         .map_err(|_| IdentityError::MalformedAssertion)
 }
 
+/// The key type and curve a key must declare to be used under `algorithm` (RFC 7518 §3.3/§3.4):
+/// RS256 takes an `RSA` key, ES256 an `EC` key on `P-256`. Material of the other family inside
+/// an entry that declares the wrong one is never read.
 fn decoding_key_for(jwk: &Jwk, algorithm: OidcAlgorithm) -> Result<DecodingKey, IdentityError> {
     match algorithm {
         OidcAlgorithm::Rs256 => {
+            if jwk.kty != "RSA" {
+                return Err(IdentityError::AlgorithmRejected);
+            }
             let n = jwk.n.as_deref().ok_or(IdentityError::JwksUnavailable)?;
             let e = jwk.e.as_deref().ok_or(IdentityError::JwksUnavailable)?;
             DecodingKey::from_rsa_components(n, e).map_err(|_| IdentityError::JwksUnavailable)
         }
         OidcAlgorithm::Es256 => {
+            if jwk.kty != "EC" || jwk.crv.as_deref() != Some("P-256") {
+                return Err(IdentityError::AlgorithmRejected);
+            }
             let x = jwk.x.as_deref().ok_or(IdentityError::JwksUnavailable)?;
             let y = jwk.y.as_deref().ok_or(IdentityError::JwksUnavailable)?;
             DecodingKey::from_ec_components(x, y).map_err(|_| IdentityError::JwksUnavailable)

@@ -10,10 +10,17 @@
 //!   new thread: they wait in a queue of [`QUEUE_DEPTH`] jobs or fail at once
 //!   when it is full. A job whose deadline passed while it waited is skipped,
 //!   never run late.
+//! - **One deadline.** The deadline is one absolute instant fixed when the
+//!   call starts. Queueing, the lookup and the receipt of its answer all
+//!   happen before it; an answer that arrives after it (a lookup that was
+//!   already running when it passed) is discarded, never returned.
 //! - **Answers are capped.** More than [`MAX_ANSWERS`] distinct addresses is
 //!   a failure, not a truncation: `PolicedIo` vets every answer and the bound
 //!   connection tries every vetted address, so an unbounded list is unbounded
-//!   work. Duplicates collapse; order is kept.
+//!   work. Duplicates collapse; order is kept. The OS adapter reads at most
+//!   [`MAX_RAW_ANSWERS`] raw entries; an answer that is longer than that is a
+//!   failure too, because the entries past the budget were never looked at
+//!   (see [`distinct_answers`]).
 //! - **Fail closed.** A lookup error, an empty answer, a full queue, a dead
 //!   worker and a missed deadline are all [`ResolveFailed`].
 //!
@@ -31,12 +38,15 @@ use maos_domain::outbound::{ResolveFailed, ResolveHost};
 
 /// Most distinct addresses one lookup may return.
 pub const MAX_ANSWERS: usize = 16;
+/// Most raw answer entries the OS adapter reads before it gives up (duplicates included).
+pub const MAX_RAW_ANSWERS: usize = MAX_ANSWERS * 4;
 /// Jobs that may wait behind the one running lookup.
 pub const QUEUE_DEPTH: usize = 4;
 /// Deadline of one lookup, queue wait included.
 pub const RESOLVE_DEADLINE: Duration = Duration::from_secs(2);
 
 type Lookup = dyn Fn(&str, u16) -> std::io::Result<Vec<IpAddr>> + Send + Sync;
+type Now = dyn Fn() -> Instant + Send + Sync;
 type Answer = Result<Vec<IpAddr>, ResolveFailed>;
 
 struct Job {
@@ -52,6 +62,39 @@ pub struct BoundedResolver {
     /// `None` when the worker thread could not start: every call fails.
     jobs: Option<SyncSender<Job>>,
     deadline: Duration,
+    now: Arc<Now>,
+}
+
+/// The distinct addresses of a raw answer, within the scan budget.
+///
+/// Reads at most [`MAX_RAW_ANSWERS`] entries. Reaching the end of the answer inside the budget
+/// returns the distinct addresses (order kept). More than [`MAX_ANSWERS`] distinct ones stop the
+/// scan early and are returned for the caller's cap to refuse. Entries remaining after the
+/// budget was spent are an error: truncating there would accept an answer whose unread tail
+/// could hold more addresses than the cap allows.
+///
+/// # Errors
+/// `InvalidData` when the budget ran out before the end of the answer.
+pub fn distinct_answers(mut raw: impl Iterator<Item = IpAddr>) -> std::io::Result<Vec<IpAddr>> {
+    let mut seen = Vec::new();
+    for _ in 0..MAX_RAW_ANSWERS {
+        let Some(address) = raw.next() else {
+            return Ok(seen);
+        };
+        if !seen.contains(&address) {
+            seen.push(address);
+        }
+        if seen.len() > MAX_ANSWERS {
+            return Ok(seen);
+        }
+    }
+    if raw.next().is_some() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "resolver answer exceeds the scan budget",
+        ));
+    }
+    Ok(seen)
 }
 
 impl BoundedResolver {
@@ -60,18 +103,7 @@ impl BoundedResolver {
     pub fn os(deadline: Duration) -> Self {
         Self::with_lookup(
             Arc::new(|host: &str, port: u16| {
-                let mut seen = Vec::new();
-                // `take(MAX_ANSWERS + 1)` bounds the work done before the cap
-                // check; the extra one is what makes an oversize answer visible.
-                for address in (host, port).to_socket_addrs()?.take(MAX_ANSWERS * 4 + 1) {
-                    if !seen.contains(&address.ip()) {
-                        seen.push(address.ip());
-                    }
-                    if seen.len() > MAX_ANSWERS {
-                        break;
-                    }
-                }
-                Ok(seen)
+                distinct_answers((host, port).to_socket_addrs()?.map(|address| address.ip()))
             }),
             deadline,
         )
@@ -80,21 +112,29 @@ impl BoundedResolver {
     /// A resolver over an injected lookup (tests, and the OS lookup above).
     #[must_use]
     pub fn with_lookup(lookup: Arc<Lookup>, deadline: Duration) -> Self {
+        Self::with_lookup_and_clock(lookup, deadline, Arc::new(Instant::now))
+    }
+
+    /// As [`Self::with_lookup`], reading time from `now` (tests move it without sleeping).
+    #[must_use]
+    pub fn with_lookup_and_clock(lookup: Arc<Lookup>, deadline: Duration, now: Arc<Now>) -> Self {
         let (jobs, queue) = sync_channel::<Job>(QUEUE_DEPTH);
+        let worker_now = Arc::clone(&now);
         let started = thread::Builder::new()
             .name("maos-resolver".to_owned())
-            .spawn(move || serve(&queue, lookup.as_ref()))
+            .spawn(move || serve(&queue, lookup.as_ref(), worker_now.as_ref()))
             .is_ok();
         Self {
             jobs: started.then_some(jobs),
             deadline,
+            now,
         }
     }
 }
 
-fn serve(queue: &Receiver<Job>, lookup: &Lookup) {
+fn serve(queue: &Receiver<Job>, lookup: &Lookup, now: &Now) {
     while let Ok(job) = queue.recv() {
-        if Instant::now() >= job.expires {
+        if now() >= job.expires {
             continue;
         }
         let answer = lookup(&job.host, job.port)
@@ -119,17 +159,24 @@ fn serve(queue: &Receiver<Job>, lookup: &Lookup) {
 impl ResolveHost for BoundedResolver {
     fn resolve(&self, host: &str, port: u16) -> Answer {
         let jobs = self.jobs.as_ref().ok_or(ResolveFailed)?;
+        // One absolute deadline for queueing, the lookup and the receipt of its answer.
+        let expires = (self.now)() + self.deadline;
         let (reply, answer) = sync_channel(1);
         jobs.try_send(Job {
             host: host.to_owned(),
             port,
-            expires: Instant::now() + self.deadline,
+            expires,
             reply,
         })
         .map_err(|_| ResolveFailed)?;
-        answer
-            .recv_timeout(self.deadline)
-            .map_err(|_| ResolveFailed)?
+        let outcome = answer
+            .recv_timeout(expires.saturating_duration_since((self.now)()))
+            .map_err(|_| ResolveFailed)?;
+        // A lookup that was already running when the deadline passed answers late: discard it.
+        if (self.now)() >= expires {
+            return Err(ResolveFailed);
+        }
+        outcome
     }
 }
 

@@ -6,11 +6,13 @@
 //! (the lookup errors after a safety limit).
 
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use maos_bin::bounded_resolver::{BoundedResolver, MAX_ANSWERS, QUEUE_DEPTH};
+use maos_bin::bounded_resolver::{
+    distinct_answers, BoundedResolver, MAX_ANSWERS, MAX_RAW_ANSWERS, QUEUE_DEPTH,
+};
 use maos_domain::outbound::{ResolveFailed, ResolveHost};
 
 const DEADLINE: Duration = Duration::from_millis(50);
@@ -214,4 +216,71 @@ fn jobs_that_expired_in_the_queue_never_run_late() {
         2,
         "only the hung call and the fresh one ran"
     );
+}
+
+/// F7: the OS adapter's raw scan has a budget; an answer that is not fully read inside it fails
+/// closed (its unread tail could hold more addresses than the cap allows), and the cap still
+/// stops the scan early.
+#[test]
+fn an_answer_longer_than_the_scan_budget_fails_closed() {
+    // Exactly the budget, 16 distinct among duplicates: read to the end, admitted.
+    let within: Vec<IpAddr> = (0..MAX_RAW_ANSWERS)
+        .map(|index| ip(index % MAX_ANSWERS))
+        .collect();
+    assert_eq!(within.len(), MAX_RAW_ANSWERS);
+    assert_eq!(
+        distinct_answers(within.into_iter()).unwrap().len(),
+        MAX_ANSWERS
+    );
+    // One entry past the budget, all duplicates: the tail was never read -> refused.
+    let past: Vec<IpAddr> = (0..=MAX_RAW_ANSWERS).map(|_| ip(0)).collect();
+    assert!(distinct_answers(past.into_iter()).is_err());
+    // The tail that hides the excess: 10 distinct addresses fill the budget, 7 new ones follow.
+    // Truncating at the budget would admit 10; the answer really holds 17.
+    let hidden_excess: Vec<IpAddr> = (0..MAX_RAW_ANSWERS)
+        .map(|index| ip(index % 10))
+        .chain((10..17).map(ip))
+        .collect();
+    assert!(distinct_answers(hidden_excess.into_iter()).is_err());
+    // Over the cap inside the budget: the scan stops and the caller's cap refuses it.
+    let over: Vec<IpAddr> = (0..=MAX_ANSWERS).map(ip).collect();
+    assert_eq!(
+        distinct_answers(over.into_iter()).unwrap().len(),
+        MAX_ANSWERS + 1
+    );
+}
+
+/// F8: one absolute deadline covers queueing, execution and receipt. A lookup that was already
+/// RUNNING when the deadline passed answers late, and the answer is discarded.
+#[test]
+fn a_running_lookup_that_finishes_after_the_deadline_is_discarded() {
+    let origin = Instant::now();
+    let elapsed_ms = Arc::new(AtomicU64::new(0));
+    let now = {
+        let elapsed_ms = Arc::clone(&elapsed_ms);
+        Arc::new(move || origin + Duration::from_millis(elapsed_ms.load(Ordering::SeqCst)))
+    };
+    let deadline = Duration::from_secs(5);
+    let resolver = {
+        let elapsed_ms = Arc::clone(&elapsed_ms);
+        BoundedResolver::with_lookup_and_clock(
+            Arc::new(move |host: &str, _| {
+                if host == "slow.example" {
+                    // The lookup runs past the deadline and then answers successfully.
+                    elapsed_ms.store(5_000, Ordering::SeqCst);
+                }
+                Ok(vec![ip(7)])
+            }),
+            deadline,
+            now,
+        )
+    };
+    assert_eq!(
+        resolver.resolve("slow.example", 443),
+        Err(ResolveFailed),
+        "an answer after the deadline is never returned"
+    );
+    // Just inside the deadline the same lookup is accepted.
+    elapsed_ms.store(0, Ordering::SeqCst);
+    assert_eq!(resolver.resolve("fast.example", 443), Ok(vec![ip(7)]));
 }
