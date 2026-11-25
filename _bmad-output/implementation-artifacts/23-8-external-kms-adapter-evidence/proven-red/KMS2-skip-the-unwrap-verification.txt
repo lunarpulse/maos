@@ -1,0 +1,13 @@
+KMS-2 (operator ruling A, 2026-11-25): "the encrypted-file store verifies the envelope opens before it commits".
+
+Plant (marker E238-PLANT, since removed; grep-verified absent): in `EncryptedFileSecretStore::store`
+(`crates/maos-secrets/src/lib.rs`) the `open_at_rest` unwrap of the fresh envelope was replaced by
+`let verified = value.as_bytes().to_vec();`, so the comparison trivially passed and the envelope was committed unverified.
+
+Command: cargo test --locked -p maos-secrets --features http-kms --test external_kms_23_8
+Result with the plant: 22 passed; 4 FAILED (exit 101):
+  a_store_whose_envelope_does_not_open_leaves_the_old_credential_untouched  (store returned Ok on an unusable `wrapped`)
+  a_refused_first_store_creates_no_file                                    (store returned Ok)
+  a_healthy_store_costs_exactly_one_extra_unwrap                           (unwrap count 0, expected 1)
+  an_encrypted_file_store_over_the_endpoint_round_trips_a_credential       (unwrap count 0 after store, expected 1)
+Result with the plant removed: 26 passed; 0 failed (23 tests before the KMS-2 change).

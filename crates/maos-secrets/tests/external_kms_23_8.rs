@@ -121,13 +121,132 @@ fn an_encrypted_file_store_over_the_endpoint_round_trips_a_credential() {
         "the file on disk holds no plaintext"
     );
     assert_eq!(
+        fixture.count("POST", "/unwrap"),
+        1,
+        "the store's own verification went through /unwrap"
+    );
+    assert_eq!(
         store.get(SecretKey::AnthropicApiKey).unwrap().as_deref(),
         Some("sk-ant-through-the-kms")
     );
     assert_eq!(
         fixture.count("POST", "/unwrap"),
+        2,
+        "the read went through /unwrap once more"
+    );
+}
+
+fn store_over(
+    fixture: &KmsFixture,
+    root: std::path::PathBuf,
+    clock: &Arc<FakeClock>,
+) -> maos_secrets::EncryptedFileSecretStore {
+    maos_secrets::EncryptedFileSecretStore::new(
+        root,
+        Arc::new(healthy_adapter(fixture, clock)),
+        Arc::new(RingCryptoProvider),
+    )
+}
+
+fn directory_names(root: &std::path::Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(root)
+        .expect("vault directory")
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+/// KMS-2: a `wrapped` the endpoint cannot unwrap, or unwraps to another key,
+/// must not replace an existing credential: the store verifies the envelope
+/// opens to the value before it touches the file.
+#[test]
+fn a_store_whose_envelope_does_not_open_leaves_the_old_credential_untouched() {
+    use maos_domain::ports::{SecretKey, SecretStore};
+
+    for (label, mode) in [
+        ("unusable wrapped, /unwrap refuses", Mode::UnusableWrap),
+        ("/unwrap answers a different key", Mode::WrongUnwrapKey),
+    ] {
+        let fixture = KmsFixture::start();
+        let clock = FakeClock::new();
+        let directory = tempfile::tempdir().expect("fixture directory");
+        let root = directory.path().join("vault");
+        let store = store_over(&fixture, root.clone(), &clock);
+        store
+            .put(SecretKey::AnthropicApiKey, "sk-ant-old-credential")
+            .expect("a first store through a healthy endpoint");
+        let sealed_path = root.join("anthropic-api-key.sealed");
+        let before = std::fs::read(&sealed_path).expect("old sealed file");
+        let names_before = directory_names(&root);
+
+        fixture.set_mode(mode);
+        let error = store
+            .put(SecretKey::AnthropicApiKey, "sk-ant-new-credential")
+            .expect_err("an envelope that does not open must be refused");
+        let text = format!("{error:?} {error}");
+        assert!(
+            !text.contains("sk-ant-new-credential") && !text.contains("sk-ant-old-credential"),
+            "{label}: a credential in the error: {text}"
+        );
+        assert_eq!(
+            std::fs::read(&sealed_path).expect("sealed file still present"),
+            before,
+            "{label}: the old file must be byte-identical"
+        );
+        assert_eq!(
+            directory_names(&root),
+            names_before,
+            "{label}: no temporary file may be left"
+        );
+        fixture.set_mode(Mode::Normal);
+        assert_eq!(
+            store.get(SecretKey::AnthropicApiKey).unwrap().as_deref(),
+            Some("sk-ant-old-credential"),
+            "{label}: the old credential still reads"
+        );
+    }
+}
+
+/// KMS-2, first write: the refusal leaves no file at all.
+#[test]
+fn a_refused_first_store_creates_no_file() {
+    use maos_domain::ports::{SecretKey, SecretStore};
+
+    let fixture = KmsFixture::start();
+    let clock = FakeClock::new();
+    let directory = tempfile::tempdir().expect("fixture directory");
+    let root = directory.path().join("vault");
+    let store = store_over(&fixture, root.clone(), &clock);
+    fixture.set_mode(Mode::UnusableWrap);
+    store
+        .put(SecretKey::AnthropicApiKey, "sk-ant-never-written")
+        .expect_err("refused");
+    assert!(
+        directory_names(&root).is_empty(),
+        "nothing may be written: {:?}",
+        directory_names(&root)
+    );
+}
+
+/// KMS-2, healthy endpoint: the store succeeds and costs exactly one extra
+/// `POST /unwrap`.
+#[test]
+fn a_healthy_store_costs_exactly_one_extra_unwrap() {
+    use maos_domain::ports::{SecretKey, SecretStore};
+
+    let fixture = KmsFixture::start();
+    let clock = FakeClock::new();
+    let directory = tempfile::tempdir().expect("fixture directory");
+    let store = store_over(&fixture, directory.path().join("vault"), &clock);
+    store
+        .put(SecretKey::AnthropicApiKey, "sk-ant-verified")
+        .expect("store");
+    assert_eq!(fixture.count("POST", "/wrap"), 1);
+    assert_eq!(
+        fixture.count("POST", "/unwrap"),
         1,
-        "the read went through /unwrap"
+        "one verification unwrap, no read yet"
     );
 }
 
