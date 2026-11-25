@@ -6,18 +6,16 @@
 //! itself (`ResolveHost` is injected), reads no environment and no clock.
 //!
 //! A refusal is typed by its class and never carries any part of the input.
-//! Known limit (RELEASE-HOLDS 23-0.a): for a host NAME, `PolicedIo` vets every
-//! DNS answer but does not bind the connection to them. `IoSubsystemPort`
-//! takes a URL string, so the inner adapter resolves the name again, and a
-//! rebinding answer (TTL 0: public first, private second) is not stopped.
-//! Consumer stories must not count `PolicedIo` as SSRF protection for host
-//! names until the port can bind the connection to the vetted addresses.
-//! Literal-IP URLs are not affected. Worker egress connects to the vetted
-//! addresses and has no such gap.
+//! Host names: `PolicedIo` vets every DNS answer once and binds the request to
+//! those addresses through `IoSubsystemPort::bind` (Story 23-0b), so a later
+//! DNS answer cannot move the connection. A port that cannot bind refuses a
+//! name (`outbound_unbound_refused`). Only a port that declares
+//! `never_follows_redirects` is wrapped. Literal-IP URLs have nothing to
+//! rebind. Worker egress connects to the vetted addresses itself.
 
 use crate::ports::io_subsystem::{HttpExchange, IoError, IoSubsystemPort};
 use std::fmt;
-use std::net::IpAddr;
+use std::net::{IpAddr, SocketAddr};
 use url::{Host, Url};
 
 /// Destination class of one IP address.
@@ -85,6 +83,7 @@ fn classify_v6(ip: std::net::Ipv6Addr) -> IpClass {
         && !(segments[0] == 0x2001 && segments[1] < 0x0200)
         && !(segments[0] == 0x2001 && segments[1] == 0x0db8)
         && segments[0] != 0x2002
+        && !(segments[0] == 0x3fff && segments[1] & 0xf000 == 0)
     {
         // Only global unicast, minus the special-use blocks inside 2000::/3.
         IpClass::Public
@@ -105,6 +104,8 @@ pub enum OutboundRefusal {
     Redirect,
     Unresolved,
     UrlInvalid,
+    /// The inner port cannot bind a host name to the vetted addresses.
+    Unbound,
 }
 
 impl OutboundRefusal {
@@ -119,6 +120,7 @@ impl OutboundRefusal {
             Self::Reserved => "outbound_reserved_refused",
             Self::Redirect => "outbound_redirect_refused",
             Self::Unresolved => "outbound_unresolved",
+            Self::Unbound => "outbound_unbound_refused",
             Self::UrlInvalid => "outbound_url_invalid",
         }
     }
@@ -301,10 +303,54 @@ impl VettedUrl {
     pub fn addresses(&self) -> &[IpAddr] {
         &self.addresses
     }
+
+    /// True when the host is a DNS name (so the connection can be rebound),
+    /// false for an IP literal.
+    #[must_use]
+    pub fn is_name(&self) -> bool {
+        matches!(self.url.host(), Some(Host::Domain(_)))
+    }
+
+    /// The host exactly as a connector parses it from the URL (lowercase,
+    /// punycode for a name; an IPv6 literal keeps its brackets).
+    #[must_use]
+    pub fn host_str(&self) -> &str {
+        self.url.host_str().unwrap_or_default()
+    }
+
+    /// The explicit or scheme-default port; `vet_url` refuses a URL without one.
+    #[must_use]
+    pub fn port(&self) -> u16 {
+        self.url.port_or_known_default().unwrap_or_default()
+    }
+
+    /// The vetted addresses paired with the URL's port.
+    #[must_use]
+    pub fn socket_addrs(&self) -> Vec<SocketAddr> {
+        let port = self.port();
+        self.addresses
+            .iter()
+            .map(|ip| SocketAddr::new(*ip, port))
+            .collect()
+    }
 }
 
 /// An [`IoSubsystemPort`] that vets every URL before it delegates. A refused
-/// URL never reaches the inner port. A 3xx answer is refused here for
+/// URL never reaches the inner port.
+///
+/// A host NAME is vetted once (every answer must pass) and the request goes
+/// through `inner.bind(&vetted)`: the bound port connects only to the vetted
+/// addresses (Story 23-0b), so a second DNS answer cannot move the
+/// connection. An inner port that cannot bind refuses a name
+/// (`outbound_unbound_refused`); a name is never sent down the raw-string
+/// path. A literal-IP URL has nothing to rebind and goes down the raw-string
+/// path.
+///
+/// No-follow contract: the redirect check below runs after the transport
+/// returned, so a transport that follows a redirect would already have
+/// connected to an unvetted address. `new` refuses an inner port that does
+/// not declare [`IoSubsystemPort::never_follows_redirects`], and a bound port
+/// is held to the same declaration. A 3xx answer is then refused here for
 /// `http_post` and `http_post_exchange` (both read the exchange status);
 /// `http_get` returns bytes only, so a GET redirect is refused by the inner
 /// adapter (the kernel adapter never follows and fails a non-2xx).
@@ -315,27 +361,51 @@ pub struct PolicedIo<P: IoSubsystemPort, R: ResolveHost> {
 }
 
 impl<P: IoSubsystemPort, R: ResolveHost> PolicedIo<P, R> {
-    #[must_use]
-    pub fn new(inner: P, resolver: R, policy: OutboundPolicy) -> Self {
-        Self {
+    /// # Errors
+    /// `OutboundRefusal::Redirect` when `inner` does not declare
+    /// [`IoSubsystemPort::never_follows_redirects`].
+    pub fn new(inner: P, resolver: R, policy: OutboundPolicy) -> Result<Self, OutboundRefusal> {
+        if !inner.never_follows_redirects() {
+            return Err(OutboundRefusal::Redirect);
+        }
+        Ok(Self {
             inner,
             resolver,
             policy,
-        }
+        })
     }
 
-    fn vet(&self, url: &str) -> Result<(), IoError> {
-        self.policy
+    /// Vet `url`, then run `call` on the port that may carry it: the inner
+    /// port for a literal IP, a port bound to the vetted addresses for a name.
+    fn through<T>(
+        &self,
+        url: &str,
+        call: impl FnOnce(&dyn IoSubsystemPort, &str) -> Result<T, IoError>,
+    ) -> Result<T, IoError> {
+        let vetted = self
+            .policy
             .vet_url(url, &self.resolver)
-            .map(|_| ())
-            .map_err(|refusal| IoError::InvalidUrl(refusal.code().to_owned()))
+            .map_err(|refusal| IoError::InvalidUrl(refusal.code().to_owned()))?;
+        if !vetted.is_name() {
+            return call(&self.inner, url);
+        }
+        let bound = self.inner.bind(&vetted)?;
+        if !bound.never_follows_redirects() {
+            return Err(IoError::InvalidUrl(
+                OutboundRefusal::Redirect.code().to_owned(),
+            ));
+        }
+        call(&*bound, vetted.as_str())
     }
 }
 
 impl<P: IoSubsystemPort, R: ResolveHost> IoSubsystemPort for PolicedIo<P, R> {
+    fn never_follows_redirects(&self) -> bool {
+        true
+    }
+
     fn http_get(&self, url: &str) -> Result<Vec<u8>, IoError> {
-        self.vet(url)?;
-        self.inner.http_get(url)
+        self.through(url, |port, url| port.http_get(url))
     }
 
     fn http_post(
@@ -358,10 +428,9 @@ impl<P: IoSubsystemPort, R: ResolveHost> IoSubsystemPort for PolicedIo<P, R> {
         headers: &[(&str, &str)],
         response_header: &str,
     ) -> Result<HttpExchange, IoError> {
-        self.vet(url)?;
-        let exchange = self
-            .inner
-            .http_post_exchange(url, body, headers, response_header)?;
+        let exchange = self.through(url, |port, url| {
+            port.http_post_exchange(url, body, headers, response_header)
+        })?;
         if (300..400).contains(&exchange.status) {
             return Err(IoError::Transport(
                 OutboundRefusal::Redirect.code().to_owned(),

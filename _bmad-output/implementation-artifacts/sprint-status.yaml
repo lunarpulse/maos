@@ -436,6 +436,7 @@ development_status:
   22-9-wasm-form-residuals: in-progress  # Closes the 21-9 rows moved by SCP 2026-11-13 §2 (21-9 AC10 and the rest of AC11) (SCP 2026-11-13 §6)
   epic-22-retrospective: backlog  # NOT optional: a REFINEMENT session that preflights Epic 23 before its first story is created (lane rule 6)
   epic-23: backlog  # Standards Interop (W8) — epic-23-standards-interop-w8.md; hermetic exit interop_session_23, created by 23-5; it absorbs 21-8.
+  23-0b-outbound-connection-binding: review  # Binds a host-name URL's connection to the addresses the outbound policy vetted (closes RELEASE-HOLDS 23-0.a for host names); the one Epic 23 story that touches the kernel (io/mod.rs, +19 tokei measured); D-23-0b-01..07 CONFIRMED 2026-11-25. Row added to the code repo's tracker copy so scripts/repin.py can resolve the story key; the docs-worktree tracker is the live copy.
   23-1-mcp-oauth-client: backlog  # Closes FR67, NFR-Sec-20 (SCP 2026-11-13 §6)
   23-2-oidc-discovery-and-key-rotation: backlog  # Closes the NFR-Sec-18 extension (SCP 2026-11-13 §6)
   23-3-otel-wiring-and-genai-projection: backlog  # Closes FR69, NFR-Obs-2 live, NFR-Obs-6 (SCP 2026-11-13 §6)

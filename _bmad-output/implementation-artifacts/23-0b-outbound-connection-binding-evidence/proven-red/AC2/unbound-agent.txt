@@ -1,0 +1,18 @@
+an_untrusted_certificate_for_the_name_is_refused --- FAILED
+a_changed_second_answer_does_not_move_the_connection --- FAILED
+the_tls_name_is_the_original_host --- FAILED
+a_bound_port_refuses_a_different_host_or_port --- FAILED
+failures:
+thread 'an_untrusted_certificate_for_the_name_is_refused' (3042365) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:277:5:
+expected a certificate refusal, got err(transport("ureq get https://rebind.maos.test:34269/x: https://rebind.maos.test:34269/x: dns failed: resolve dns name 'rebind.maos.test:34269': failed to lookup address information: name or service not known"))
+thread 'a_changed_second_answer_does_not_move_the_connection' (3042362) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:209:5:
+assertion `left == right` failed: listener A saw exactly one connection
+  left: 0
+ right: 1
+thread 'the_tls_name_is_the_original_host' (3042367) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:265:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+thread 'a_bound_port_refuses_a_different_host_or_port' (3042361) panicked at crates/maos-kernel-core/tests/io_binding_23_0b.rs:246:17:
+failures:
+test result: FAILED. 2 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s

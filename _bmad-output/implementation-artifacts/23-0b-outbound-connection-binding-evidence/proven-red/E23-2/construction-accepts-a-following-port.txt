@@ -1,0 +1,9 @@
+a_transport_that_follows_redirects_is_refused_before_any_request --- FAILED
+failures:
+thread 'a_transport_that_follows_redirects_is_refused_before_any_request' (3047606) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:911:5:
+assertion `left == right` failed
+  left: None
+ right: Some(Redirect)
+failures:
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+error: test failed, to rerun pass `-p maos-domain --test outbound_policy_23_0`

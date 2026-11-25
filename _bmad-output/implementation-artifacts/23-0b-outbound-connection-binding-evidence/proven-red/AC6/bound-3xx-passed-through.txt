@@ -1,0 +1,19 @@
+a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes --- FAILED
+a_redirect_answer_is_refused_and_not_followed --- FAILED
+a_redirect_on_the_bound_path_is_refused_with_no_location_and_no_body --- FAILED
+failures:
+thread 'a_redirect_is_refused_on_post_and_a_failing_get_is_not_passed_as_bytes' (3045303) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:626:9:
+assertion `left == right` failed: 301
+  left: Err(Transport("status 301"))
+ right: Err(Transport("outbound_redirect_refused"))
+thread 'a_redirect_answer_is_refused_and_not_followed' (3045302) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:553:5:
+assertion `left == right` failed
+  left: Ok(HttpExchange { status: 302, body: [101, 120, 99, 104, 97, 110, 103, 101, 45, 98, 111, 100, 121], header: Some("https://elsewhere.example/") })
+ right: Err(Transport("outbound_redirect_refused"))
+thread 'a_redirect_on_the_bound_path_is_refused_with_no_location_and_no_body' (3045304) panicked at crates/maos-domain/tests/outbound_policy_23_0.rs:848:9:
+assertion `left == right` failed: 301
+  left: Ok(HttpExchange { status: 301, body: [98, 111, 117, 110, 100, 45, 101, 120, 99, 104, 97, 110, 103, 101, 45, 98, 111, 100, 121], header: Some("https://elsewhere.example/") })
+ right: Err(Transport("outbound_redirect_refused"))
+failures:
+test result: FAILED. 22 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+error: test failed, to rerun pass `-p maos-domain --test outbound_policy_23_0`

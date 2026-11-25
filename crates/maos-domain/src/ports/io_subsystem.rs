@@ -52,6 +52,39 @@ pub trait IoSubsystemPort: Send + Sync {
             header: None,
         })
     }
+
+    /// Class: data-movement
+    ///
+    /// Story 23-0b (D-23-0b-02 a): a port bound to one vetted URL. The
+    /// returned port connects, for that URL's host and port, only to the
+    /// addresses the outbound policy vetted (TLS still names and verifies
+    /// the original host) and refuses any other host or port. The default
+    /// cannot bind and fails closed (D-23-0b-03 a): it never falls back to
+    /// a raw-string request.
+    ///
+    /// # Errors
+    /// `IoError::InvalidUrl("outbound_unbound_refused")` unless overridden.
+    fn bind(
+        &self,
+        _vetted: &crate::outbound::VettedUrl,
+    ) -> Result<Box<dyn IoSubsystemPort>, IoError> {
+        Err(IoError::InvalidUrl(
+            crate::outbound::OutboundRefusal::Unbound.code().to_owned(),
+        ))
+    }
+
+    /// Class: data-movement
+    ///
+    /// The no-follow contract. `true` is a declaration that this port NEVER
+    /// follows an HTTP redirect: a 3xx comes back as data or an error and no
+    /// request is made to its `Location`. `PolicedIo` checks the answer to a
+    /// redirect only after the transport returned, so a port that follows
+    /// would already have connected to an address the policy never saw;
+    /// `PolicedIo::new` and `bind` refuse a port that does not declare it.
+    /// The default is `false`.
+    fn never_follows_redirects(&self) -> bool {
+        false
+    }
 }
 
 /// One HTTP exchange: status, body, and the requested response header.

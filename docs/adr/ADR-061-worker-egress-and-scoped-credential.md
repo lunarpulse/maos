@@ -182,3 +182,7 @@ the guard inversion in the same commit).
 ## Amendment — Story 23-0 (one outbound classifier; 2026-11-24)
 
 Decided by the operator on 2026-11-24 (D-23-0-03 A). The egress proxy's private `public_ip` is deleted. `maos_domain::outbound::classify_ip` carries its true-set bit for bit as `IpClass::Public`, and the proxy admits an upstream address only when `classify_ip(ip) == IpClass::Public`, at the same two call sites (the literal-IPv4 check and the check of every resolved answer). The rest of the old refusal set is partitioned into `Loopback`, `LinkLocal`, `Private` and `Reserved`. Nothing else in egress changes: the literal-loopback `http` rule, the 10 s bounded resolver and the refusal code `unsafe-upstream-resolution` stay in `maos-egress`. A test in `maos-domain` pins the new classifier to a verbatim copy of the old predicate over every IPv4 /16, every IPv6 first segment and the v4-mapped forms. Why: ADR-051's amendment for Story 23-0 adds a shared outbound policy, and two classifiers would drift.
+
+## Amendment — Story 23-0b (3fff::/20; 2026-11-25)
+
+Decided by the operator on 2026-11-25. The shared classifier refuses `3fff::/20` (RFC 9637 documentation) as `Reserved`. The old `public_ip` admitted it, so the "bit for bit" sentence above holds with this one intended difference, recorded in the `maos-domain` equivalence test; Worker egress now refuses a granted name that resolves into that block (`vet_resolved` unit test in `maos-egress`). More destinations are refused; none is newly admitted.

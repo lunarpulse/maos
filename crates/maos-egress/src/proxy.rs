@@ -1063,6 +1063,11 @@ fn vetted_addresses(
     // request instead of pinning this worker and stop_and_join. A timed-out
     // helper thread is abandoned (bounded by the distinct granted hostnames).
     let addresses = resolve_bounded(&destination.host, destination.port)?;
+    Ok(("https", vet_resolved(addresses)?))
+}
+
+/// Every resolved answer must be public; an empty or mixed answer fails closed.
+fn vet_resolved(addresses: Vec<SocketAddr>) -> io::Result<Vec<SocketAddr>> {
     if addresses.is_empty()
         || addresses
             .iter()
@@ -1070,7 +1075,7 @@ fn vetted_addresses(
     {
         return Err(invalid("unsafe upstream resolution"));
     }
-    Ok(("https", addresses))
+    Ok(addresses)
 }
 
 const RESOLVE_TIMEOUT: Duration = Duration::from_secs(10);
@@ -1087,4 +1092,28 @@ fn resolve_bounded(host: &str, port: u16) -> io::Result<Vec<SocketAddr>> {
     receiver
         .recv_timeout(RESOLVE_TIMEOUT)
         .map_err(|_| invalid("dns resolution deadline exceeded"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 23-0b: a resolved answer in 3fff::/20 (RFC 9637 documentation) is
+    /// refused like any other non-public answer; its neighbours are not.
+    #[test]
+    fn a_resolved_answer_in_the_rfc_9637_block_is_refused() {
+        let answer = |text: &str| vec![SocketAddr::new(text.parse().unwrap(), 443)];
+        for refused in ["3fff::1", "3fff:fff:ffff:ffff:ffff:ffff:ffff:ffff"] {
+            assert!(vet_resolved(answer(refused)).is_err(), "{refused}");
+        }
+        for admitted in ["3fff:1000::1", "3ffe:ffff::1", "2606:4700::1111"] {
+            assert!(vet_resolved(answer(admitted)).is_ok(), "{admitted}");
+        }
+        assert!(vet_resolved(vec![]).is_err());
+        assert!(vet_resolved(vec![
+            SocketAddr::new("2606:4700::1111".parse().unwrap(), 443),
+            SocketAddr::new("3fff::1".parse().unwrap(), 443),
+        ])
+        .is_err());
+    }
 }

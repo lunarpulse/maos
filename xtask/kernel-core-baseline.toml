@@ -1,12 +1,12 @@
 # Exact kernel pin: src_lines (physical, formatted), per-file digests and set_hash of crates/maos-kernel-core/src.
 # Regenerate with `xtask check-kernel-baseline --emit-pin` and `scripts/repin.py`; history is `git log -p`, not prose here.
-src_lines = 28339
+src_lines = 28372
 
 
 
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "978cb02e1a71c63adced620a065a3db20a1f592d9d9180720322b99609ee3eef"
+set_hash = "3b23e28a5347f7122fe81bd7c4113b3ffb99324f8d16a9672e0cfef365307561"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -35,7 +35,7 @@ set_hash = "978cb02e1a71c63adced620a065a3db20a1f592d9d9180720322b99609ee3eef"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
 "inference/mod.rs" = "864778ae4df25be04404c707b81fb73147e22af98d2dc2ac16d74ea3eaea21d0"
 "inference/router.rs" = "82135d50d4187cc946044802c9adb5d378e023440d790c8fd1e6ebe51cceee29"
-"io/mod.rs" = "3f9c15a28c65f6b3b123dd829e1037ae9ca74642db5030f560a5cd90bd38eea5"
+"io/mod.rs" = "9d8ef63b8e0fdd55fd0248e57907eccb38beca9e8d02ec8aaaffd3844b82ce45"
 "isolation/mod.rs" = "e6c54ed505f5f6fc9e07fe28ca239504dcdc02abae039f021dfaf17ecf047b24"
 "isolation/runner.rs" = "3b4890261b2116d91efe15a9e0369ad8e1544b056a5286826ab7ee87ead593ff"
 "journal/mod.rs" = "ec7fa9c2b4508a5d339b6ffd6d0aac0030956c7c504ef9042582cc95f14c51bf"
