@@ -11,8 +11,10 @@ the sprint-row comment is only its pointer.
 
 **Inventory source:** the secret denominator is every distinct
 `secrets.<NAME>` reference in `.github/workflows/*.yml` or `*.yaml`, excluding GitHub's
-auto-provided `GITHUB_TOKEN`. The inventory currently contains eight names
-(seven until 2026-09-24, when the operator ruled `CI_EVIDENCE_AUDIT_KEY` in).
+auto-provided `GITHUB_TOKEN`. The inventory currently contains six names
+(eight until 2026-11-24, when the operator ruled GHCR the only container registry and
+`DOCKERHUB_TOKEN`/`DOCKERHUB_USERNAME` left the workflows; seven before 2026-09-24, when
+the operator ruled `CI_EVIDENCE_AUDIT_KEY` in).
 Non-secret external dependencies are listed from their real tree anchors rather
 than inherited from planning prose.
 
@@ -21,14 +23,13 @@ than inherited from planning prose.
 | Item | Consumer or tree anchor | Behavior when unavailable | Owning sprint row | State |
 |---|---|---|---|---|
 | `CI_EVIDENCE_AUDIT_KEY` | `.github/workflows/discipline.yml` `check-multi-tenant-loom` step "Install the CI-only evidence audit key" | hard fail for the gate: without it the required `reza-three-team-three-region-journey` leg is `ABSENT`, `check-multi-tenant-loom` is red, and through `v1-0-ship-gate` so is `aggregate` (the tag precondition). The step warns and writes nothing | `ops-provisioning-secrets-and-accounts` | `present` |
-| `DOCKERHUB_TOKEN` | `.github/workflows/container.yml` job `env.PUBLISH`, Docker Hub login | image build/smoke always run; all login/push/cosign steps skipped unless both credentials exist, with explicit `SKIPPED: DOCKERHUB_* absent` | `ops-provisioning-secrets-and-accounts` | `absent` |
-| `DOCKERHUB_USERNAME` | `.github/workflows/container.yml` job `env.PUBLISH`, `env.HUB_USER` | same publication-only gating as token; neither registry is pushed without both values | `ops-provisioning-secrets-and-accounts` | `absent` |
+| `GHCR package visibility and repository link` | `.github/workflows/container.yml` job `publication` (`GITHUB_TOKEN` with `packages: write`; no registry secret) | a tag push publishes `ghcr.io/lunarpulse/maos` and FAILS the run if it cannot; a package created by `GITHUB_TOKEN` starts PRIVATE, so anonymous `docker pull` and the documented `cosign verify` fail until the operator makes it public once (procedure `### GHCR package` below) | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `FUZZ_LEDGER_WRITE_TOKEN` | `.github/workflows/fuzz-cadence.yml` and `fuzz-prerelease.yml`, collector checkout | falls back to auto-provided `GITHUB_TOKEN`; the collector hard-fails if that token cannot push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (dedicated token optional; operator must provision branch and write permission)` |
 | `MAOS_ANTHROPIC_API_KEY` | `.github/workflows/journey-nightly.yml` jobs `secret-gate` (presence probe) and `tier-2-rerecord` (live record steps) | the paid live re-record leg is skipped or hard-fails; it runs ONLY on manual dispatch with `rerecord=true` (never on the daily cron, operator ruling 2026-11-12); hermetic replay is unaffected | `ops-nightly-cassette-rerecord` | `present` |
 | `MAOS_RELEASE_PUBKEY` | `.github/workflows/release.yml:41-46,90-110` | hard fail: an absent/empty key fails the exact lowercase parser; the shipped `maosctl` also refuses the bundled development key | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RELEASE_SIGNING_KEY` | `.github/workflows/release.yml:93,95` | hard fail once artifact assembly reaches `release-verify --sign` | `ops-provisioning-secrets-and-accounts` | `present` |
 | `RTO_LEDGER_WRITE_TOKEN` | `.github/workflows/rpo-rto-cadence.yml`, collector checkout | falls back to auto-provided `GITHUB_TOKEN`; the collector hard-fails if that token cannot push | `ops-provisioning-secrets-and-accounts` | `not-a-provisioning-item (GITHUB_TOKEN has already produced the live rto-ledger history)` |
-| `GitHub OIDC for cosign` | `.github/workflows/container.yml` permission `id-token: write`, step `Sign both published digests` | only runs after credential-gated push; no operator signing secret is required | `ops-provisioning-secrets-and-accounts` | `present` |
+| `GitHub OIDC for cosign` | `.github/workflows/container.yml` job `publication` permission `id-token: write`, step `Sign the GHCR digest` | runs on every publication, keyless; no operator signing secret is required | `ops-provisioning-secrets-and-accounts` | `present` |
 | `release environment protection evidence` | `release.yml` `sign-and-publish`, `container.yml` `publication`, operator recipe `operator-publication` reference `environment: release` | required before publication: configure required reviewers, prevent self-review/admin bypass, restrict deployment tags to protected `v*` tags, and protect tag creation/update/deletion; operator verify-branch deployment needs explicit approval | `ops-provisioning-secrets-and-accounts` | `absent` |
 | `macOS/aarch64 release build` | `.github/workflows/release.yml:10-60`; `.github/workflows/discipline.yml` `release-dry-run` | partial: Linux aarch64 is blocking per commit; macOS arm64 remains a required manual pre-tag dispatch and tagged-release leg | `ops-provisioning-secrets-and-accounts` | `present` |
 | `lunarpulse/homebrew-maos` | authenticated rendered `dist/maos.rb` attached by `release.yml` | publication unavailable until the tap exists; authenticate the signed packaging manifest first, never publish the committed template | `ops-brew-tap-and-aur-publication` | `absent` |
@@ -168,7 +169,7 @@ than inherited from planning prose.
   - `RELEASE_SIGNING_KEY`: repository secret exists, created 2026-09-24T13:54:40Z, generated offline by the operator; name confirmed via the secrets API, value never read. Its pairing with `MAOS_RELEASE_PUBKEY` is first exercised by `release.yml` `sign-and-publish` at the tag push.
   - Delivery measured: run 36058940696 (`9b77c3e3`) received `CI_EVIDENCE_AUDIT_KEY` as `***`, it passed the step's 64-hex shape check, and `check-multi-tenant-loom` passed with `reza-three-team-three-region-journey` `PROVEN_LIVE_SIGNED`. The first delivered value was 65 bytes (one non-whitespace character too many) and was re-set by the operator.
 
-## Operator procedures (the two KEY procedures were tested end to end with THROWAWAY keys, 2026-09-24; Docker Hub is account setup and untested here)
+## Operator procedures (the two KEY procedures were tested end to end with THROWAWAY keys, 2026-09-24; the GHCR package step is untested here)
 
 ### `RELEASE_SIGNING_KEY` + `MAOS_RELEASE_PUBKEY` — generate OFFLINE (operator ruling)
 
@@ -203,11 +204,27 @@ contents, then delete the local copy — CI is its only holder. Tested with a
 throwaway key under CI's own binding (`GITHUB_ACTIONS=true`, `GITHUB_SHA`,
 `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`) and the three-team substrate.
 
-### `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN`
+### GHCR package (once, after the first publication)
 
-Requires a Docker Hub account (the lead-time item). Create an access token with
-push scope for the `maos` repository and set both secrets; consumers are
-`.github/workflows/container.yml:43-52,80`.
+GHCR is the only container registry; there is no Docker Hub account or secret. Publication
+uses the workflow's `GITHUB_TOKEN` (`packages: write` on the `publication` job only), so there
+is nothing to provision before the first push. The first publication creates the package
+`ghcr.io/lunarpulse/maos` **private**. To exercise it without cutting a release, dispatch
+`container.yml` on `main` with `release_tag=<an existing signed release, e.g. v1.0.0>` and
+`publish=true`; it pushes only `main-<short-sha>` (never `latest`, never a version tag).
+Then, once:
+
+1. Open `https://github.com/users/lunarpulse/packages/container/maos/settings` (or the
+   organization's package settings), confirm the package is linked to `lunarpulse/maos` (the
+   image carries `org.opencontainers.image.source`, which links it on first push; if the
+   "Connected repository" box is empty, connect it there), and under "Danger Zone" set
+   visibility to **Public**. This is irreversible. `gh api -X PATCH` cannot change a user
+   package's visibility; the UI is the supported path.
+2. Verify anonymously: `docker logout ghcr.io && docker pull ghcr.io/lunarpulse/maos:main-<short-sha>`,
+   then `cosign verify` per `docs/maos.dev/install.md` against the digest.
+3. Flip the `GHCR package visibility and repository link` row to `present`.
+
+Until step 1 is done the image is private and no public pull is claimed.
 
 After setting any secret, report it here by flipping its row to `present`; the
 agent can confirm names (never values) via

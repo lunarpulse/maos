@@ -844,9 +844,9 @@ fn validate(root: &Path) -> Vec<String> {
             workflows.len()
         ));
     }
-    if secrets.len() < 7 {
+    if secrets.len() < 6 {
         findings.push(format!(
-            "secret denominator: found {} distinct non-GITHUB_TOKEN secrets.<NAME> references, need >=7; scan .github/workflows/*.yml and add every result to {CHECKLIST}",
+            "secret denominator: found {} distinct non-GITHUB_TOKEN secrets.<NAME> references, need >=6; scan .github/workflows/*.yml and add every result to {CHECKLIST}",
             secrets.len()
         ));
     }
@@ -1177,7 +1177,7 @@ fn every_clause_and_denominator_has_a_planted_red() {
     std::fs::remove_dir_all(fx.root().join(".github/workflows")).unwrap();
     assert_red_contains(&fx, "workflow denominator");
 
-    // Denominator: fewer than seven distinct operator secrets.
+    // Denominator: fewer than six distinct operator secrets.
     let fx = Fixture::complete();
     fx.rewrite(".github/workflows/workflow-0.yml", |_| {
         "name: no-secrets\n".into()
