@@ -103,12 +103,33 @@ pub fn client_config(
     ca_pem: &[u8],
     client: Option<(&[u8], &[u8])>,
 ) -> Result<Arc<ClientConfig>, SetupError> {
-    let roots = root_store(ca_pem)?;
-    let builder =
-        ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
-            .with_safe_default_protocol_versions()
-            .map_err(|_| SetupError::CaInvalid)?
-            .with_root_certificates(roots);
+    client_config_pinned(ca_pem, client).map(|(config, _)| config)
+}
+
+/// As [`client_config`], also returning the IMMUTABLE root store that was handed to the server
+/// certificate verifier (the very same `Arc`): a test can pin exactly the anchors the
+/// verifier trusts, not what a helper returned earlier.
+///
+/// # Errors
+/// As [`client_config`].
+#[doc(hidden)]
+pub fn client_config_pinned(
+    ca_pem: &[u8],
+    client: Option<(&[u8], &[u8])>,
+) -> Result<(Arc<ClientConfig>, Arc<RootCertStore>), SetupError> {
+    let roots = Arc::new(root_store(ca_pem)?);
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let verifier = rustls::client::WebPkiServerVerifier::builder_with_provider(
+        Arc::clone(&roots),
+        Arc::clone(&provider),
+    )
+    .build()
+    .map_err(|_| SetupError::CaInvalid)?;
+    let builder = ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|_| SetupError::CaInvalid)?
+        .dangerous()
+        .with_custom_certificate_verifier(verifier);
     let config = match client {
         None => builder.with_no_client_auth(),
         Some((cert_pem, key_pem)) => {
@@ -125,7 +146,7 @@ pub fn client_config(
                 .map_err(|_| SetupError::ClientKeyInvalid)?
         }
     };
-    Ok(Arc::new(config))
+    Ok((Arc::new(config), roots))
 }
 
 /// Where in a delivery a test hook runs.
@@ -136,6 +157,8 @@ pub enum CloseStage {
     BeforeEarlyCheck,
     /// The pre-close look found nothing; our `close_notify` has not been sent.
     AfterEarlyCheck,
+    /// A socket write BLOCKED until its bound (the collector stopped reading).
+    WriteBlocked,
 }
 
 /// A test hook (see [`TlsSink::with_close_hook`]).
@@ -278,8 +301,10 @@ impl BatchSink for TlsSink {
             &|| self.check_cancel().is_err(),
         )?;
 
-        let write = Instant::now() + self.timeouts.write;
+        // The payload is built BEFORE the write deadline starts: assembling a large batch is
+        // not "the collector is slow to read".
         let payload = octet_counted(frames);
+        let write = Instant::now() + self.timeouts.write;
         let mut sent = 0;
         while sent < payload.len() {
             self.check_cancel()?;
@@ -288,7 +313,11 @@ impl BatchSink for TlsSink {
                 .write(&payload[sent..])
                 .map_err(|_| SinkFailure::new("siem_sink_io"))?;
             sent += accepted;
-            flush(&mut tls, &mut tcp, write)?;
+            flush(&mut tls, &mut tcp, write, &|blocked| {
+                if let Some(hook) = &self.hook {
+                    hook(blocked, CloseStage::WriteBlocked);
+                }
+            })?;
         }
 
         // A collector that closed first (its close_notify is already here) did not read this
@@ -304,7 +333,7 @@ impl BatchSink for TlsSink {
             hook(&tcp, CloseStage::AfterEarlyCheck);
         }
         tls.send_close_notify();
-        flush(&mut tls, &mut tcp, write)?;
+        flush(&mut tls, &mut tcp, write, &|_| {})?;
 
         // RFC 5425 §4.4: the receiver answers our close_notify with its own.
         let close = Instant::now() + self.timeouts.close;
@@ -476,11 +505,21 @@ fn flush(
     tls: &mut ClientConnection,
     tcp: &mut TcpStream,
     deadline: Instant,
+    on_blocked: &dyn Fn(&TcpStream),
 ) -> Result<(), SinkFailure> {
     while tls.wants_write() {
-        arm(tcp, deadline)?;
-        tls.write_tls(tcp)
-            .map_err(|error| classify(&error, "siem_sink_io"))?;
+        // Bytes are still owed to the socket: running out of time here (or a write that waited
+        // out its bound) means the collector is not draining them.
+        if let Err(failure) = arm(tcp, deadline) {
+            on_blocked(tcp);
+            return Err(failure);
+        }
+        if let Err(error) = tls.write_tls(tcp) {
+            if is_timeout(&error) {
+                on_blocked(tcp);
+            }
+            return Err(classify(&error, "siem_sink_io"));
+        }
     }
     Ok(())
 }

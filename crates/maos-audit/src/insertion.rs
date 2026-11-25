@@ -133,6 +133,20 @@ impl LogView {
         })
     }
 
+    /// As [`LogView::open_live`], with a `paused` callback at the point where the sealed
+    /// segments are open and NO read transaction is held yet (a test seam).
+    ///
+    /// # Errors
+    /// An unreadable source, or a registry that kept changing under the read.
+    #[doc(hidden)]
+    pub fn open_live_paused(db_path: &Path, paused: &dyn Fn()) -> Result<Self, AuditError> {
+        Ok(Self {
+            sources: segment::open_log_sources_live_with(db_path, paused)?,
+            peak_lookahead: AtomicUsize::new(0),
+            read_tx: true,
+        })
+    }
+
     /// The highest insertion id in the LIVE file (`None` when it holds no row): one indexed
     /// lookup through a normal read-only connection that holds nothing afterwards. The cheap
     /// idle probe of an export tick.

@@ -170,6 +170,10 @@ pub enum Event {
     /// A connection is being held: accepted in [`Mode::HoldHandshake`] with its ClientHello
     /// read, or (in [`Mode::StopReading`]) past its handshake with reads stopped.
     Held,
+    /// A gate the test was to open stayed closed past the bound: the fixture closed WITHOUT
+    /// sending the alert or the acknowledgement (so the test fails instead of passing on a
+    /// timeout-open).
+    GateTimedOut,
 }
 
 #[derive(Default)]
@@ -458,7 +462,11 @@ fn serve(
         // this is indistinguishable from an acknowledgement (RFC 5425 has no application ack).
         bytes.clear();
     }
-    ack.wait();
+    if !ack.wait_open() {
+        // The test never opened the ack gate: close WITHOUT an acknowledgement and say so.
+        let _ = events.send(Event::GateTimedOut);
+        return;
+    }
     let version = conn
         .protocol_version()
         .map_or_else(String::new, |v| format!("{v:?}"));
@@ -614,7 +622,10 @@ fn serve_close_without_reading(
         )));
         return;
     }
-    gates.alert_hold.wait();
+    if !gates.alert_hold.wait_open() {
+        let _ = events.send(Event::GateTimedOut);
+        return;
+    }
     conn.send_close_notify();
     while conn.wants_write() {
         if conn.write_tls(&mut tcp).is_err() {

@@ -146,42 +146,160 @@ fn write_and_sync(file: &mut std::fs::File, bytes: &[u8]) -> std::io::Result<()>
     file.sync_data()
 }
 
-/// Open for append, creating atomically: `(file, created by this call, the path of the entry
-/// whose directory must be synced)`. A symlink whose target does not exist yet is followed:
-/// the target is created (`O_EXCL`) and its own directory is the one to sync.
-fn open_append(path: &Path) -> std::io::Result<(std::fs::File, bool, PathBuf)> {
-    let create = |target: &Path| {
-        std::fs::OpenOptions::new()
-            .append(true)
-            .create_new(true)
-            .open(target)
-    };
-    for _ in 0..3 {
-        match create(path) {
-            Ok(file) => return Ok((file, true, path.to_path_buf())),
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                match std::fs::OpenOptions::new().append(true).open(path) {
-                    Ok(file) => return Ok((file, false, path.to_path_buf())),
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                        // Either moved away between the two opens (create it on the next
-                        // pass) or a dangling symlink (create its target).
-                        if let Ok(link) = std::fs::read_link(path) {
-                            let target = path.parent().unwrap_or_else(|| Path::new(".")).join(link);
-                            match create(&target) {
-                                Ok(file) => return Ok((file, true, target)),
-                                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
-                                }
-                                Err(error) => return Err(error),
-                            }
-                        }
-                    }
-                    Err(error) => return Err(error),
-                }
+/// The most symlink levels followed between the configured path and the file.
+pub const MAX_LINK_DEPTH: usize = 16;
+
+/// Why a sink path could not be opened.
+#[derive(Debug)]
+pub enum OpenError {
+    /// More than [`MAX_LINK_DEPTH`] levels of symlinks (a loop).
+    Loop,
+    Io(std::io::Error),
+}
+
+/// Follow EVERY symlink level of `path` to the entry that would actually be opened (which may
+/// not exist yet: a dangling chain resolves to its last, missing, target). The directory that
+/// CONTAINS that entry is the one whose durability matters.
+///
+/// # Errors
+/// [`OpenError::Loop`] past [`MAX_LINK_DEPTH`] levels; [`OpenError::Io`] for anything else.
+pub fn resolve_entry(path: &Path) -> Result<PathBuf, OpenError> {
+    let mut current = path.to_path_buf();
+    for _ in 0..=MAX_LINK_DEPTH {
+        match std::fs::symlink_metadata(&current) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let link = std::fs::read_link(&current).map_err(OpenError::Io)?;
+                current = current
+                    .parent()
+                    .unwrap_or_else(|| Path::new("."))
+                    .join(link);
             }
-            Err(error) => return Err(error),
+            Ok(_) => return Ok(current),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(current),
+            Err(error) => return Err(OpenError::Io(error)),
         }
     }
-    Err(std::io::Error::other("the sink file kept vanishing"))
+    Err(OpenError::Loop)
+}
+
+/// Open for append, creating atomically: `(file, created by this call, the RESOLVED entry
+/// whose directory must be synced)`. Every symlink level is followed on every call (so a rotator
+/// that repointed a link is noticed); the final target is created with `O_EXCL` when missing.
+fn open_append(path: &Path) -> Result<(std::fs::File, bool, PathBuf), OpenError> {
+    for _ in 0..3 {
+        let entry = resolve_entry(path)?;
+        match std::fs::OpenOptions::new()
+            .append(true)
+            .create_new(true)
+            .open(&entry)
+        {
+            Ok(file) => return Ok((file, true, entry)),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                match std::fs::OpenOptions::new().append(true).open(&entry) {
+                    Ok(file) => return Ok((file, false, entry)),
+                    // Moved away between the two opens: resolve and create on the next pass.
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(OpenError::Io(error)),
+                }
+            }
+            Err(error) => return Err(OpenError::Io(error)),
+        }
+    }
+    Err(OpenError::Io(std::io::Error::other(
+        "the sink file kept vanishing",
+    )))
+}
+
+/// `true` while `file` is still linked and `entry` still names it (device and inode).
+fn still_the_entry(file: &std::fs::File, entry: &Path, id: FileId) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let linked = file.metadata().is_ok_and(|meta| meta.nlink() > 0);
+        linked && std::fs::metadata(entry).is_ok_and(|meta| file_id(&meta) == id)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (file, entry, id);
+        true
+    }
+}
+
+/// `canonicalize`, tolerating a path whose tail does not exist yet (the deepest existing
+/// ancestor is canonicalised and the missing tail appended).
+fn canonical_lenient(path: &Path) -> Option<PathBuf> {
+    let mut tail = Vec::new();
+    let mut head = path.to_path_buf();
+    loop {
+        match std::fs::canonicalize(&head) {
+            Ok(mut resolved) => {
+                resolved.extend(tail.iter().rev());
+                return Some(resolved);
+            }
+            Err(_) => {
+                tail.push(head.file_name()?.to_owned());
+                head = head.parent()?.to_path_buf();
+                if head.as_os_str().is_empty() {
+                    head = PathBuf::from(".");
+                }
+            }
+        }
+    }
+}
+
+/// `true` when the file sink at `sink` ALIASES state it must never write: the cursor file, its
+/// `.tmp`, its `.corrupt-*` names, the audit database and its `-wal`/`-shm`, or anything under
+/// the segment directory. Links are resolved at every level, and a hard link to any of those
+/// files is caught by device and inode. (A path that cannot be resolved here is reported by the
+/// sink itself when it opens.)
+#[must_use]
+pub fn aliases_audit_state(sink: &Path, audit_db: &Path) -> bool {
+    let Ok(entry) = resolve_entry(sink) else {
+        return false;
+    };
+    let parent = |path: &Path| {
+        path.parent()
+            .filter(|dir| !dir.as_os_str().is_empty())
+            .map_or_else(|| PathBuf::from("."), Path::to_path_buf)
+    };
+    let Ok(dir) = std::fs::canonicalize(parent(audit_db)) else {
+        return false;
+    };
+    let Some(entry_dir) = canonical_lenient(&parent(&entry)) else {
+        return false;
+    };
+    let Some(entry_name) = entry.file_name() else {
+        return false;
+    };
+    let entry_name_text = entry_name.to_string_lossy().into_owned();
+    let db_name = audit_db
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let protected = [
+        crate::cursor::CURSOR_FILE.to_owned(),
+        format!("{}.tmp", crate::cursor::CURSOR_FILE),
+        db_name.clone(),
+        format!("{db_name}-wal"),
+        format!("{db_name}-shm"),
+    ];
+    if entry_dir == dir
+        && (entry_name_text.starts_with(crate::cursor::CURSOR_FILE)
+            || protected.contains(&entry_name_text))
+    {
+        return true;
+    }
+    if entry_dir.starts_with(dir.join("segments")) {
+        return true;
+    }
+    #[cfg(unix)]
+    if let Ok(meta) = std::fs::metadata(entry_dir.join(entry_name)) {
+        let id = file_id(&meta);
+        return protected.iter().any(|name| {
+            std::fs::metadata(dir.join(name)).is_ok_and(|other| file_id(&other) == id)
+        });
+    }
+    false
 }
 
 fn sync_parent(path: &Path) -> std::io::Result<()> {
@@ -214,7 +332,11 @@ impl BatchSink for FileSink {
             out.push(b'\n');
         }
 
-        let (mut file, created, entry) = open_append(&self.path).map_err(io)?;
+        let (mut file, created, entry) = match open_append(&self.path) {
+            Ok(opened) => opened,
+            Err(OpenError::Loop) => return Err(SinkFailure::new("siem_file_symlink_loop")),
+            Err(OpenError::Io(error)) => return Err(io(error)),
+        };
         let meta = file.metadata().map_err(io)?;
         let id = file_id(&meta);
         let replaced = self.last_file.is_some_and(|last| last != id);
@@ -248,6 +370,15 @@ impl BatchSink for FileSink {
         if file.metadata().map_err(io)?.len() < end {
             self.lead_newline = true;
             return Err(SinkFailure::new("siem_file_truncated_during_append"));
+        }
+        // The file we appended to must still BE the file at the path, with at least one link:
+        // a rotator that renamed it away and a shipper that consumed and unlinked it while we
+        // were paused would otherwise take our bytes (the open handle keeps them readable by
+        // nobody). The batch is then not acknowledged; the next tick reopens the path and
+        // re-sends (at-least-once). The old file must stay until the sink has reopened.
+        if !still_the_entry(&file, &entry, id) {
+            self.lead_newline = true;
+            return Err(SinkFailure::new("siem_file_replaced_during_append"));
         }
         self.lead_newline = false;
 
@@ -605,15 +736,18 @@ fn drive(
                 )
                 .map_err(ExportError::Journal)?;
                 after = to;
+                // The typed line is queued BEFORE the cursor is persisted: a rename that
+                // succeeds and a directory sync that then fails must not swallow it (the next
+                // tick loads the moved cursor and would never emit it).
+                tick.notes.push(format!(
+                    "siem_gap: ids {from}..={to} of expired segment {seq} were never delivered"
+                ));
                 store
                     .save(&Cursor {
                         insertion_id: after,
                         frame_id: None,
                     })
                     .map_err(ExportError::Cursor)?;
-                tick.notes.push(format!(
-                    "siem_gap: ids {from}..={to} of expired segment {seq} were never delivered"
-                ));
                 continue;
             }
         }
@@ -704,15 +838,15 @@ fn reset(
         }),
     )
     .map_err(ExportError::Journal)?;
+    tick.notes.push(format!(
+        "{}: the SIEM cursor was moved aside; every retained row is re-sent",
+        reason.code()
+    ));
     let now_ns = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |elapsed| elapsed.as_nanos());
     store
         .move_aside(u64::try_from(now_ns).unwrap_or(u64::MAX))
         .map_err(ExportError::Cursor)?;
-    tick.notes.push(format!(
-        "{}: the SIEM cursor was moved aside; every retained row is re-sent",
-        reason.code()
-    ));
     Ok(())
 }

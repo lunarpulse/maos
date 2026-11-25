@@ -667,11 +667,11 @@ pub fn open_log_sources(db_path: &Path) -> Result<Vec<Connection>, crate::AuditE
 /// `-wal`/`-shm` sidecar, so a read leaves nothing beside a quiesced or snapshot database.
 /// Only valid when nothing writes the files while they are read (a checkpointed snapshot).
 pub fn open_log_sources_immutable(db_path: &Path) -> Result<Vec<Connection>, crate::AuditError> {
-    open_sources_with(db_path, true, true, false)
+    open_sources_with(db_path, true, true)
 }
 
 fn open_sources(db_path: &Path, strict: bool) -> Result<Vec<Connection>, crate::AuditError> {
-    open_sources_with(db_path, strict, false, false)
+    open_sources_with(db_path, strict, false)
 }
 
 /// Every source of a log whose live file a daemon may be writing: the live file through a
@@ -679,7 +679,7 @@ fn open_sources(db_path: &Path, strict: bool) -> Result<Vec<Connection>, crate::
 /// caller ends (`COMMIT`) as soon as its bounded read is done, plus the quiesced sealed
 /// segments (immutable). The last connection is the live file.
 pub fn open_log_sources_live(db_path: &Path) -> Result<Vec<Connection>, crate::AuditError> {
-    open_sources_with(db_path, true, false, true)
+    open_log_sources_live_with(db_path, &|| {})
 }
 
 /// A normal (never `immutable=1`) read-only connection to a live file.
@@ -707,20 +707,7 @@ fn open_ro(path: &Path, immutable: bool) -> rusqlite::Result<Connection> {
     Connection::open_with_flags(uri, flags | OpenFlags::SQLITE_OPEN_URI)
 }
 
-fn open_sources_with(
-    db_path: &Path,
-    strict: bool,
-    immutable: bool,
-    live_tx: bool,
-) -> Result<Vec<Connection>, crate::AuditError> {
-    let live = open_ro(db_path, immutable).map_err(crate::AuditError::Open)?;
-    if live_tx {
-        // One read transaction on the LIVE file, begun before the registry is read: the
-        // registry, the live rows and the segment list all come from one snapshot, so a
-        // rotation between two of our statements cannot hide rows from us.
-        live.execute_batch("BEGIN")
-            .map_err(crate::AuditError::Read)?;
-    }
+fn registered_seqs(live: &Connection) -> Result<Vec<i64>, crate::AuditError> {
     let registered: bool = live
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' \
@@ -729,38 +716,97 @@ fn open_sources_with(
             |row| row.get(0),
         )
         .map_err(crate::AuditError::Read)?;
+    if !registered {
+        return Ok(Vec::new());
+    }
+    let mut statement = live
+        .prepare(
+            "SELECT seq FROM transparency_log_segments WHERE expired_at_ns IS NULL ORDER BY seq",
+        )
+        .map_err(crate::AuditError::Read)?;
+    let seqs = statement
+        .query_map([], |row| row.get::<_, i64>(0))
+        .map_err(crate::AuditError::Read)?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(crate::AuditError::Read)?;
+    Ok(seqs)
+}
+
+fn open_segments(
+    db_path: &Path,
+    seqs: &[i64],
+    strict: bool,
+    immutable: bool,
+) -> Result<Vec<Connection>, crate::AuditError> {
+    let dir = db_path
+        .parent()
+        .unwrap_or_else(|| Path::new("."))
+        .join("segments");
     let mut sources = Vec::new();
-    if registered {
-        let mut statement = live
-            .prepare("SELECT seq FROM transparency_log_segments WHERE expired_at_ns IS NULL ORDER BY seq")
-            .map_err(crate::AuditError::Read)?;
-        let seqs = statement
-            .query_map([], |row| row.get::<_, i64>(0))
-            .map_err(crate::AuditError::Read)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(crate::AuditError::Read)?;
-        drop(statement);
-        let dir = db_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .join("segments");
-        for seq in seqs {
-            let path = dir.join(format!("{seq:010}.sqlite"));
-            // Sealed segments are quiesced: always immutable when the live file is read live.
-            match open_ro(&path, immutable || live_tx) {
-                Ok(conn) => sources.push(conn),
-                Err(_) if !strict => {}
-                Err(error) => {
-                    return Err(crate::AuditError::Row(format!(
-                        "sealed segment {seq} is unavailable at {}: {error}",
-                        path.display()
-                    )))
-                }
+    for seq in seqs {
+        let path = dir.join(format!("{seq:010}.sqlite"));
+        match open_ro(&path, immutable) {
+            Ok(conn) => sources.push(conn),
+            Err(_) if !strict => {}
+            Err(error) => {
+                return Err(crate::AuditError::Row(format!(
+                    "sealed segment {seq} is unavailable at {}: {error}",
+                    path.display()
+                )))
             }
         }
     }
+    Ok(sources)
+}
+
+fn open_sources_with(
+    db_path: &Path,
+    strict: bool,
+    immutable: bool,
+) -> Result<Vec<Connection>, crate::AuditError> {
+    let live = open_ro(db_path, immutable).map_err(crate::AuditError::Open)?;
+    let seqs = registered_seqs(&live)?;
+    let mut sources = open_segments(db_path, &seqs, strict, immutable)?;
     sources.push(live);
     Ok(sources)
+}
+
+/// How many times [`open_log_sources_live_with`] re-reads a registry that rotation changed
+/// under it before it gives up (the tick then fails and is retried later).
+const LIVE_OPEN_ATTEMPTS: usize = 5;
+
+/// As [`open_log_sources_live`], with a `paused` callback that runs at the one point where the
+/// sealed segments are open and the live read transaction is NOT yet begun (a test seam: a
+/// deterministic place to prove that no WAL read mark is held while source I/O happens).
+pub fn open_log_sources_live_with(
+    db_path: &Path,
+    paused: &dyn Fn(),
+) -> Result<Vec<Connection>, crate::AuditError> {
+    for _ in 0..LIVE_OPEN_ATTEMPTS {
+        // 1. The segment list from a short autocommit read (no transaction outlives it), and
+        //    the segments opened: all the slow source I/O happens with NO read mark held, so a
+        //    rotation checkpoint under the audit writer mutex never waits for it.
+        let seqs = {
+            let probe = open_ro(db_path, false).map_err(crate::AuditError::Open)?;
+            registered_seqs(&probe)?
+        };
+        let mut sources = open_segments(db_path, &seqs, true, true)?;
+        paused();
+        // 2. The read transaction, short: begun, the registry re-read as its first statement;
+        //    unchanged means the opened segments and the live rows are one consistent view.
+        let live = open_ro(db_path, false).map_err(crate::AuditError::Open)?;
+        live.execute_batch("BEGIN")
+            .map_err(crate::AuditError::Read)?;
+        if registered_seqs(&live)? == seqs {
+            sources.push(live);
+            return Ok(sources);
+        }
+        // A rotation sealed more rows in between: drop everything (ending the transaction)
+        // and start over.
+    }
+    Err(crate::AuditError::Row(
+        "the segment registry kept changing under the export read (retry later)".to_owned(),
+    ))
 }
 
 /// Count and bytes of the sealed segments a log directory holds (`maos purge --keep-log`).

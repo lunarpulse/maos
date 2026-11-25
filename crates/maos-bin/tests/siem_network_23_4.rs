@@ -1483,6 +1483,45 @@ fn boot_refuses_a_client_certificate_without_a_usable_key_and_boots_with_one() {
     assert!(!text.contains("PRIVATE KEY"), "{text}");
 }
 
+/// R6-2: `MAOS_SIEM_FILE` naming the cursor file, its `.tmp`, or a symlink to either is a typed
+/// boot refusal (exit 78) BEFORE the first append; a distinct file beside them boots.
+#[cfg(unix)]
+#[test]
+fn boot_refuses_a_file_sink_that_aliases_the_cursor() {
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path();
+    // The boot helper's audit database is `<MAOS_HOME>/audit/transparency.sqlite`.
+    let audit_of = |name: &str| {
+        let dir = root.join(format!("maos-home-{name}")).join("audit");
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    };
+    for (name, file) in [
+        ("direct", "siem-cursor.json"),
+        ("tmp", "siem-cursor.json.tmp"),
+        ("symlink", "link.log"),
+        ("db", "transparency.sqlite"),
+    ] {
+        let audit = audit_of(name);
+        std::os::unix::fs::symlink("siem-cursor.json", audit.join("link.log")).unwrap();
+        let sink = audit.join(file);
+        let output = boot(root, name, &[("MAOS_SIEM_FILE", sink.to_str().unwrap())]);
+        let text = assert_refused(&output, "siem_file_aliases_cursor");
+        assert!(
+            !text.contains(sink.to_str().unwrap()),
+            "no path is printed: {text}"
+        );
+    }
+    let audit = audit_of("distinct");
+    let sink = audit.join("siem.log");
+    let fine = boot(
+        root,
+        "distinct",
+        &[("MAOS_SIEM_FILE", sink.to_str().unwrap())],
+    );
+    assert!(fine.status.success(), "{}", stderr(&fine));
+}
+
 #[test]
 fn boot_with_no_siem_variable_starts_no_consumer_and_the_file_sink_alone_boots() {
     let temp = tempfile::tempdir().expect("fixture");

@@ -407,3 +407,49 @@ fn the_live_probe_returns_the_newest_row_and_its_frame_id() {
     );
     drop(tl);
 }
+
+// ── review round 6 ───────────────────────────────────────────────────────────
+
+/// R6-1: the source I/O of a live export read (the registry read, the sealed-segment opens)
+/// happens with NO WAL read mark held. A rotation's `wal_checkpoint(TRUNCATE)` runs under the
+/// audit writer mutex; if it had to wait for the exporter here, audit inserts would queue
+/// behind it. The `paused` seam is that exact point: the checkpoint run from inside it must
+/// not be busy, and the view then reads the segment and the live rows consistently.
+#[test]
+fn no_read_mark_is_held_while_the_live_sources_are_opened() {
+    let (dir, db, tl) = seeded(3);
+    let segments = dir.path().join("segments");
+    std::fs::create_dir_all(&segments).unwrap();
+    {
+        let seg = rusqlite::Connection::open(segments.join("0000000001.sqlite")).unwrap();
+        seg.execute_batch(
+            "CREATE TABLE transparency_log (frame_id BLOB NOT NULL PRIMARY KEY, timestamp_ns \
+             INTEGER NOT NULL, spirit_pid INTEGER NOT NULL, boot_nonce INTEGER NOT NULL, \
+             capability_token BLOB, kind INTEGER NOT NULL, intent TEXT NOT NULL, \
+             payload_redacted BLOB NOT NULL, origin INTEGER NOT NULL); \
+             INSERT INTO transparency_log (rowid, frame_id, timestamp_ns, spirit_pid, boot_nonce, \
+             kind, intent, payload_redacted, origin) VALUES (100, randomblob(16), 1, 1, 1, 4, 'x', X'', 0);",
+        )
+        .unwrap();
+    }
+    raw(&db)
+        .execute_batch("INSERT INTO transparency_log_segments VALUES (1, 0, 100, 100, 1, 1, 2, 'a', NULL, 3, NULL);")
+        .unwrap();
+    let observed = std::cell::Cell::new(None);
+    let view = LogView::open_live_paused(&db, &|| {
+        let busy: i64 = raw(&db)
+            .query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |row| row.get(0))
+            .unwrap();
+        observed.set(Some(busy));
+    })
+    .unwrap();
+    assert_eq!(
+        observed.get(),
+        Some(0),
+        "a read mark was held while the sealed sources were opened"
+    );
+    let rows = view.read_after(0, 100, usize::MAX).unwrap();
+    assert_eq!(rows.len(), 4, "the live rows and the sealed one");
+    drop(view);
+    drop(tl);
+}

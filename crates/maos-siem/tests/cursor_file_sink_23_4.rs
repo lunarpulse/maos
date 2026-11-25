@@ -293,9 +293,16 @@ fn a_blocked_cursor_write_journals_the_same_gap_payload_every_attempt() {
         .unwrap();
     std::fs::create_dir(rig.db.with_file_name("siem-cursor.json.tmp")).unwrap();
     for _ in 0..3 {
-        assert_eq!(
-            rig.tick().expect_err("cursor write blocked").code(),
-            "siem_cursor_io"
+        let failure = rig.tick().expect_err("cursor write blocked");
+        assert_eq!(failure.code(), "siem_cursor_io");
+        assert!(
+            failure
+                .tick
+                .notes
+                .iter()
+                .any(|note| note.starts_with("siem_gap")),
+            "the typed gap line travels with the cursor failure: {:?}",
+            failure.tick.notes
         );
     }
     let journal = rig.journal.lock().unwrap().clone();
@@ -830,4 +837,168 @@ fn a_dangling_symlink_is_followed_and_its_targets_directory_is_synced() {
         data,
         "the target's own directory"
     );
+}
+
+// ── review round 6 ───────────────────────────────────────────────────────────
+
+fn dir_sync_recorder() -> (maos_siem::export::DirSync, Arc<Mutex<Vec<PathBuf>>>) {
+    let seen = Arc::new(Mutex::new(Vec::<PathBuf>::new()));
+    let sink = Arc::clone(&seen);
+    (
+        Arc::new(move |entry| {
+            sink.lock().unwrap().push(entry.to_path_buf());
+            Ok(())
+        }),
+        seen,
+    )
+}
+
+/// R6-3: a link in directory A to an EXISTING file in directory B (the state after a restart):
+/// the directory synced is the one that CONTAINS the file behind the link, B.
+#[cfg(unix)]
+#[test]
+fn the_directory_behind_a_symlink_is_the_one_synced() {
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let (a, b) = (
+        rig.sink_path.with_file_name("a"),
+        rig.sink_path.with_file_name("b"),
+    );
+    std::fs::create_dir(&a).unwrap();
+    std::fs::create_dir(&b).unwrap();
+    std::fs::write(b.join("real.log"), "").unwrap();
+    let link = a.join("link.log");
+    std::os::unix::fs::symlink(b.join("real.log"), &link).unwrap();
+    let (recorder, seen) = dir_sync_recorder();
+    let mut sink = FileSink::new(link, Arc::new(SiemExporter)).with_dir_sync(recorder);
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    let seen = seen.lock().unwrap().clone();
+    assert_eq!(seen.len(), 1);
+    assert_eq!(
+        seen[0].parent().unwrap(),
+        b,
+        "B, not the link's directory A"
+    );
+}
+
+/// R6-5: a CHAIN `sink -> current -> logs/new.log` with only the last target missing: every
+/// level is followed, the final target is created and ITS directory synced; a loop is a typed
+/// error that acknowledges nothing.
+#[cfg(unix)]
+#[test]
+fn a_chain_of_symlinks_is_followed_to_its_target_and_a_loop_is_a_typed_error() {
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let dir = rig.sink_path.with_file_name("chain");
+    std::fs::create_dir_all(dir.join("logs")).unwrap();
+    std::os::unix::fs::symlink("logs/new.log", dir.join("current")).unwrap();
+    std::os::unix::fs::symlink("current", dir.join("sink")).unwrap();
+    let (recorder, seen) = dir_sync_recorder();
+    let mut sink = FileSink::new(dir.join("sink"), Arc::new(SiemExporter)).with_dir_sync(recorder);
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 2);
+    assert_eq!(records(&dir.join("logs").join("new.log")).len(), 2);
+    assert_eq!(
+        seen.lock().unwrap()[0].parent().unwrap(),
+        dir.join("logs"),
+        "the directory of the FINAL target"
+    );
+
+    // A loop.
+    let looped = rig.sink_path.with_file_name("loop");
+    std::fs::create_dir(&looped).unwrap();
+    std::os::unix::fs::symlink("b", looped.join("a")).unwrap();
+    std::os::unix::fs::symlink("a", looped.join("b")).unwrap();
+    let other = rig.sink_path.with_file_name("loop-sink.log");
+    std::os::unix::fs::symlink(looped.join("a"), &other).unwrap();
+    let mut sink = FileSink::new(other, Arc::new(SiemExporter));
+    seed(&rig.db, 1);
+    let failure = rig
+        .tick_using(&mut sink)
+        .expect_err("a loop never acknowledges");
+    assert_eq!(failure.code(), "siem_file_symlink_loop");
+
+    // A directory target fails (typed I/O error), acknowledging nothing.
+    let dir_link = rig.sink_path.with_file_name("dir-sink");
+    std::os::unix::fs::symlink(&dir, &dir_link).unwrap();
+    let mut sink = FileSink::new(dir_link, Arc::new(SiemExporter));
+    let failure = rig
+        .tick_using(&mut sink)
+        .expect_err("a directory is not a sink file");
+    assert_eq!(failure.code(), "siem_sink_file_io");
+}
+
+/// R6-4: pause-after-open, rename-rotate, the shipper reads to EOF and UNLINKS the old file,
+/// the sink resumes: the append and the sync succeed on the unlinked inode, so the batch is NOT
+/// acknowledged (nobody can reopen those bytes); the next tick reopens the path and re-sends.
+#[cfg(unix)]
+#[test]
+fn a_batch_appended_to_a_retired_file_is_not_acknowledged() {
+    use std::io::Write;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let rig = Rig::new();
+    seed(&rig.db, 3);
+    let path = rig.sink_path.clone();
+    let retire = AtomicBool::new(true);
+    let mut sink = rig.sink().with_writer(Arc::new(move |file, bytes| {
+        file.write_all(bytes)?;
+        if retire.swap(false, Ordering::SeqCst) {
+            // Rotated away and consumed by the shipper while the sink was paused.
+            std::fs::rename(&path, path.with_extension("old"))?;
+            std::fs::remove_file(path.with_extension("old"))?;
+        }
+        file.sync_data()
+    }));
+    let failure = rig.tick_using(&mut sink).expect_err("retired under us");
+    assert_eq!(failure.code(), "siem_file_replaced_during_append");
+    assert!(!cursor_for(&rig, &sink).exists(), "the cursor stayed");
+    assert_eq!(rig.tick_using(&mut sink).unwrap().delivered, 3);
+    assert_eq!(
+        records(&rig.sink_path).len(),
+        3,
+        "re-sent into the reopened file"
+    );
+}
+
+/// R6-2: a file sink that aliases the cursor's files, the audit database or its segments is
+/// recognised (direct names, the `.tmp` and `.corrupt-*` names, a symlink, a hard link); a
+/// distinct file beside them is not.
+#[cfg(unix)]
+#[test]
+fn a_file_sink_that_aliases_the_cursor_or_the_audit_state_is_recognised() {
+    use maos_siem::export::aliases_audit_state;
+    let rig = Rig::new();
+    seed(&rig.db, 1);
+    let dir = rig.db.parent().unwrap().to_path_buf();
+    let cursor = dir.join("siem-cursor.json");
+    std::fs::write(&cursor, "{}").unwrap();
+    for name in [
+        "siem-cursor.json",
+        "siem-cursor.json.tmp",
+        "siem-cursor.json.corrupt-123",
+        "audit.sqlite",
+        "audit.sqlite-wal",
+        "audit.sqlite-shm",
+    ] {
+        assert!(aliases_audit_state(&dir.join(name), &rig.db), "{name}");
+    }
+    assert!(aliases_audit_state(
+        &dir.join("segments").join("0000000001.sqlite"),
+        &rig.db
+    ));
+    // Symlink (two levels) to the cursor, and a hard link to it.
+    std::os::unix::fs::symlink("siem-cursor.json", dir.join("hop")).unwrap();
+    std::os::unix::fs::symlink("hop", dir.join("via-link.log")).unwrap();
+    assert!(
+        aliases_audit_state(&dir.join("via-link.log"), &rig.db),
+        "a symlink alias"
+    );
+    std::fs::hard_link(&cursor, dir.join("hard.log")).unwrap();
+    assert!(
+        aliases_audit_state(&dir.join("hard.log"), &rig.db),
+        "a hard link alias"
+    );
+    // An unrelated file beside them, and one in another directory, are fine.
+    std::fs::write(dir.join("siem.log"), "").unwrap();
+    assert!(!aliases_audit_state(&dir.join("siem.log"), &rig.db));
+    assert!(!aliases_audit_state(&dir.join("not-yet.log"), &rig.db));
 }

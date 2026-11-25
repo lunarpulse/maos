@@ -2294,6 +2294,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     if let Some(siem) = &configured_siem {
+        // R6-2: before the first append, a file sink may not alias the cursor or the audit state.
+        if let Err(refusal) = siem.refuse_file_aliases(&audit_db_path) {
+            eprintln!("maos: {refusal}");
+            std::process::exit(78);
+        }
+    }
+    if let Some(siem) = &configured_siem {
         eprintln!("maos: SIEM sink selected: {}", siem.kind_name());
     }
     let enterprise_runtime: Option<Arc<maos_bin::enterprise_identity::EnterpriseRuntime>> =
@@ -17849,6 +17856,9 @@ mod story_13_5a_enterprise_daemon_seam {
                         }
                     }
                     Ok(Event::Held) => {}
+                    Ok(Event::GateTimedOut) => {
+                        return Err("a collector gate stayed closed past its bound".to_string());
+                    }
                     Ok(Event::Unacked { .. }) => {
                         return Err("a delivery went unacknowledged after the release".to_string());
                     }

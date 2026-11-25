@@ -25,7 +25,7 @@ use maos_siem::export::{
     run_tick, run_tick_cancellable, BatchSink, Frame, Tick, TickFailure, MAX_BATCH_BYTES,
     MAX_BATCH_FRAMES,
 };
-use maos_siem::tls_sink::{client_config, root_store, SetupError, Timeouts, TlsSink};
+use maos_siem::tls_sink::{client_config, client_config_pinned, SetupError, Timeouts, TlsSink};
 use tempfile::TempDir;
 
 const HOST: &str = "siem.test";
@@ -1219,17 +1219,22 @@ fn steady_progress_beyond_the_handshake_deadline_is_a_timeout_on_an_injected_clo
     assert_eq!(io.timeouts, 0);
 }
 
-/// Waits until the collector's whole close_notify record is readable on `tcp` (or its EOF is
-/// visible, which means everything before it was already consumed): with no TLS 1.3 tickets
-/// the alert is the only thing after the handshake, 24 bytes in TLS 1.3 (31 in 1.2).
-/// Loopback delivery can lag the sender's `write` under CPU load, so a single `peek` proves
-/// nothing; this polls until the bytes are there.
-fn alert_is_queued(tcp: &std::net::TcpStream) -> bool {
+/// The close_notify record on the wire: 5 header + 2 plaintext + 1 content type + 16 tag in TLS
+/// 1.3, 5 + 8 explicit nonce + 2 + 16 tag in TLS 1.2 (AES-128-GCM).
+const TLS13_ALERT_LEN: usize = 24;
+const TLS12_ALERT_LEN: usize = 31;
+
+/// Waits until the collector's WHOLE close_notify record (`len` bytes of the negotiated
+/// version) is readable on `tcp`. EOF with fewer bytes is NOT proof (those bytes were consumed
+/// or never sent), so it is `false`. With no TLS 1.3 tickets the alert is the only thing the
+/// collector sends after the handshake. Loopback delivery can lag the sender's `write` under
+/// CPU load, so a single `peek` proves nothing; this polls until the bytes are there.
+fn alert_is_queued(tcp: &std::net::TcpStream, len: usize) -> bool {
     let mut buffer = [0_u8; 256];
     for _ in 0..1_000_000 {
         match tcp.peek(&mut buffer) {
-            Ok(0) => return true,
-            Ok(n) if n >= 24 => return true,
+            Ok(0) => return false,
+            Ok(n) if n >= len => return true,
             Ok(_) => std::thread::yield_now(),
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::yield_now();
@@ -1252,12 +1257,21 @@ fn an_alert_readable_before_our_pre_close_look_is_refused_in_tls_13_and_12() {
             ..Options::default()
         });
         rig.fake.set_mode(Mode::CloseWithoutReading);
-        let sent = rig.fake.alert_sent.clone();
+        // The alert is held until the hook releases it, AFTER the handshake has completed on
+        // both sides, so the client's handshake reads can never swallow it (TLS 1.2 too).
+        rig.fake.alert_hold.close();
+        let (hold, sent) = (rig.fake.alert_hold.clone(), rig.fake.alert_sent.clone());
+        let alert_len = if tls12 {
+            TLS12_ALERT_LEN
+        } else {
+            TLS13_ALERT_LEN
+        };
         let mut sink = rig.sink().with_close_hook(Arc::new(move |tcp, stage| {
             if stage == CloseStage::BeforeEarlyCheck {
+                hold.open();
                 assert!(sent.wait_open(), "the collector never sent its alert");
                 assert!(
-                    alert_is_queued(tcp),
+                    alert_is_queued(tcp, alert_len),
                     "the collector's alert never became readable"
                 );
             }
@@ -1289,13 +1303,18 @@ fn an_alert_that_arrives_after_our_pre_close_look_is_accepted_though_nothing_was
         rig.fake.set_mode(Mode::CloseWithoutReading);
         rig.fake.alert_hold.close();
         let (hold, sent) = (rig.fake.alert_hold.clone(), rig.fake.alert_sent.clone());
+        let alert_len = if tls12 {
+            TLS12_ALERT_LEN
+        } else {
+            TLS13_ALERT_LEN
+        };
         let mut sink = rig.sink().with_close_hook(Arc::new(move |tcp, stage| {
             if stage == CloseStage::AfterEarlyCheck {
                 // The look found nothing; only now does the collector's alert leave.
                 hold.open();
                 assert!(sent.wait_open(), "the collector never sent its alert");
                 assert!(
-                    alert_is_queued(tcp),
+                    alert_is_queued(tcp, alert_len),
                     "the collector's alert never became readable"
                 );
             }
@@ -1422,22 +1441,34 @@ fn a_collector_that_stops_reading_turns_the_write_phase_into_a_timeout() {
     raw_insert(&rig.db, 1, "huge.row", &vec![b'x'; 48 << 20]);
     rig.fake.set_mode(Mode::StopReading);
     rig.fake.alert_hold.close();
-    let mut sink = TlsSink::new(
+    let sink = TlsSink::new(
         HOST,
         rig.fake.addr.port(),
         client_config(rig.ca.pem.as_bytes(), None).unwrap(),
         OutboundPolicy::strict().allow_private(),
         rig.resolver.clone(),
         Timeouts {
-            write: Duration::from_millis(300),
+            // Generous: the proof is the OBSERVED blocked write, not elapsed time.
+            write: Duration::from_secs(2),
             ..Timeouts::default()
         },
     );
+    let blocked = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let seen = Arc::clone(&blocked);
+    let mut sink = sink.with_close_hook(Arc::new(move |_, stage| {
+        if stage == CloseStage::WriteBlocked {
+            seen.store(true, Ordering::SeqCst);
+        }
+    }));
     let store = rig.store();
     // Through the EXPORTER: nothing is acknowledged (the collector never reads), so the cursor
     // must not exist afterwards.
     let failure = rig.tick(&mut sink, &store).expect_err("the write blocks");
     assert_eq!(failure.code(), "siem_sink_timeout");
+    assert!(
+        blocked.load(Ordering::SeqCst),
+        "the timeout came from a socket write that was observed BLOCKED"
+    );
     assert!(!rig.cursor_path().exists(), "the cursor stayed");
     assert_eq!(failure.buffered(), Some(1));
     // The collector signalled that the handshake COMPLETED and that it stopped reading.
@@ -1450,6 +1481,66 @@ fn a_collector_that_stops_reading_turns_the_write_phase_into_a_timeout() {
     assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
 }
 
+/// AC5, the PRODUCTION connect deadline (no injected connector): against a listener whose
+/// accept queue is full, the kernel drops our SYN and a plain `connect` hangs for minutes. The
+/// sink's own `connect_timeout` ends it with `siem_sink_timeout` well inside that. Linux only
+/// (the saturation behaviour is the kernel's); elsewhere the test says why it skips.
+#[test]
+fn the_production_connect_deadline_ends_a_connect_that_never_completes() {
+    if !cfg!(target_os = "linux") {
+        eprintln!("skipped: a saturated accept queue is a Linux kernel behaviour");
+        return;
+    }
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    // Fill the accept queue: connect until one attempt cannot complete (the SYN was dropped).
+    let mut held = Vec::new();
+    let mut saturated = false;
+    let addr = listener.local_addr().unwrap();
+    let probe = || std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(500));
+    for _ in 0..20_000 {
+        match probe() {
+            Ok(stream) => held.push(stream),
+            // One slow probe under CPU load proves nothing: saturated only when three in a row
+            // cannot complete.
+            Err(_) => {
+                if (0..3).all(|_| probe().is_err()) {
+                    saturated = true;
+                    break;
+                }
+            }
+        }
+    }
+    if !saturated {
+        eprintln!("skipped: the accept queue could not be saturated on this host");
+        return;
+    }
+    let rig = Rig::new();
+    let mut sink = TlsSink::new(
+        HOST,
+        port,
+        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
+        OutboundPolicy::strict().allow_private(),
+        rig.resolver.clone(),
+        Timeouts {
+            connect: Duration::from_millis(500),
+            ..Timeouts::default()
+        },
+    );
+    let started = std::time::Instant::now();
+    let failure = sink
+        .deliver(&[dummy_frame()])
+        .expect_err("the connect never completes");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    // An unbounded connect holds for the kernel's SYN retries (about two minutes).
+    assert!(
+        started.elapsed() < Duration::from_secs(30),
+        "the connect was bounded by the connect budget: {:?}",
+        started.elapsed()
+    );
+    drop(held);
+}
+
 /// AC1c (offline witness): the sink's root store holds EXACTLY the anchors of the configured
 /// bundle, so system or bundled (webpki) roots added to it would change the count. The
 /// positive control (`a_widened_root_store_is_detected_by_the_ca_only_witness`) shows a widened
@@ -1458,11 +1549,14 @@ fn a_collector_that_stops_reading_turns_the_write_phase_into_a_timeout() {
 fn the_root_store_holds_exactly_the_anchors_of_the_configured_bundle() {
     let one = Ca::new("anchor-one");
     let two = Ca::new("anchor-two");
-    assert_eq!(root_store(one.pem.as_bytes()).unwrap().roots.len(), 1);
+    // The store handed to the VERIFIER of the built configuration (client_config_pinned returns
+    // the same immutable Arc the verifier was built from), for one and for two anchors.
+    let (_, roots) = client_config_pinned(one.pem.as_bytes(), None).unwrap();
+    assert_eq!(roots.roots.len(), 1);
     let both = format!("{}{}", one.pem, two.pem);
-    let store = root_store(both.as_bytes()).unwrap();
+    let (_, roots) = client_config_pinned(both.as_bytes(), None).unwrap();
     assert_eq!(
-        store.roots.len(),
+        roots.roots.len(),
         2,
         "exactly the two anchors, nothing added"
     );

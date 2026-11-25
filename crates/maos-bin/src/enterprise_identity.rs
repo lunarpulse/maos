@@ -742,6 +742,8 @@ pub enum SiemBootRefusal {
     ClientCertInvalid,
     /// `MAOS_SIEM_CLIENT_CERT_FILE` is set and the key is missing, unparsable, or not its key.
     ClientKeyInvalid,
+    /// `MAOS_SIEM_FILE` aliases the cursor files, the audit database or its segments.
+    FileAliasesCursor,
 }
 
 impl SiemBootRefusal {
@@ -756,6 +758,7 @@ impl SiemBootRefusal {
             Self::ClientIncomplete => "siem_client_incomplete",
             Self::ClientCertInvalid => "siem_client_cert_invalid",
             Self::ClientKeyInvalid => "siem_client_key_invalid",
+            Self::FileAliasesCursor => "siem_file_aliases_cursor",
         }
     }
 }
@@ -795,6 +798,11 @@ impl std::fmt::Display for SiemBootRefusal {
                 f,
                 "{code}: MAOS_SIEM_CLIENT_CERT_FILE is set but MAOS_SIEM_CLIENT_KEY is missing, \
                  not a PEM private key, or not the key of that certificate"
+            ),
+            Self::FileAliasesCursor => write!(
+                f,
+                "{code}: MAOS_SIEM_FILE names (or links to) the SIEM cursor, its temporary or \
+                 moved-aside files, the audit database or its segments"
             ),
         }
     }
@@ -854,6 +862,21 @@ impl ConfiguredSiem {
             SiemKind::File(path) => Some(path.clone()),
             #[cfg(feature = "online-adapters")]
             SiemKind::Network(_) => None,
+        }
+    }
+
+    /// Refuse a file sink that aliases the cursor's files, the audit database or the segment
+    /// directory (R6-2): the cursor rename would overwrite acknowledged records, and the cursor
+    /// temp file's `create` would truncate the sink. Direct names, symlinks and hard links.
+    ///
+    /// # Errors
+    /// [`SiemBootRefusal::FileAliasesCursor`].
+    pub fn refuse_file_aliases(&self, audit_db: &std::path::Path) -> Result<(), SiemBootRefusal> {
+        match self.file_path() {
+            Some(sink) if maos_siem::export::aliases_audit_state(&sink, audit_db) => {
+                Err(SiemBootRefusal::FileAliasesCursor)
+            }
+            _ => Ok(()),
         }
     }
 
