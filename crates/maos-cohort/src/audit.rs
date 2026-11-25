@@ -136,6 +136,41 @@ pub enum CohortAuditEvent {
         declared: String,
         version: u64,
     },
+    /// Story 23-7 / D-23-7-02 C — what the own-leaf reconciler did with the configured PEM paths
+    /// after the signed manifest moved (or still disagreed with) this host's declaration.
+    /// `on_disk` is the fingerprint the files hold, `declared` the signed one.
+    SelfLeafReconciled {
+        host: String,
+        outcome: SelfLeafOutcome,
+        on_disk: String,
+        declared: String,
+        version: u64,
+    },
+}
+
+/// Story 23-7 — the outcome rows of the own-leaf reconciler.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SelfLeafOutcome {
+    /// The files held the declared leaf; the serving and dialing leaf (and plane C) moved to it.
+    Swapped,
+    /// The files still hold the served leaf while the manifest declares another one: nothing is
+    /// served until the PKI writes the declared leaf. Fail-closed, retried on every tick.
+    SwapPending,
+    /// The files hold a leaf the signed manifest does not declare. Never served.
+    RefusedUndeclared,
+    /// The files could not be read, parsed, or (under `peer_san = "required"`) lacked the SAN.
+    RefusedUnusable,
+}
+
+impl SelfLeafOutcome {
+    fn event_name(self) -> &'static str {
+        match self {
+            SelfLeafOutcome::Swapped => "self_leaf_swapped",
+            SelfLeafOutcome::SwapPending => "self_leaf_swap_pending",
+            SelfLeafOutcome::RefusedUndeclared => "self_leaf_refused_undeclared",
+            SelfLeafOutcome::RefusedUnusable => "self_leaf_refused_unusable",
+        }
+    }
 }
 
 /// Deterministic in-memory implementation for focused state tests. Production
@@ -302,6 +337,22 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                 format!(
                     "{{\"event\":\"local_leaf_declaration_moved\",\"host\":{host:?},\"serving_short\":{:?},\"declared_short\":{:?},\"version\":{version}}}",
                     fingerprint_short(serving),
+                    fingerprint_short(declared)
+                ),
+                None,
+            ),
+            CohortAuditEvent::SelfLeafReconciled {
+                host,
+                outcome,
+                on_disk,
+                declared,
+                version,
+            } => (
+                CERT_ROTATION_INTENT,
+                format!(
+                    "{{\"event\":\"{}\",\"host\":{host:?},\"on_disk_short\":{:?},\"declared_short\":{:?},\"version\":{version}}}",
+                    outcome.event_name(),
+                    fingerprint_short(on_disk),
                     fingerprint_short(declared)
                 ),
                 None,

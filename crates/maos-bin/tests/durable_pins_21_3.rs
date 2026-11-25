@@ -32,8 +32,8 @@ use maos_bin::repin_door::RepinControl;
 use maos_control::{OperatorOutcome, PeerPinStatus};
 use maos_persistence::{FilePinStore, PIN_FILE_NAME};
 use rotation_daemon::{
-    boot_daemon, drive_a_signed_rotation, operator_get, rotated_fingerprint, signed_manifest,
-    signing_key, Fixture, Rotation, HOST_B_NONCE,
+    boot_daemon, drive_a_signed_rotation, fixture_grace, operator_get, rotated_fingerprint,
+    signed_manifest, signing_key, Fixture, Rotation, HOST_B_NONCE,
 };
 use serde_json::Value;
 
@@ -98,8 +98,7 @@ async fn promoted_then_stopped(tag: &str) -> Rotation {
     );
     assert_eq!(host_b(&before)["boot_nonce"], HOST_B_NONCE.to_string());
 
-    let deadline =
-        rotation.acked_at + maos_cohort::cold_deployment_t_grace() + Duration::from_secs(45);
+    let deadline = rotation.acked_at + fixture_grace() + Duration::from_secs(45);
     loop {
         let rows = pins(rotation.operator_port);
         let row = host_b(&rows);
@@ -244,6 +243,8 @@ async fn t_21_3_a_consented_repin_survives_a_restart_only_through_the_file() {
         }],
         handshake_timeout: Duration::from_secs(5),
         ca_roots: None,
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     };
 
     // Run 1: the peer restarts (nonce 8), the operator approves.

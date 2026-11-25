@@ -435,6 +435,11 @@ pub enum RuptureReason {
     /// grant this addressee. Distinct from `IntentAllowlistMismatch`, which is
     /// the RECEIVER's allowlist.
     ConsentNotGranted,
+    /// Story 23-7 / D-23-7-07 A — a peer presented a certificate its signed rotation retired:
+    /// the subject peer's durable pin record carries a promotion (`promoted`), and the
+    /// observed leaf is not its serving or open-window leaf. Emitted only when that join
+    /// holds; an unknown leaf or a never-promoted peer stays `PeerIdentityUnverified`.
+    CertPostGraceReject,
 }
 
 /// Story 6.4 / NFR-Scale-4 — RateLimited payload.

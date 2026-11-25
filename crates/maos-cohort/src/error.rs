@@ -36,6 +36,9 @@ pub enum CohortManifestForkReason {
     VersionRegression,
     ConcurrentFork,
     SchemaDowngrade,
+    /// Story 23-7 / D-23-7-09 A — below the manifest-version floor durably recorded by a
+    /// previous run (a replayed, validly signed, superseded manifest after a restart).
+    VersionBelowDurableFloor,
 }
 
 impl std::fmt::Display for CohortManifestForkReason {
@@ -45,6 +48,7 @@ impl std::fmt::Display for CohortManifestForkReason {
             Self::VersionRegression => "version_regression",
             Self::ConcurrentFork => "concurrent_fork",
             Self::SchemaDowngrade => "schema_downgrade",
+            Self::VersionBelowDurableFloor => "version_below_durable_floor",
         };
         formatter.write_str(value)
     }

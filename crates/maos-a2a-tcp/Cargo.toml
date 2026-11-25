@@ -30,6 +30,9 @@ tokio-util = { version = "0.7", features = ["codec"] }
 # for the Framed codec. Documented in the Dev Agent Record.
 rustls-pemfile = "2"
 webpki = { package = "rustls-webpki", version = "0.103" }
+# Story 23-7 / D-23-7-05 A — SPIFFE URI SAN extraction on the handshake path (RustCrypto parser; no
+# default features: PEM decoding is not needed, the verifier already holds the leaf DER).
+x509-cert = { version = "0.2", default-features = false }
 futures-util = { version = "0.3", features = ["sink"] }
 tracing = "0.1"
 
@@ -48,6 +51,8 @@ smallvec = "1"
 rcgen = "0.13"
 time = "0.3"
 ed25519-dalek = { version = "2", features = ["std"] }
+# Story 23-7 — the rotation scenes run the real durable pin file (AC6/AC7).
+maos-persistence = { path = "../maos-persistence" }
 hex = "0.4"
 toml = "0.8"
 tempfile = "3"

@@ -26,6 +26,13 @@ pub trait CohortClock: Send + Sync {
     fn now_secs(&self) -> u64;
 }
 
+/// The pull interval a manifest signs: half its stale lease, rounded up. Also the lag between
+/// two members applying one reissue, which is why Story 23-7 / D-23-7-03 A adds it to the
+/// rotation grace.
+fn confirmation_of(manifest: &CohortManifest) -> Duration {
+    Duration::from_secs((manifest.t_stale_secs + 1) / 2)
+}
+
 struct SystemCohortClock {
     base: Instant,
 }
@@ -201,6 +208,11 @@ pub struct CohortManifestState {
     /// this process" — every non-daemon `MAOS_ONE_SHOT` arm, byte-for-byte
     /// unchanged.
     cert_rotation: std::sync::OnceLock<Arc<PeerCertRotation>>,
+    /// Story 23-7 / D-23-7-02 C — called, OFF the `cached` lock, after a reissue left this host's
+    /// signed declaration different from the leaf the transport serves. The composition root's
+    /// own-leaf reconciler wakes on it; implementations MUST NOT block (they run on the caller of
+    /// `apply_reissue`) and may call back into this state (the lock is released).
+    local_leaf_observer: std::sync::OnceLock<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl CohortManifestState {
@@ -250,6 +262,7 @@ impl CohortManifestState {
             received_digest_summaries: Mutex::new(HashMap::new()),
             peer_convergence: Mutex::new(BTreeMap::new()),
             cert_rotation: std::sync::OnceLock::new(),
+            local_leaf_observer: std::sync::OnceLock::new(),
             clock,
         })
     }
@@ -322,6 +335,7 @@ impl CohortManifestState {
                     None,
                     self.local_leaf_declaration_event(&cached.manifest, None)
                         .as_ref(),
+                    confirmation_of(&cached.manifest),
                 )?;
             }
             // The SAME named row the reissue path writes for the identical
@@ -563,6 +577,43 @@ impl CohortManifestState {
             .and_then(|member| PeerCertFingerprint::parse(&member.fingerprint))
     }
 
+    /// Story 23-7 / D-23-7-02 C — the fingerprint the signed manifest declares for this host and the
+    /// manifest version it came from.
+    pub fn local_declaration(&self) -> Result<Option<(PeerCertFingerprint, u64)>, CohortError> {
+        let cached = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        Ok(self
+            .local_declared_fingerprint(&cached.manifest)
+            .map(|declared| (declared, cached.manifest.version)))
+    }
+
+    /// Story 23-7 — install the observer woken after a reissue diverges this host's declaration
+    /// from its serving leaf. Set-once; `false` when one is already installed.
+    #[must_use]
+    pub fn install_local_leaf_observer(&self, observer: Arc<dyn Fn() + Send + Sync>) -> bool {
+        self.local_leaf_observer.set(observer).is_ok()
+    }
+
+    /// Story 23-7 — journal what the own-leaf reconciler did, through the same sink as every other
+    /// rotation row.
+    pub fn journal_self_leaf(
+        &self,
+        outcome: crate::audit::SelfLeafOutcome,
+        on_disk: &str,
+        declared: &str,
+        version: u64,
+    ) -> Result<(), CohortError> {
+        self.audit.append(&CohortAuditEvent::SelfLeafReconciled {
+            host: self.local_host.as_str().to_string(),
+            outcome,
+            on_disk: on_disk.to_string(),
+            declared: declared.to_string(),
+            version,
+        })
+    }
+
     /// Story 14-2c — `Some` only when this manifest MOVES the local host's
     /// declared fingerprint off the identity the transport still serves, and
     /// the local row actually changed against the manifest being replaced
@@ -647,6 +698,15 @@ impl CohortManifestState {
                 Some(CohortManifestForkReason::VersionRegression)
             } else if candidate.version == seen_version && candidate_hash != cached.canonical_hash {
                 Some(CohortManifestForkReason::ConcurrentFork)
+            } else if candidate.version
+                < self
+                    .cert_rotation
+                    .get()
+                    .map_or(0, |rotation| rotation.manifest_floor())
+            {
+                // Story 23-7 / D-23-7-09 A — below the highest version this host ever applied,
+                // which survives a restart (the in-memory `seen_version` does not).
+                Some(CohortManifestForkReason::VersionBelowDurableFloor)
             } else {
                 None
             };
@@ -713,6 +773,7 @@ impl CohortManifestState {
                         self.clock.now_secs(),
                         Some(&accepted_event),
                         local_leaf_event.as_ref(),
+                        confirmation_of(&candidate),
                     )?;
                     true
                 }
@@ -737,6 +798,10 @@ impl CohortManifestState {
             self.audit.append(&accepted_event)?;
         }
         let version = candidate.version;
+        let local_leaf_diverged = self
+            .local_leaf_fingerprint()
+            .zip(self.local_declared_fingerprint(&candidate))
+            .is_some_and(|(serving, declared)| serving != declared);
         *cached = CachedManifest {
             manifest: candidate,
             canonical_hash: candidate_hash,
@@ -769,6 +834,17 @@ impl CohortManifestState {
             .lock()
             .map_err(|_| CohortError::EStatePoisoned)?
             .clear();
+        // Story 23-7: both effects run with the `cached` lock RELEASED — the floor write fsyncs,
+        // and the observer may read this state.
+        drop(cached);
+        if let Some(rotation) = self.cert_rotation.get() {
+            rotation.raise_manifest_floor(version);
+        }
+        if local_leaf_diverged {
+            if let Some(observer) = self.local_leaf_observer.get() {
+                observer();
+            }
+        }
         Ok(ReissueOutcome::Applied { version })
     }
 
@@ -848,7 +924,7 @@ impl CohortManifestState {
             .cached
             .lock()
             .map_err(|_| CohortError::EStatePoisoned)?;
-        Ok(Duration::from_secs((cached.manifest.t_stale_secs + 1) / 2))
+        Ok(confirmation_of(&cached.manifest))
     }
 
     fn reject_non_authority(&self, rejected_version: u64) -> Result<ReissueOutcome, CohortError> {

@@ -235,3 +235,121 @@ impl CohortSelfIdentitySource for CohortSelfIdentity {
         }))
     }
 }
+
+/// Story 23-7 / D-23-7-02 C — the production caller of `TcpA2ATransport::swap_serving_cert`.
+///
+/// The signed cohort manifest is the ONLY authority for replacing this host's serving leaf
+/// (ADR-062 keeps serving-leaf replacement off the operator POST surface). So the trigger is not
+/// a verb: this reconciler wakes when a reissue moved this host's declaration off the served leaf
+/// ([`CohortManifestState::install_local_leaf_observer`], delivered after the `cached` lock is
+/// released) and on every confirmation tick, and ONLY while the declaration and the served leaf
+/// differ it re-reads the configured PEM paths and swaps if the leaf there IS the declared one
+/// ([`TcpA2ATransport::reload_own_identity`]). A leaf the manifest does not declare is never
+/// served; a declared leaf that is not on disk yet leaves the host partitioned from every peer
+/// that already promoted (fail-closed), and a later tick heals it with no restart.
+///
+/// It runs on its own task: never inside a `RotationGraceTimer` callback, never under `cached`.
+pub struct OwnLeafReconciler {
+    transport: Arc<maos_a2a_tcp::TcpA2ATransport>,
+    state: Arc<CohortManifestState>,
+    /// The last row journaled, so a standing condition (`swap_pending`) writes ONE row, not one
+    /// per tick.
+    last_row: Mutex<Option<(maos_cohort::SelfLeafOutcome, String, String)>>,
+}
+
+impl OwnLeafReconciler {
+    pub fn new(
+        transport: Arc<maos_a2a_tcp::TcpA2ATransport>,
+        state: Arc<CohortManifestState>,
+    ) -> Self {
+        Self {
+            transport,
+            state,
+            last_row: Mutex::new(None),
+        }
+    }
+
+    /// One pass. Returns the outcome it journaled, or `None` when the served leaf already is the
+    /// declared one (no file is read) or the row was already written for this exact condition.
+    pub fn reconcile(&self) -> Option<maos_cohort::SelfLeafOutcome> {
+        use maos_a2a_tcp::OwnLeafReload;
+        use maos_cohort::SelfLeafOutcome;
+
+        let (declared, version) = self.state.local_declaration().ok().flatten()?;
+        if self.state.local_leaf_fingerprint().as_ref() == Some(&declared) {
+            // Consistent again: a later divergence is a new condition and gets its own row.
+            *self
+                .last_row
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+            return None;
+        }
+        let (outcome, on_disk) = match self.transport.reload_own_identity(&declared) {
+            Ok(OwnLeafReload::Current) => return None,
+            Ok(OwnLeafReload::Swapped { serving, .. }) => {
+                (SelfLeafOutcome::Swapped, serving.wire())
+            }
+            Ok(OwnLeafReload::Pending { on_disk }) => {
+                (SelfLeafOutcome::SwapPending, on_disk.wire())
+            }
+            Ok(OwnLeafReload::Undeclared { on_disk }) => {
+                (SelfLeafOutcome::RefusedUndeclared, on_disk.wire())
+            }
+            Err(error) => {
+                eprintln!(
+                    "cohort own-leaf reconcile: the configured identity is unusable: {error}"
+                );
+                (SelfLeafOutcome::RefusedUnusable, "unusable".to_string())
+            }
+        };
+        let key = (outcome, on_disk.clone(), declared.wire());
+        let mut last = self
+            .last_row
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if last.as_ref() == Some(&key) {
+            return None;
+        }
+        match self
+            .state
+            .journal_self_leaf(outcome, &on_disk, &declared.wire(), version)
+        {
+            Ok(()) => {
+                *last = Some(key);
+                Some(outcome)
+            }
+            Err(error) => {
+                eprintln!("cohort own-leaf reconcile: the journal row was not written: {error}");
+                None
+            }
+        }
+    }
+
+    /// Run [`Self::reconcile`] now, on every `wake`, and on every confirmation interval of the
+    /// manifest in force, until `cancel`.
+    pub fn spawn(
+        self: Arc<Self>,
+        wake: Arc<tokio::sync::Notify>,
+        cancel: tokio_util::sync::CancellationToken,
+    ) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            loop {
+                // A pass reads files and fsyncs nothing, but it is blocking I/O: keep it off the
+                // reactor.
+                let this = Arc::clone(&self);
+                if let Err(error) = tokio::task::spawn_blocking(move || this.reconcile()).await {
+                    eprintln!("cohort own-leaf reconcile task failed: {error}");
+                }
+                let interval = self
+                    .state
+                    .confirmation_interval()
+                    .unwrap_or(Duration::from_secs(15));
+                tokio::select! {
+                    () = cancel.cancelled() => return,
+                    () = wake.notified() => {}
+                    () = tokio::time::sleep(interval) => {}
+                }
+            }
+        })
+    }
+}

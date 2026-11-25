@@ -69,6 +69,15 @@ pub fn mint_identity(dir: &Path, tag: &str) -> Identity {
     }
 }
 
+/// Story 23-7 / D-23-7-03 A — the signed lease of the fixture manifests: the minimum (30), so the
+/// rotation grace `G = cold_deployment_t_grace() + (t_stale + 1) / 2` is 20 s, not 65 s.
+pub const FIXTURE_T_STALE_SECS: u64 = 30;
+
+/// `G` for the fixture manifests, derived from the shipped formula.
+pub fn fixture_grace() -> Duration {
+    maos_cohort::cold_deployment_t_grace() + Duration::from_secs((FIXTURE_T_STALE_SECS + 1) / 2)
+}
+
 pub fn signed_manifest(
     key: &SigningKey,
     version: u64,
@@ -113,7 +122,7 @@ pub fn signed_manifest(
             RESERVED_INTENT_REISSUE.to_string(),
             RESERVED_INTENT_HALT_RECEIPT.to_string(),
         ],
-        t_stale_secs: 120,
+        t_stale_secs: FIXTURE_T_STALE_SECS,
         teams: None,
         signature: ManifestSignature { sig: String::new() },
         cross_team_consent: Vec::new(),
@@ -386,6 +395,8 @@ pub async fn drive_a_signed_rotation(tag: &str) -> Rotation {
         }],
         handshake_timeout: Duration::from_secs(5),
         ca_roots: None,
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     };
     let host_b = Arc::new(
         maos_a2a_tcp::TcpA2ATransport::bind(

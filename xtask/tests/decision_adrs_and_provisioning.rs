@@ -36,7 +36,7 @@ const REQUIRED_ADRS: &[(&str, &str)] = &[
     ("060", "17-3b-wasm-form-admission-and-contract"),
     ("061", "17-1-worker-egress-allowlist-and-scoped-credential"),
     ("062", "16-1-daemon-post-surface-and-verb-retarget"),
-    ("063", "21-3-durable-tofu-and-self-leaf-rotation"),
+    ("063", "23-7-peer-identity-rotation"),
     ("064", "15-6-inference-replay-seam"),
 ];
 const REQUIRED_FRONTMATTER: &[&str] = &[
@@ -589,7 +589,7 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
             if let Some(frame) =
                 anchor_source(root, number, "crates/maos-domain/src/frame.rs", findings)
             {
-                require_absent(
+                require_contains(
                     number,
                     context,
                     "RuptureReason",
@@ -611,7 +611,7 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                     "build_server_config",
                     "crates/maos-a2a-tcp/src/transport.rs",
                     &transport,
-                    "None, // listen side learns the peer from the cert",
+                    "None, // listen side: peer_san off = flat TOFU lookup",
                     findings,
                 );
             }
@@ -1017,7 +1017,7 @@ impl Fixture {
                 60 => "class.forms accepts rust-inproc, subprocess and wasm-component; admit_spirit reads it and refuses first-party forms.",
                 61 => "env_clear replaces ambient inheritance after the daemon-minted proxy channel; --network=none is the T3 model.",
                 62 => "The four GET routes have no 405 today and maos-kernel-core remains excluded.",
-                63 => "RuptureReason lacks the variant and build_server_config uses a flat lookup.",
+                63 => "RuptureReason carries CertPostGraceReject and build_server_config scopes the listen side by SAN under peer_san = required.",
                 64 => "ReplayLiveConflict guards replay plus --live; providers_map.values_mut() is the router provider-value seam — its arms construct CassetteReplayProvider::from_file and CassetteRecordProvider::new, each anchored independently; --replay-llm is retired.",
                 _ => "Fixture context anchored to no governed decision.",
             };
@@ -1087,12 +1087,12 @@ impl Fixture {
         write_file(
             root,
             "crates/maos-domain/src/frame.rs",
-            "pub enum RuptureReason { PeerIdentityUnverified }\n",
+            "pub enum RuptureReason { PeerIdentityUnverified, CertPostGraceReject }\n",
         );
         write_file(
             root,
             "crates/maos-a2a-tcp/src/transport.rs",
-            "pub fn build_server_config() { None, // listen side learns the peer from the cert\n}\n",
+            "pub fn build_server_config_with_san() { None, // listen side: peer_san off = flat TOFU lookup, required = SAN-scoped\n}\n",
         );
         write_file(
             root,

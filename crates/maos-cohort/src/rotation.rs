@@ -132,8 +132,9 @@
 //! entry → a plane-A `peers` entry → [`PeerCertRotation::ledger`]. The first two
 //! are the only real locks and the tree already documents the second
 //! (`tofu.rs:171-172`). `TcpA2ATransport::swap_lock` is NOT in this order
-//! because peer-trust rotation never takes it. Local-leaf rotation belongs to
-//! Story 14-2d (`swap_serving_cert` still has no production caller here).
+//! because peer-trust rotation never takes it. Local-leaf rotation (Story 23-7) is driven by
+//! the composition root's own-leaf reconciler, off the `cached` lock
+//! ([`crate::CohortManifestState::install_local_leaf_observer`]); it takes `swap_lock` only.
 //! ⚠ Implementations of [`RotationGraceTimer`] MUST NOT call back into
 //! `CohortManifestState`: the manifest lock is held across [`PeerCertRotation::reload`].
 
@@ -331,6 +332,10 @@ pub struct PeerCertRotation {
     core: Arc<A2ARouterCore>,
     audit: Arc<dyn CohortAuditSink>,
     timer: Arc<dyn RotationGraceTimer>,
+    /// Story 23-7 / D-23-7-03 A — the §7.2.1.a base ([`cold_deployment_t_grace`]); each window
+    /// opened by `reload` closes after this PLUS the confirmation interval of the manifest being
+    /// applied, so a peer that applies the reissue one pull later than another still sees the
+    /// incoming leaf accepted by every peer that already did.
     grace: Duration,
     /// Serializes every plane/ledger transition with grace closers. Readers do
     /// not take the store's writer lock, so ordering still preserves their
@@ -396,6 +401,16 @@ impl PeerCertRotation {
     /// Read plane C from the live router rather than snapshotting it at install.
     pub fn local_leaf_fingerprint(&self) -> Option<PeerCertFingerprint> {
         self.core.local_leaf_fingerprint()
+    }
+
+    /// Story 23-7 / D-23-7-09 A — the highest signed-manifest version this host durably applied.
+    pub fn manifest_floor(&self) -> u64 {
+        self.pins.manifest_floor()
+    }
+
+    /// Raise the durable manifest-version floor after a reissue was applied.
+    pub fn raise_manifest_floor(&self, version: u64) {
+        self.pins.raise_manifest_floor(version);
     }
 
     /// The rotation status an operator can read: every window this process still
@@ -510,7 +525,9 @@ impl PeerCertRotation {
         now_secs: u64,
         commit_event: Option<&CohortAuditEvent>,
         local_leaf_event: Option<&CohortAuditEvent>,
+        confirmation_interval: Duration,
     ) -> Result<RotationOutcome, CohortError> {
+        let grace = self.grace + confirmation_interval;
         let _transition = match self.transition_lock.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
@@ -553,6 +570,7 @@ impl PeerCertRotation {
                     &pinned,
                     manifest_version,
                     now_secs,
+                    grace,
                     &mut outcome,
                     &mut applied,
                 ),
@@ -564,6 +582,7 @@ impl PeerCertRotation {
                     declared,
                     manifest_version,
                     now_secs,
+                    grace,
                     &mut outcome,
                     &mut applied,
                 ),
@@ -690,6 +709,7 @@ impl PeerCertRotation {
         retiring: &str,
         manifest_version: u64,
         now_secs: u64,
+        grace: Duration,
         outcome: &mut RotationOutcome,
         applied: &mut Vec<AppliedChange>,
     ) -> Result<(), CohortError> {
@@ -725,7 +745,7 @@ impl PeerCertRotation {
         self.ledger_write(|ledger| {
             ledger.insert(window.peer.clone(), window.clone());
         });
-        self.schedule_close(&window, manifest_version);
+        self.schedule_close(&window, manifest_version, grace);
         if let Err(error) = self
             .audit
             .append(&CohortAuditEvent::CertRotationWindowOpened {
@@ -783,6 +803,7 @@ impl PeerCertRotation {
         declared: &PeerCertFingerprint,
         manifest_version: u64,
         now_secs: u64,
+        grace: Duration,
         outcome: &mut RotationOutcome,
         applied: &mut Vec<AppliedChange>,
     ) -> Result<(), CohortError> {
@@ -826,6 +847,7 @@ impl PeerCertRotation {
                 &pinned,
                 manifest_version,
                 now_secs,
+                grace,
                 outcome,
                 applied,
             );
@@ -1012,7 +1034,7 @@ impl PeerCertRotation {
     ///    to the serving pin ONLY when no window is open for the peer;
     ///    otherwise a closer whose own window vanished would drag plane A off a
     ///    DIFFERENT, in-flight rotation.
-    fn schedule_close(&self, window: &RotationWindow, manifest_version: u64) {
+    fn schedule_close(&self, window: &RotationWindow, manifest_version: u64, grace: Duration) {
         let pins = Arc::clone(&self.pins);
         let core = Arc::clone(&self.core);
         let audit = Arc::clone(&self.audit);
@@ -1020,7 +1042,7 @@ impl PeerCertRotation {
         let transition_lock = Arc::clone(&self.transition_lock);
         let window = window.clone();
         self.timer.schedule(
-            self.grace,
+            grace,
             Box::new(move || {
                 let _transition = match transition_lock.lock() {
                     Ok(guard) => guard,

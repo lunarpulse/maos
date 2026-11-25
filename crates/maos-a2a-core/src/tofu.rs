@@ -11,7 +11,7 @@ use crate::identity::{PeerCertFingerprint, PeerId};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant, SystemTime};
 
@@ -169,6 +169,10 @@ pub struct PinRecord {
     /// Observed boot nonce of the pending re-pin request (D-21-3-03 A). A request
     /// armed while a rotation window was open is not recorded: it is not approvable.
     pub pending_observed: Option<u64>,
+    /// Story 23-7 / D-23-7-07 A — a rotation promotion closed on this peer's current
+    /// fingerprint (its signed rotation retired the previous one). Cleared by a re-pair or
+    /// a re-seed; a pin file written before schema 2 reads as `false`.
+    pub promoted: bool,
 }
 
 /// Story 21-3 / D-21-3-01 A — the synchronous durability port. `store` runs
@@ -177,8 +181,21 @@ pub struct PinRecord {
 pub trait PinPersistence: Send + Sync {
     /// The records read and validated when the backing file was opened.
     fn load(&self) -> Vec<PinRecord>;
-    /// Durably replace the whole record set. A success also lifts any fence.
-    fn store(&self, records: &[PinRecord]) -> Result<(), String>;
+    /// Story 23-7 / D-23-7-09 A — the highest signed-manifest version this host durably applied
+    /// (`0` when none was recorded).
+    fn load_floor(&self) -> u64 {
+        0
+    }
+    /// Durably replace the whole record set together with the manifest version `floor`. A
+    /// success also lifts any fence.
+    fn store(&self, records: &[PinRecord], floor: u64) -> Result<(), String>;
+    /// Story 23-7 / D-23-7-08 A — [`Self::store`] for a transition that NARROWS trust
+    /// (retirement, invalidation, a raised floor). An implementation with a fence marks the file
+    /// untrustworthy BEFORE the write and lifts the mark only once the write is durable, so a
+    /// crash at any point between leaves the next open refusing. The default has no fence.
+    fn store_narrowing(&self, records: &[PinRecord], floor: u64) -> Result<(), String> {
+        self.store(records, floor)
+    }
     /// A narrowing transition (retirement, invalidation) could not be written:
     /// durably mark the backing file untrustworthy so the next open refuses
     /// instead of reviving the older snapshot. It must not need a fresh
@@ -189,6 +206,7 @@ pub trait PinPersistence: Send + Sync {
 struct PinMeta {
     anchor: (PeerCertFingerprint, u64),
     generation: u64,
+    promoted: bool,
 }
 
 /// TOFU pin store trait. [`InMemoryTofuPinStore`] is the only implementation;
@@ -298,6 +316,9 @@ pub struct InMemoryTofuPinStore {
     /// A narrowing transition could not be persisted; cleared by the next
     /// successful write.
     degraded: AtomicBool,
+    /// Story 23-7 / D-23-7-09 A — highest applied signed-manifest version; durable through the
+    /// port, written under `window_lock`.
+    manifest_floor: AtomicU64,
 }
 
 impl Default for InMemoryTofuPinStore {
@@ -312,6 +333,7 @@ impl Default for InMemoryTofuPinStore {
             meta: DashMap::new(),
             persistence: None,
             degraded: AtomicBool::new(false),
+            manifest_floor: AtomicU64::new(0),
         }
     }
 }
@@ -331,6 +353,8 @@ impl InMemoryTofuPinStore {
     /// Story 21-3 / D-21-3-01 A — make every pin-lifecycle write durable
     /// through `port`.
     pub fn with_persistence(mut self, port: Arc<dyn PinPersistence>) -> Self {
+        self.manifest_floor
+            .store(port.load_floor(), Ordering::Release);
         self.persistence = Some(port);
         self
     }
@@ -380,6 +404,7 @@ impl InMemoryTofuPinStore {
             anchor,
             generation,
             pending_observed,
+            promoted,
         } = record;
         if let Some(colliding_peer) = self.colliding_peer(&pin.peer, &pin.fingerprint) {
             return Err(EPinMismatch::FingerprintCollision {
@@ -419,8 +444,14 @@ impl InMemoryTofuPinStore {
                 },
             );
         }
-        self.meta
-            .insert(key.clone(), PinMeta { anchor, generation });
+        self.meta.insert(
+            key.clone(),
+            PinMeta {
+                anchor,
+                generation,
+                promoted,
+            },
+        );
         self.pins.insert(
             key,
             TofuPin {
@@ -456,6 +487,29 @@ impl InMemoryTofuPinStore {
         self.degraded.load(Ordering::Acquire)
     }
 
+    /// Story 23-7 / D-23-7-07 A — `peer`'s current pin is the product of a rotation promotion
+    /// (the durable join that types a post-grace refusal).
+    pub fn is_promoted(&self, peer: &PeerId) -> bool {
+        self.meta
+            .get(peer.as_str())
+            .is_some_and(|meta| meta.promoted)
+    }
+
+    /// Story 23-7 / D-23-7-09 A — the highest signed-manifest version durably applied.
+    pub fn manifest_floor(&self) -> u64 {
+        self.manifest_floor.load(Ordering::Acquire)
+    }
+
+    /// Raise the durable manifest-version floor (never lowers it). A raise narrows what a replayed
+    /// signed manifest may do, so it is written like any narrowing transition.
+    pub fn raise_manifest_floor(&self, version: u64) {
+        let _guard = self.lock_window();
+        if version > self.manifest_floor.load(Ordering::Acquire) {
+            self.manifest_floor.store(version, Ordering::Release);
+            self.persist_narrowed();
+        }
+    }
+
     /// The pin set as records; `change` replaces (or adds) its peer's record.
     fn records_with(&self, change: Option<PinRecord>) -> Vec<PinRecord> {
         let mut records: Vec<PinRecord> = self
@@ -475,9 +529,9 @@ impl InMemoryTofuPinStore {
 
     fn record_of(&self, pin: TofuPin) -> PinRecord {
         let key = pin.peer.as_str();
-        let (anchor, generation) = self.meta.get(key).map_or_else(
-            || ((pin.fingerprint.clone(), pin.boot_nonce), 0),
-            |meta| (meta.anchor.clone(), meta.generation),
+        let (anchor, generation, promoted) = self.meta.get(key).map_or_else(
+            || ((pin.fingerprint.clone(), pin.boot_nonce), 0, false),
+            |meta| (meta.anchor.clone(), meta.generation, meta.promoted),
         );
         // A request armed while a rotation window was open can never be approved
         // (`rotating`); it is not recorded, so a restart cannot re-arm it as approvable.
@@ -491,16 +545,27 @@ impl InMemoryTofuPinStore {
             anchor,
             generation,
             pending_observed,
+            promoted,
         }
     }
 
     /// Write the pin set (with `change` applied); a success clears `degraded`.
     /// Caller holds `window_lock`; never called with a `pins` entry guard held.
     fn persist(&self, change: Option<PinRecord>) -> Result<(), String> {
+        self.persist_with(change, false)
+    }
+
+    fn persist_with(&self, change: Option<PinRecord>, narrowing: bool) -> Result<(), String> {
         let Some(port) = &self.persistence else {
             return Ok(());
         };
-        port.store(&self.records_with(change))?;
+        let records = self.records_with(change);
+        let floor = self.manifest_floor.load(Ordering::Acquire);
+        if narrowing {
+            port.store_narrowing(&records, floor)?;
+        } else {
+            port.store(&records, floor)?;
+        }
         self.degraded.store(false, Ordering::Release);
         Ok(())
     }
@@ -509,7 +574,7 @@ impl InMemoryTofuPinStore {
     /// degraded (D-21-3-04 A) and FENCES the durable file, so a restart refuses
     /// to revive the older, wider snapshot the failed write left behind.
     fn persist_narrowed(&self) {
-        if let Err(detail) = self.persist(None) {
+        if let Err(detail) = self.persist_with(None, true) {
             self.degraded.store(true, Ordering::Release);
             tracing::error!(%detail, "TOFU pin file not written; pins degraded");
             if let Some(Err(fence)) = self.persistence.as_ref().map(|port| port.fence()) {
@@ -529,10 +594,12 @@ impl InMemoryTofuPinStore {
         })
     }
 
-    /// A promotion changed `peer`'s fingerprint: bump its durable generation.
+    /// A promotion changed `peer`'s fingerprint: bump its durable generation and mark the
+    /// current pin as promoted (the durable join behind `CertPostGraceReject`).
     fn persist_promotion(&self, peer: &PeerId) {
         if let Some(mut meta) = self.meta.get_mut(peer.as_str()) {
             meta.generation += 1;
+            meta.promoted = true;
         }
         self.persist_narrowed();
     }
@@ -931,6 +998,7 @@ impl TofuPinStore for InMemoryTofuPinStore {
             anchor: anchor.clone(),
             generation: 0,
             pending_observed: None,
+            promoted: false,
         }))
         .map_err(|detail| EPinMismatch::Invalidated {
             peer: key.clone(),
@@ -941,6 +1009,7 @@ impl TofuPinStore for InMemoryTofuPinStore {
             PinMeta {
                 anchor,
                 generation: 0,
+                promoted: false,
             },
         );
         self.pins.insert(key, pin.clone());
@@ -1083,7 +1152,10 @@ impl TofuPinStore for InMemoryTofuPinStore {
                     repin_approval_id: Some(approval_id),
                 };
                 let mut record = self.record_of(new_pin.clone());
-                record.generation += u64::from(&pending.request.pinned_fingerprint != new_observed);
+                let changed = &pending.request.pinned_fingerprint != new_observed;
+                record.generation += u64::from(changed);
+                // A consented re-pin to a different fingerprint is a re-pair, not a promotion.
+                record.promoted &= !changed;
                 // Widening: persist FIRST. A refused write applies nothing and the
                 // request stays pending, verdict dropped (D-21-3-04 A).
                 if let Err(detail) = self.persist(Some(record.clone())) {
@@ -1096,6 +1168,7 @@ impl TofuPinStore for InMemoryTofuPinStore {
                     PinMeta {
                         anchor: record.anchor,
                         generation: record.generation,
+                        promoted: record.promoted,
                     },
                 );
                 self.rotation_next.remove(peer.as_str());

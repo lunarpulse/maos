@@ -167,8 +167,10 @@ pub struct A2ARouterCore {
     /// `CohortMember.fingerprint` for the local host, so a signed reissue that
     /// rotates the local fingerprint away stops this host from originating a
     /// crossing until the operator realigns. `None` (non-cohort deployments)
-    /// fails closed exactly like an unauthenticated endpoint.
-    local_leaf_fingerprint: Option<PeerCertFingerprint>,
+    /// fails closed exactly like an unauthenticated endpoint. Story 23-7 (plane C moves
+    /// with the serving leaf): behind a lock so an own-leaf swap can move it; read once
+    /// per Send, never held across an `.await`; a poisoned lock reads as `None` (closed).
+    local_leaf_fingerprint: std::sync::RwLock<Option<PeerCertFingerprint>>,
     /// Optional intake sink for tests — when set, accepted frames are
     /// pushed here so test code can observe them.
     intake_sink: Arc<tokio::sync::Mutex<Option<tokio::sync::mpsc::Sender<IacFrame>>>>,
@@ -218,7 +220,7 @@ impl A2ARouterCore {
             rupture_sink: Arc::new(tokio::sync::Mutex::new(None)),
             next_id: Arc::new(std::sync::atomic::AtomicU64::new(1)),
             consent_now_ns: None,
-            local_leaf_fingerprint: None,
+            local_leaf_fingerprint: std::sync::RwLock::new(None),
             cohort_manifest_gate: Arc::new(LegacyCohortManifestGate),
             halt_receipt_observer: Arc::new(LegacyHaltReceiptObserver),
             digest_read_port: Arc::new(LegacyDigestReadPort),
@@ -250,9 +252,17 @@ impl A2ARouterCore {
     /// Story 13.6a (review P1) — wire the local TLS leaf fingerprint the
     /// Send-seam team binding is checked against. Builder, same discipline as
     /// [`Self::with_cohort_manifest_gate`].
-    pub fn with_local_leaf_fingerprint(mut self, fingerprint: PeerCertFingerprint) -> Self {
-        self.local_leaf_fingerprint = Some(fingerprint);
+    pub fn with_local_leaf_fingerprint(self, fingerprint: PeerCertFingerprint) -> Self {
+        self.set_local_leaf_fingerprint(fingerprint);
         self
+    }
+
+    /// Story 23-7 / AC2(d) — move plane C to the leaf this host now serves. Called by the
+    /// transport's own-leaf swap after the serving and dialing halves moved.
+    pub fn set_local_leaf_fingerprint(&self, fingerprint: PeerCertFingerprint) {
+        if let Ok(mut guard) = self.local_leaf_fingerprint.write() {
+            *guard = Some(fingerprint);
+        }
     }
 
     /// Story 12.3 — inject the out-of-kernel halt-receipt presence observer.
@@ -491,6 +501,10 @@ impl A2ARouterCore {
     /// strong — the listen side accepts ANY active pin, while per-peer scoping
     /// exists only on the dial side.
     ///
+    /// `reason` is `PeerIdentityUnverified` unless the caller holds the Story 23-7 durable join
+    /// (the subject peer's pin record carries a promotion), in which case it is
+    /// `CertPostGraceReject`; the router does not decide it.
+    ///
     /// Returns `Err` when no sink is installed, so a deployment that expects
     /// journaling and has none fails loudly rather than silently.
     pub async fn journal_peer_identity_refusal(
@@ -498,6 +512,7 @@ impl A2ARouterCore {
         direction: PeerRefusalDirection,
         peer_hint: &str,
         detail: &str,
+        reason: maos_domain::frame::RuptureReason,
     ) -> Result<(), String> {
         let sink = {
             let guard = self.rupture_sink.lock().await;
@@ -528,7 +543,7 @@ impl A2ARouterCore {
             accepted: vec![],
             rejected: vec![maos_domain::frame::RuptureRejection {
                 address: local.clone(),
-                reason: maos_domain::frame::RuptureReason::PeerIdentityUnverified,
+                reason,
             }],
             ruptured_at_ns: now_ns,
         };
@@ -606,7 +621,10 @@ impl A2ARouterCore {
 
     /// The TLS leaf fingerprint this process is currently configured to serve.
     pub fn local_leaf_fingerprint(&self) -> Option<PeerCertFingerprint> {
-        self.local_leaf_fingerprint.clone()
+        self.local_leaf_fingerprint
+            .read()
+            .ok()
+            .and_then(|guard| guard.clone())
     }
 
     pub fn lookup_peer(&self, host_id: &HostId) -> Result<A2APeerConfig, A2AError> {
@@ -936,10 +954,11 @@ impl A2ARouterCore {
                 // verdict decides consent, the declaration stamps the team, and
                 // the declaration is returned only when this host's own leaf
                 // fingerprint equals its signed `CohortMember.fingerprint`.
+                let local_leaf = self.local_leaf_fingerprint();
                 let (verdict, declaration) = self.cohort_manifest_gate.consent_and_team(
                     CohortConsentSeam::Send,
                     peer,
-                    self.local_leaf_fingerprint.as_ref(),
+                    local_leaf.as_ref(),
                     None,
                     &intent,
                     None,

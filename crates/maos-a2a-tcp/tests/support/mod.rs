@@ -153,6 +153,23 @@ pub fn mk_self_signed(clock: &Clock, before_off: i64, after_off: i64) -> Leaf {
     finish_leaf(cert, key)
 }
 
+/// Story 23-7 — a valid leaf issued by `ca` carrying exactly the given URI SANs (plus the
+/// loopback IP SAN every leaf here has).
+pub fn mk_san_leaf(ca: &Ca, clock: &Clock, uris: &[String]) -> Leaf {
+    let (mut params, key) = leaf_params(clock, -HOUR, HOUR);
+    for uri in uris {
+        params.subject_alt_names.push(rcgen::SanType::URI(
+            uri.clone()
+                .try_into()
+                .expect("an IA5 string for the URI SAN"),
+        ));
+    }
+    let cert = params
+        .signed_by(&key, &ca.cert, &ca.key)
+        .expect("san leaf signed_by ca");
+    finish_leaf(cert, key)
+}
+
 fn finish_leaf(cert: rcgen::Certificate, key: KeyPair) -> Leaf {
     let der = cert.der().clone();
     let fingerprint = PeerCertFingerprint::from_cert_der(der.as_ref());
@@ -297,6 +314,8 @@ pub fn tcp_config(
         peer_pins,
         handshake_timeout,
         ca_roots: pems.ca_roots.clone(),
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     }
 }
 

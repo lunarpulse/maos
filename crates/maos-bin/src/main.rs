@@ -13620,6 +13620,24 @@ async fn run_cohort_a2a_daemon(
         Arc::new(maos_bin::cert_rotation::TokioGraceTimer),
         maos_cohort::cold_deployment_t_grace(),
     )?;
+    // ── Story 23-7 / D-23-7-02 C — THE OWN-LEAF TRIGGER ─────────────────────
+    //
+    // The production caller of `swap_serving_cert`: a reissue that moves THIS host's declaration
+    // off the served leaf wakes the reconciler (after the manifest lock is released), and it
+    // re-checks on every confirmation tick while they differ. It swaps only when the configured
+    // PEM paths hold the declared leaf — the signed manifest, never an operator verb, decides
+    // (ADR-062). Delete this and the daemon still serves and still opens peer windows, and
+    // silently never moves its own leaf.
+    let own_leaf_wake = Arc::new(tokio::sync::Notify::new());
+    let observer_wake = Arc::clone(&own_leaf_wake);
+    if !rotation_state.install_local_leaf_observer(Arc::new(move || observer_wake.notify_one())) {
+        return Err("cohort daemon: the own-leaf observer was already installed".into());
+    }
+    let _own_leaf_reconciler = Arc::new(maos_bin::cert_rotation::OwnLeafReconciler::new(
+        Arc::clone(&runtime.transport),
+        Arc::clone(&rotation_state),
+    ))
+    .spawn(own_leaf_wake, runtime.cancel.child_token());
     // ── Story 19-7 (AC2.1, D-19-7-05/08 A) — THE RE-PIN CONSENT WIRING ──────
     //
     // Same root, same reason as the rotation control above: only here does the
@@ -13873,6 +13891,30 @@ fn reconcile_transport_identity_with_manifest(
                  for {} (loaded {own_fingerprint:?}, manifest {signed_own:?}) — the identity \
                  on disk is stale relative to the signed manifest",
                 state.local_host().as_str(),
+            )
+            .into());
+        }
+    }
+    // (c.2) Story 23-7 / D-23-7-06 A — under `peer_san = "required"` the own leaf must carry the
+    // SPIFFE URI SAN that names THIS host: every `required` peer scopes our handshake to it.
+    if let Some(domain) = tcp_config.peer_san_domain()? {
+        let (own_chain, _own_key) = tcp_config.load_identity()?;
+        let own_leaf = own_chain
+            .first()
+            .ok_or("cohort daemon identity chain is empty")?;
+        let named =
+            maos_a2a_tcp::san::peer_from_leaf(own_leaf.as_ref(), &domain).map_err(|refusal| {
+                format!(
+                    "peer_san = \"required\": the daemon's own certificate is refused ({refusal}); \
+                     it must carry exactly one URI SAN {}",
+                    maos_a2a_tcp::san::spiffe_id(&domain, state.local_host().as_str())
+                )
+            })?;
+        if named.as_str() != state.local_host().as_str() {
+            return Err(format!(
+                "peer_san = \"required\": the daemon's own certificate names {} but this host is {}",
+                named.as_str(),
+                state.local_host().as_str()
             )
             .into());
         }
@@ -14512,6 +14554,8 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
         }],
         handshake_timeout: std::time::Duration::from_secs(30),
         ca_roots: Some(ca_path.clone()),
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     };
     let nash_peers = vec![A2APeerConfig {
         peer_id: PeerId::new("host_a"),
@@ -14539,6 +14583,8 @@ async fn smoke_a2a_tcp_8_6() -> Result<(), Box<dyn std::error::Error>> {
         }],
         handshake_timeout: std::time::Duration::from_secs(30),
         ca_roots: Some(ca_path.clone()),
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     };
     let mira_peers = vec![A2APeerConfig {
         peer_id: PeerId::new("host_b"),
@@ -17899,6 +17945,8 @@ mod story_13_5a_enterprise_daemon_seam {
             }],
             handshake_timeout: std::time::Duration::from_secs(5),
             ca_roots: None,
+            peer_san: Default::default(),
+            peer_trust_domain: None,
         };
         let gate: Arc<dyn maos_a2a_core::CohortManifestGate> = state.clone();
         let observer: Arc<dyn maos_a2a_core::HaltReceiptObserver> = state.clone();

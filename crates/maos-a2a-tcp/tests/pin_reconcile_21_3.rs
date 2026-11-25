@@ -30,7 +30,7 @@ impl PinPersistence for Port {
         self.loaded.clone()
     }
 
-    fn store(&self, records: &[PinRecord]) -> Result<(), String> {
+    fn store(&self, records: &[PinRecord], _floor: u64) -> Result<(), String> {
         self.stored.lock().unwrap().push(records.to_vec());
         Ok(())
     }
@@ -59,6 +59,8 @@ fn config(pins: &[(&str, u8, u64)]) -> TcpA2AConfig {
             .collect(),
         handshake_timeout: Duration::from_secs(30),
         ca_roots: None,
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     }
 }
 
@@ -83,6 +85,7 @@ fn record(
         anchor: (fp(anchor_seed), anchor_nonce),
         generation,
         pending_observed: None,
+        promoted: false,
     }
 }
 

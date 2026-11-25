@@ -336,6 +336,8 @@ async fn cross_host_bind_refuses_the_zero_own_boot_nonce() {
         peer_pins: vec![],
         handshake_timeout: std::time::Duration::from_secs(30),
         ca_roots: None,
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     };
     let error = maos_a2a_tcp::TcpA2ATransport::bind_with_intake_sink(
         config,
@@ -383,6 +385,8 @@ hex = "0000000000000000000000000000000000000000000000000000000000000000"
         peer_pins: vec![zero_pin],
         handshake_timeout: std::time::Duration::from_secs(30),
         ca_roots: None,
+        peer_san: Default::default(),
+        peer_trust_domain: None,
     };
     let error = maos_a2a_tcp::TcpA2ATransport::bind_with_intake_sink(
         config,

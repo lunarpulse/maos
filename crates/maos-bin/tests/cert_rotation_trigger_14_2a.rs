@@ -39,7 +39,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use maos_iac::adapter::transparency_log::{FrameFilter, FrameKind as TlFrameKind};
-use rotation_daemon::{drive_a_signed_rotation, operator_get};
+use rotation_daemon::{drive_a_signed_rotation, fixture_grace, operator_get};
 
 /// Story 14-2a / AC1.1, AC1.2, AC1.5, AC2.1, AC2.2 — THE CONTROL: an operator
 /// rotates a live daemon's trust in a peer's certificate by signing a new
@@ -248,7 +248,7 @@ async fn t_14_2a_the_production_grace_timer_fires_its_terminal_action_exactly_on
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn t_14_2a_the_installed_production_closer_closes_the_window_and_journals_the_close() {
     let rotation = drive_a_signed_rotation("installed-closer").await;
-    let grace = maos_cohort::cold_deployment_t_grace();
+    let grace = fixture_grace();
 
     // ── 5. The window must survive until the grace and be gone after it ─────
     let mut seen = rotation.windows.clone();

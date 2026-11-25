@@ -16,13 +16,17 @@
 
 pub mod config;
 pub mod error;
+pub mod san;
 pub mod transport;
 pub mod verifier;
 
-pub use config::{clone_key, load_certs, load_private_key, PinnedFingerprint, TcpA2AConfig};
+pub use config::{
+    clone_key, load_certs, load_identity_paths, load_private_key, PinnedFingerprint, TcpA2AConfig,
+};
 pub use error::TcpTransportError;
+pub use san::{PeerSanMode, SanRefusal};
 pub use transport::{
-    build_client_config, build_server_config, length_delimited_codec, TcpA2ATransport, TcpTimeouts,
-    MAX_FRAME_LEN,
+    build_client_config, build_server_config, build_server_config_with_san, length_delimited_codec,
+    OwnLeafReload, TcpA2ATransport, TcpTimeouts, MAX_FRAME_LEN,
 };
 pub use verifier::{TofuPinningVerifier, TrustPosture, VerifyDirection};

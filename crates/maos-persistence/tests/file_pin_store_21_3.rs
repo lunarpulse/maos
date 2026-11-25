@@ -25,6 +25,7 @@ fn record(peer: &str, seed: u8) -> PinRecord {
         anchor: (fp(1), 7),
         generation: 2,
         pending_observed: None,
+        promoted: false,
     }
 }
 
@@ -98,7 +99,7 @@ fn round_trips_every_durable_field() {
     let records = vec![record("peer-a", 1), restarted, manual];
 
     let store = FilePinStore::open(&path).unwrap();
-    store.store(&records).unwrap();
+    store.store(&records, 0).unwrap();
     drop(store);
     assert_eq!(FilePinStore::open(&path).unwrap().load(), records);
 }
@@ -118,7 +119,7 @@ fn the_file_is_mode_0600() {
     let path = path_in(&dir);
     FilePinStore::open(&path)
         .unwrap()
-        .store(&[record("peer-a", 1)])
+        .store(&[record("peer-a", 1)], 0)
         .unwrap();
     assert_eq!(
         fs::metadata(&path).unwrap().permissions().mode() & 0o777,
@@ -140,8 +141,8 @@ fn unknown_fields_versions_and_malformed_json_are_typed_refusals() {
     ));
 
     assert!(matches!(
-        refusal(&doc(2, vec![row("peer-a")])),
-        PinFileError::Version { found: 2, .. }
+        refusal(&doc(3, vec![row("peer-a")])),
+        PinFileError::Version { found: 3, .. }
     ));
     assert!(matches!(
         refusal(&json!({"pins": []})),
@@ -280,7 +281,7 @@ fn a_failed_write_leaves_no_temp_behind() {
     // The rename over a non-empty directory fails after the temp was created.
     fs::create_dir(&path).unwrap();
     fs::write(path.join("keep"), b"x").unwrap();
-    assert!(store.store(&[record("peer-a", 1)]).is_err());
+    assert!(store.store(&[record("peer-a", 1)], 0).is_err());
     assert_eq!(fs::read(path.join("keep")).unwrap(), b"x");
     assert_eq!(temps_in(dir.path()), 0);
 }
@@ -293,12 +294,12 @@ fn a_failed_write_leaves_the_prior_file_valid() {
     let path = path_in(&dir);
     let store = FilePinStore::open(&path).unwrap();
     let prior = vec![record("peer-a", 1)];
-    store.store(&prior).unwrap();
+    store.store(&prior, 0).unwrap();
     let before = fs::read(&path).unwrap();
 
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o500)).unwrap();
     let writable_anyway = fs::File::create(dir.path().join("probe")).is_ok();
-    let result = store.store(&[record("peer-b", 2)]);
+    let result = store.store(&[record("peer-b", 2)], 0);
     fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
     if writable_anyway {
         return; // privileged runner: permissions cannot inject the failure
@@ -377,7 +378,7 @@ fn a_fence_is_refused_at_open_and_lifted_only_by_a_successful_write() {
     let dir = tempfile::tempdir().unwrap();
     let path = path_in(&dir);
     let store = FilePinStore::open(&path).unwrap();
-    store.store(&[record("peer-a", 1)]).unwrap();
+    store.store(&[record("peer-a", 1)], 0).unwrap();
     store.fence().unwrap();
     drop(store);
     assert!(matches!(
@@ -389,7 +390,7 @@ fn a_fence_is_refused_at_open_and_lifted_only_by_a_successful_write() {
     fs::write(dir.path().join(format!("{PIN_FILE_NAME}.lock")), b"").unwrap();
     let store = FilePinStore::open(&path).unwrap();
     store.fence().unwrap();
-    store.store(&[record("peer-a", 1)]).unwrap();
+    store.store(&[record("peer-a", 1)], 0).unwrap();
     drop(store);
     FilePinStore::open(&path).unwrap();
 }

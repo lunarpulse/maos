@@ -1,6 +1,6 @@
 ---
-Status: ACCEPTED — ratified 2026-09-08 under Story 15-5, decisions F9 and F10
-Gate: `cargo test -p xtask --test decision_adrs_and_provisioning`; implementation gate owned by Story 21-3
+Status: ACCEPTED — ratified 2026-09-08 under Story 15-5, decisions F9 and F10; AMENDED 2026-11-25 under Story 23-7 (see Amendment)
+Gate: `cargo test -p xtask --test decision_adrs_and_provisioning`; implementation gate owned by Story 23-7 (moved from Story 21-3)
 Decided: 2026-09-08
 Accepted-in-PR: pending — Story 15-5
 Revisits: RELEASE-HOLDS clause (c.6); architecture §7.2.1.a; Story 14-2a post-grace refusal
@@ -117,10 +117,12 @@ by 21-3. Assigning the durable join and its typed reason to 21-3 also closes
 
 ## Consumers
 
-- `21-3-durable-tofu-and-self-leaf-rotation` implements the typed reason,
-  durable join, SAN-scoped listener, and its negative controls.
+- `23-7-peer-identity-rotation` implements the typed reason, the durable join, the
+  SAN-scoped listener, the own-leaf trigger and their negative controls (the
+  implementation owner moved from `21-3-durable-tofu-and-self-leaf-rotation`, which landed the
+  durable pin file this story's schema 2 extends).
 - `14-2a-production-mtls-rotation-trigger` remains the shipped source of the
-  rotation-close and refusal behavior that Story 21-3 strengthens.
+  rotation-close and refusal behavior that Story 23-7 strengthens.
 
 ## Rationale
 
@@ -148,3 +150,43 @@ late.
   validation must reject missing, ambiguous, or mismatched claims.
 - Story 21-3 grows `maos-a2a-tcp` for listen-side SAN parsing and scoping rather
   than adding a post-handshake protocol.
+
+## Amendment — Story 23-7
+
+Ruled 2026-11-24/25 (D-23-7-01 A, D-23-7-02 C, D-23-7-03…11 A). This amendment records what
+Story 23-7 built; the decision above is unchanged.
+
+- **PKI profile.** Peer certificates come from the enterprise's own PKI; MAOS does not issue
+  them. A leaf is both served and presented, so it needs both `serverAuth` and `clientAuth`
+  where an extended key usage is present (the verifier asks webpki for `server_auth` on the
+  dial side and `client_auth` on the listen side). Under `peer_san = "required"` it carries
+  exactly one URI SAN, a SPIFFE X509-SVID `spiffe://<peer_trust_domain>/maos/peer/<peer_id>`
+  (`peer_id` in `[a-zA-Z0-9._-]`); a second URI SAN, a foreign trust domain or a missing SAN
+  is refused (X509-SVID §2: validators MUST reject more than one URI SAN). The SAN is read
+  with `x509-cert`.
+- **`peer_san` modes.** `[tcp] peer_san = "off"` (default) keeps the flat listen side: any
+  active pin owns a client leaf. `"required"` scopes the listen-side check to the SAN-named
+  peer's current fingerprint or open next generation; the SAN selects the record and the
+  fingerprint decides. Boot, and every own-leaf swap, refuse an own leaf without its SAN under
+  `required`. Until a deployment reissues its leaves with the SAN and sets `required`, the
+  listen side stays unscoped and row 12 clause (iii) stays open for it.
+- **`G` is built.** A window opened by a reissue closes after
+  `G = cold_deployment_t_grace() + confirmation_interval()` of the manifest being applied
+  (65 s at the default `t_stale_secs = 120`), because members apply one reissue up to one pull
+  interval apart. It is derived, never an operator knob.
+- **The join source.** The durable join is a `promoted` marker on the peer's pin record (pin
+  file schema 2): true once a rotation promotion closed on the current fingerprint, false after
+  a re-pair or re-seed. `CertPostGraceReject` is journaled exactly when the refusal's subject
+  (the dial target, or the SAN-named listen peer) has `promoted = true`; an unknown leaf, a
+  never-promoted peer and every `off`-mode listen refusal stay `PeerIdentityUnverified`. No
+  retired fingerprint is stored. The tracing token `cert_post_grace_reject` is unchanged. A WASM
+  guest sees `PeerIdentityUnverified` (the WIT enum has no post-grace variant).
+- **Own-leaf trigger.** The signed manifest stays the only authority for replacing the serving
+  leaf (ADR-062 is not amended): when a reissue moves this host's declaration off the served
+  leaf, and on every confirmation tick while they differ, the daemon re-reads the configured
+  PEM paths and swaps only if the leaf there equals the declaration.
+- **Owner move.** The typed reason, the durable join and the SAN-scoped listener move from Story
+  21-3 to Story 23-7.
+
+Not decided here: an immediate hard cut for a compromised key (D-23-7-10 A: the exposure bound
+is the pull lag plus `G`; see `RELEASE-HOLDS.md`).

@@ -352,6 +352,7 @@ async fn t_2c_journaling_without_a_sink_is_an_error_not_a_silent_success() {
             maos_a2a_core::PeerRefusalDirection::Listen,
             "127.0.0.1:1",
             "synthetic",
+            maos_domain::frame::RuptureReason::PeerIdentityUnverified,
         )
         .await
         .expect_err("a missing sink must surface");

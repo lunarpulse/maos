@@ -48,7 +48,7 @@ pub mod state;
 
 pub use audit::{
     CohortAuditEvent, CohortAuditSink, CohortTransparencyLogSink, InMemoryCohortAuditSink,
-    CERT_ROTATION_INTENT,
+    SelfLeafOutcome, CERT_ROTATION_INTENT,
 };
 pub use control::{CohortManifestControl, CONTROL_EVENT_TYPE};
 pub use digest::{

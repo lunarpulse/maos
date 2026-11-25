@@ -6,6 +6,7 @@
 //! of operator typos).
 
 use crate::error::TcpTransportError;
+use crate::san::{self, PeerSanMode};
 use crate::verifier::TrustPosture;
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::tofu::{PinPersistence, PinRecord, TofuPin};
@@ -86,6 +87,32 @@ pub struct TcpA2AConfig {
     /// (leaf validity/structure THEN pin, the FR23a self-signed posture).
     #[serde(default)]
     pub ca_roots: Option<PathBuf>,
+    /// Story 23-7 / D-23-7-06 A — `"off"` (default) keeps the flat listen-side pin lookup;
+    /// `"required"` scopes it to the peer the client leaf's SPIFFE URI SAN names and refuses a
+    /// missing, doubled or foreign-trust-domain SAN. Requires `peer_trust_domain`.
+    #[serde(default)]
+    pub peer_san: PeerSanMode,
+    /// Story 23-7 / D-23-7-04 A — the SPIFFE trust domain in
+    /// `spiffe://<trust_domain>/maos/peer/<peer_id>`; read only under `peer_san = "required"`.
+    #[serde(default)]
+    pub peer_trust_domain: Option<String>,
+}
+
+/// Load a leaf chain and its private key from two PEM paths (never an empty chain). Used at bind
+/// and again by the Story 23-7 own-leaf reload, so both read the files the same way.
+pub fn load_identity_paths(
+    chain_path: &Path,
+    key_path: &Path,
+) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), TcpTransportError> {
+    let chain = load_certs(chain_path)?;
+    if chain.is_empty() {
+        return Err(TcpTransportError::Config(format!(
+            "own_cert_chain {} contained no certificates",
+            chain_path.display()
+        )));
+    }
+    let key = load_private_key(key_path)?;
+    Ok((chain, key))
 }
 
 impl TcpA2AConfig {
@@ -108,19 +135,42 @@ impl TcpA2AConfig {
         }
     }
 
+    /// Story 23-7 — the trust domain the listen side scopes SANs to: `None` under
+    /// `peer_san = "off"`. Under `"required"` the domain must be set and well formed, and every
+    /// configured `peer_id` must be a valid SPIFFE path segment (`[a-zA-Z0-9._-]`), or the config
+    /// is refused.
+    pub fn peer_san_domain(&self) -> Result<Option<Arc<str>>, TcpTransportError> {
+        if self.peer_san == PeerSanMode::Off {
+            return Ok(None);
+        }
+        let domain = self
+            .peer_trust_domain
+            .as_deref()
+            .filter(|domain| san::is_trust_domain(domain))
+            .ok_or_else(|| {
+                TcpTransportError::Config(
+                    "peer_san = \"required\" needs `peer_trust_domain` (lowercase letters, digits, `.`, `-`, `_`)"
+                        .into(),
+                )
+            })?;
+        if let Some(pin) = self
+            .peer_pins
+            .iter()
+            .find(|pin| !san::is_peer_id(pin.peer_id.as_str()))
+        {
+            return Err(TcpTransportError::Config(format!(
+                "peer_san = \"required\": peer_id {:?} is not a SPIFFE path segment ([a-zA-Z0-9._-])",
+                pin.peer_id.as_str()
+            )));
+        }
+        Ok(Some(Arc::from(domain)))
+    }
+
     /// Load `own_cert_chain` + `own_private_key` from disk.
     pub fn load_identity(
         &self,
     ) -> Result<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>), TcpTransportError> {
-        let chain = load_certs(&self.own_cert_chain)?;
-        if chain.is_empty() {
-            return Err(TcpTransportError::Config(format!(
-                "own_cert_chain {} contained no certificates",
-                self.own_cert_chain.display()
-            )));
-        }
-        let key = load_private_key(&self.own_private_key)?;
-        Ok((chain, key))
+        load_identity_paths(&self.own_cert_chain, &self.own_private_key)
     }
 
     /// Materialize the TOFU pin store from `peer_pins` (makes ADR-012's
@@ -161,6 +211,7 @@ impl TcpA2AConfig {
                 anchor: anchor.clone(),
                 generation,
                 pending_observed: None,
+                promoted: false,
             };
             let found = records
                 .iter()

@@ -230,3 +230,295 @@ async fn t_14_2a_a_current_generation_handshake_journals_no_post_grace_row() {
 // PROCESS-global, and a co-resident subscriber-less test traversing the same
 // refusal `warn!` callsite starved the capture 26/30 runs at 8 threads.
 // A separate binary is a separate process; see that file's header.
+
+// ───────────────────── Story 23-7 / AC4 — the typed post-grace reason ─────────────────────
+//
+// `RuptureReason::CertPostGraceReject` is journaled exactly when the refusal's SUBJECT peer (the
+// dial target, or the peer a listen-side SAN names under `peer_san = "required"`) carries a
+// durable promotion. Never-promoted peers, unknown leaves and SAN-less listen-side clients stay
+// `PeerIdentityUnverified`.
+
+/// Every rupture row's first rejected reason, in order.
+#[derive(Default)]
+struct ReasonSink {
+    frames: Mutex<Vec<IacFrame>>,
+}
+
+impl ReasonSink {
+    fn reasons(&self) -> Vec<RuptureReason> {
+        self.frames
+            .lock()
+            .iter()
+            .filter_map(|frame| match &frame.payload {
+                FramePayload::ConsentRupture(payload) => {
+                    payload.rejected.first().map(|rejection| rejection.reason)
+                }
+                _ => None,
+            })
+            .collect()
+    }
+}
+
+impl ConsentRuptureSink for ReasonSink {
+    fn append(&self, frame: &IacFrame) -> Result<(), String> {
+        self.frames.lock().push(frame.clone());
+        Ok(())
+    }
+}
+
+/// Open a window on `peer` for `next`, move plane A, and close it: the peer is now promoted.
+fn promote(
+    node: &maos_a2a_tcp::TcpA2ATransport,
+    peer: &str,
+    next: &maos_a2a_core::PeerCertFingerprint,
+) {
+    let id = maos_a2a_core::identity::PeerId::new(peer);
+    node.pins().open_rotation_window(&id, next).expect("window");
+    node.core()
+        .set_peer_cert_fingerprint(&HostId(peer.to_string()), next.clone())
+        .expect("plane A declares the peer");
+    node.pins()
+        .close_rotation_window_if(&id, next)
+        .expect("promoted");
+    assert!(node.pins().is_promoted(&id));
+}
+
+#[tokio::test]
+async fn t_23_7_a_dial_to_a_promoted_peer_presenting_its_retired_leaf_is_cert_post_grace_reject() {
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-23-7-dial");
+    let retired = valid_leaf(&ca, &clock);
+    let current = valid_leaf(&ca, &clock);
+    let dialer_leaf = valid_leaf(&ca, &clock);
+
+    // The target still serves the RETIRED leaf.
+    let target = bind_endpoint(
+        &retired,
+        Some(&ca),
+        NASH_NONCE,
+        vec![pin("host_a", &dialer_leaf.fingerprint, MIRA_NONCE)],
+        vec![peer_cfg(
+            "host_a",
+            "tls://127.0.0.1:0",
+            &dialer_leaf.fingerprint,
+            &[],
+            &["readonly"],
+        )],
+        &clock,
+        no_retry(),
+    )
+    .await;
+    let dialer = bind_endpoint(
+        &dialer_leaf,
+        Some(&ca),
+        MIRA_NONCE,
+        vec![pin("host_b", &retired.fingerprint, NASH_NONCE)],
+        vec![peer_cfg(
+            "host_b",
+            &format!("tls://{}", target.local_addr().unwrap()),
+            &retired.fingerprint,
+            &["readonly"],
+            &[],
+        )],
+        &clock,
+        no_retry(),
+    )
+    .await;
+    let journal = Arc::new(ReasonSink::default());
+    dialer.core().install_rupture_sink(journal.clone()).await;
+    let dialer_ref = &dialer;
+    let send = |seq| async move {
+        let peer = HostId("host_b".into());
+        dialer_ref
+            .route_outbound(
+                make_frame("host_a", "host_b", IntentClass::Readonly, seq),
+                &peer,
+            )
+            .await
+    };
+    assert!(
+        send(1).await.is_ok(),
+        "the retired leaf is the pin: accepted before any rotation"
+    );
+    assert!(journal.reasons().is_empty());
+
+    // The rotation promotes `current`; the target never swapped and still presents `retired`.
+    promote(&dialer, "host_b", &current.fingerprint);
+    assert!(
+        send(2).await.is_err(),
+        "the retired leaf is refused after promotion"
+    );
+    assert_eq!(journal.reasons(), vec![RuptureReason::CertPostGraceReject]);
+}
+
+#[tokio::test]
+async fn t_23_7_a_never_promoted_peer_and_an_unknown_leaf_stay_peer_identity_unverified() {
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-23-7-never");
+    let served = valid_leaf(&ca, &clock);
+    let pinned = valid_leaf(&ca, &clock);
+    let dialer_leaf = valid_leaf(&ca, &clock);
+    let target = bind_endpoint(
+        &served,
+        Some(&ca),
+        NASH_NONCE,
+        vec![pin("host_a", &dialer_leaf.fingerprint, MIRA_NONCE)],
+        vec![peer_cfg(
+            "host_a",
+            "tls://127.0.0.1:0",
+            &dialer_leaf.fingerprint,
+            &[],
+            &["readonly"],
+        )],
+        &clock,
+        no_retry(),
+    )
+    .await;
+    // The dialer pins a DIFFERENT leaf for the target and never rotated it: the presented leaf is
+    // simply unknown to it.
+    let dialer = bind_endpoint(
+        &dialer_leaf,
+        Some(&ca),
+        MIRA_NONCE,
+        vec![pin("host_b", &pinned.fingerprint, NASH_NONCE)],
+        vec![peer_cfg(
+            "host_b",
+            &format!("tls://{}", target.local_addr().unwrap()),
+            &pinned.fingerprint,
+            &["readonly"],
+            &[],
+        )],
+        &clock,
+        no_retry(),
+    )
+    .await;
+    let journal = Arc::new(ReasonSink::default());
+    dialer.core().install_rupture_sink(journal.clone()).await;
+    assert!(dialer
+        .route_outbound(
+            make_frame("host_a", "host_b", IntentClass::Readonly, 1),
+            &HostId("host_b".into()),
+        )
+        .await
+        .is_err());
+    assert_eq!(
+        journal.reasons(),
+        vec![RuptureReason::PeerIdentityUnverified]
+    );
+    assert!(!dialer
+        .pins()
+        .is_promoted(&maos_a2a_core::identity::PeerId::new("host_b")));
+}
+
+#[tokio::test]
+async fn t_23_7_under_required_a_listen_side_client_with_a_promoted_peers_san_and_retired_leaf() {
+    use maos_a2a_tcp::PeerSanMode;
+    const DOMAIN: &str = "corp.example";
+    let spiffe = |peer: &str| format!("spiffe://{DOMAIN}/maos/peer/{peer}");
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-23-7-listen");
+    let nash_leaf = mk_san_leaf(&ca, &clock, &[spiffe("host_b")]);
+    let a_old = mk_san_leaf(&ca, &clock, &[spiffe("host_a")]);
+    let a_new = mk_san_leaf(&ca, &clock, &[spiffe("host_a")]);
+    let c_pinned = mk_san_leaf(&ca, &clock, &[spiffe("host_c")]);
+    let c_unknown = mk_san_leaf(&ca, &clock, &[spiffe("host_c")]);
+    let a_no_san = mk_san_leaf(&ca, &clock, &[]);
+
+    let pems = write_pem(&nash_leaf, Some(&ca));
+    let mut cfg = tcp_config(
+        &pems,
+        vec![
+            pin("host_a", &a_old.fingerprint, MIRA_NONCE),
+            pin("host_c", &c_pinned.fingerprint, MIRA_NONCE),
+        ],
+        Duration::from_secs(30),
+    );
+    cfg.peer_san = PeerSanMode::Required;
+    cfg.peer_trust_domain = Some(DOMAIN.to_string());
+    let nash = maos_a2a_tcp::TcpA2ATransport::bind(
+        cfg,
+        vec![
+            peer_cfg(
+                "host_a",
+                "tls://127.0.0.1:0",
+                &a_old.fingerprint,
+                &[],
+                &["readonly"],
+            ),
+            peer_cfg(
+                "host_c",
+                "tls://127.0.0.1:0",
+                &c_pinned.fingerprint,
+                &[],
+                &["readonly"],
+            ),
+        ],
+        NASH_NONCE,
+        maos_a2a_tcp::TcpTimeouts::test_profile(),
+        no_retry(),
+        Some(clock.unix()),
+        None,
+    )
+    .await
+    .expect("nash binds");
+    let journal = Arc::new(ReasonSink::default());
+    nash.core().install_rupture_sink(journal.clone()).await;
+    // host_a rotated and was promoted on nash: a_new is its pin, a_old is retired.
+    promote(&nash, "host_a", &a_new.fingerprint);
+    let nash_addr = nash.local_addr().unwrap();
+
+    let dial = |leaf: Leaf, name: &'static str| {
+        let clock = clock;
+        let ca = &ca;
+        let nash_leaf = &nash_leaf;
+        async move {
+            let client = bind_endpoint(
+                &leaf,
+                Some(ca),
+                MIRA_NONCE,
+                vec![pin("host_b", &nash_leaf.fingerprint, NASH_NONCE)],
+                vec![peer_cfg(
+                    "host_b",
+                    &format!("tls://{nash_addr}"),
+                    &nash_leaf.fingerprint,
+                    &["readonly"],
+                    &[],
+                )],
+                &clock,
+                no_retry(),
+            )
+            .await;
+            client
+                .route_outbound(
+                    make_frame(name, "host_b", IntentClass::Readonly, 1),
+                    &HostId("host_b".into()),
+                )
+                .await
+        }
+    };
+
+    // (ii) the SAN of a PROMOTED peer with its RETIRED leaf: the typed reason.
+    assert!(dial(a_old, "host_a").await.is_err());
+    assert!(
+        wait_until(|| !journal.reasons().is_empty(), Duration::from_secs(3)).await,
+        "the listen-side refusal is journaled"
+    );
+    assert_eq!(journal.reasons(), vec![RuptureReason::CertPostGraceReject]);
+
+    // A never-promoted peer's SAN with an unknown leaf: the untyped reason.
+    assert!(dial(c_unknown, "host_c").await.is_err());
+    assert!(wait_until(|| journal.reasons().len() >= 2, Duration::from_secs(3)).await);
+    // A leaf with no SAN names no subject — even where it stands in for a promoted peer.
+    assert!(dial(a_no_san, "host_a").await.is_err());
+    assert!(wait_until(|| journal.reasons().len() >= 3, Duration::from_secs(3)).await);
+    assert_eq!(
+        journal.reasons(),
+        vec![
+            RuptureReason::CertPostGraceReject,
+            RuptureReason::PeerIdentityUnverified,
+            RuptureReason::PeerIdentityUnverified,
+        ]
+    );
+    // The current generation is still accepted.
+    assert!(dial(a_new, "host_a").await.is_ok());
+}

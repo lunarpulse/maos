@@ -34,7 +34,7 @@ impl PinPersistence for Recording {
     fn load(&self) -> Vec<PinRecord> {
         Vec::new()
     }
-    fn store(&self, records: &[PinRecord]) -> Result<(), String> {
+    fn store(&self, records: &[PinRecord], _floor: u64) -> Result<(), String> {
         if self.fail.load(Ordering::SeqCst) {
             return Err("disk full".into());
         }

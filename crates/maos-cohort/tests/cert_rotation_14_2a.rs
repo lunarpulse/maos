@@ -246,7 +246,7 @@ impl Mesh {
                 Arc::clone(&pins),
                 Arc::clone(&core),
                 Arc::clone(&timer) as Arc<dyn RotationGraceTimer>,
-                Duration::from_secs(5),
+                maos_cohort::cold_deployment_t_grace(),
             )
             .expect("first install of the rotation control");
         Self {
@@ -353,9 +353,11 @@ fn a_signed_reissue_that_rotates_a_member_opens_a_window_moves_both_planes_and_p
             instance: windows[0].instance,
         }
     );
+    // D-23-7-03 A: the window lasts G = the §7.2.1.a base + one confirmation interval of the
+    // manifest being applied — derived, never a literal.
     assert_eq!(
         mesh.timer.armed_windows(),
-        vec![Duration::from_secs(5)],
+        vec![maos_cohort::cold_deployment_t_grace() + mesh.state.confirmation_interval().unwrap()],
         "a REAL deadline is armed — the window does not wait for the next frame"
     );
     assert!(matches!(
@@ -739,6 +741,23 @@ fn t_grace_matches_the_shipped_formula_on_the_cold_deployment_branch() {
         maos_cohort::cold_deployment_t_grace() >= Duration::from_secs(5),
         "§7.2.1.a floors T_grace at 5 s on either branch"
     );
+
+    // Story 23-7 / D-23-7-03 A, as an equality on G (a pull lag longer than the base is covered).
+    let mesh = Mesh::boot("host_a", &[("host_b", fingerprint(0x11))]);
+    let interval = mesh.state.confirmation_interval().unwrap();
+    mesh.reissue(
+        2,
+        &members(&[
+            ("host_a", &fingerprint(0xf0)),
+            ("host_b", &fingerprint(0x22)),
+        ]),
+    );
+    let g = maos_cohort::cold_deployment_t_grace() + interval;
+    assert_eq!(mesh.timer.armed_windows(), vec![g]);
+    assert!(
+        g > maos_cohort::cold_deployment_t_grace(),
+        "G exceeds the bare base by one pull interval"
+    );
 }
 
 #[test]
@@ -848,6 +867,7 @@ fn every_rotation_row_carries_one_stable_greppable_intent() {
         "CertRotationRefused",
         "CertRotationDeclarationMoved",
         "LocalLeafDeclarationMoved",
+        "SelfLeafReconciled",
     ];
     assert_eq!(
         arms,
@@ -1678,4 +1698,125 @@ fn an_unpinned_member_is_reported_as_awaiting_first_contact_not_as_a_divergence(
             .all(|row| row.state != maos_cohort::rotation::DIVERGED),
         "a boot-passing deployment must not be reported as a divergence"
     );
+}
+
+/// Story 23-7 / D-23-7-02 C — the own-leaf observer is woken only when a reissue leaves this host's
+/// declaration different from the leaf it serves (plane C).
+#[test]
+fn the_local_leaf_observer_wakes_only_when_the_declaration_diverges_from_the_served_leaf() {
+    let old = fingerprint(0x11);
+    let local = fingerprint(0xf0);
+    let mesh = Mesh::boot("host_a", &[("host_b", old.clone())]);
+    mesh.core.set_local_leaf_fingerprint(local.clone());
+    let woken = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = Arc::clone(&woken);
+    assert!(mesh.state.install_local_leaf_observer(Arc::new(move || {
+        counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    })));
+    assert!(
+        !mesh.state.install_local_leaf_observer(Arc::new(|| {})),
+        "the observer is set-once"
+    );
+
+    // A peer rotates; this host's declaration still equals the served leaf: no wake.
+    mesh.reissue(
+        2,
+        &members(&[("host_a", &local), ("host_b", &fingerprint(0x22))]),
+    );
+    assert_eq!(woken.load(std::sync::atomic::Ordering::SeqCst), 0);
+
+    // This host's declaration moves off the served leaf: one wake.
+    mesh.reissue(
+        3,
+        &members(&[
+            ("host_a", &fingerprint(0xf1)),
+            ("host_b", &fingerprint(0x22)),
+        ]),
+    );
+    assert_eq!(woken.load(std::sync::atomic::Ordering::SeqCst), 1);
+}
+
+/// Story 23-7 / AC2(e) — the observer is delivered AFTER the `cached` lock is released: while it
+/// blocks on a held gate the manifest is still readable and the interval still computable. Planted
+/// red: calling the observer before `drop(cached)` makes `manifest()` block here (the join below
+/// then never returns; the test is bounded by its channel timeouts).
+#[test]
+fn the_local_leaf_observer_runs_off_the_cached_lock() {
+    let old = fingerprint(0x11);
+    let local = fingerprint(0xf0);
+    let mesh = Mesh::boot("host_a", &[("host_b", old.clone())]);
+    mesh.core.set_local_leaf_fingerprint(local.clone());
+    let (entered_tx, entered_rx) = std::sync::mpsc::channel::<()>();
+    let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+    let release_rx = Mutex::new(release_rx);
+    assert!(mesh.state.install_local_leaf_observer(Arc::new(move || {
+        entered_tx.send(()).unwrap();
+        let _ = release_rx
+            .lock()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(60));
+    })));
+    let state = Arc::clone(&mesh.state);
+    let toml = signed_manifest(
+        2,
+        &mesh.signer,
+        &members(&[("host_a", &fingerprint(0xf1)), ("host_b", &old)]),
+    );
+    let applier = std::thread::spawn(move || state.apply_reissue(&toml).unwrap());
+    entered_rx
+        .recv_timeout(Duration::from_secs(60))
+        .expect("the observer was called");
+
+    // The reconcile step is "running" (blocked on its gate); the state must not be.
+    assert_eq!(mesh.state.manifest().unwrap().version, 2);
+    assert!(mesh.state.confirmation_interval().is_ok());
+    assert_eq!(
+        mesh.state
+            .local_declaration()
+            .unwrap()
+            .map(|(_, version)| version),
+        Some(2)
+    );
+    release_tx.send(()).unwrap();
+    assert_eq!(
+        applier.join().unwrap(),
+        ReissueOutcome::Applied { version: 2 }
+    );
+}
+
+/// Story 23-7 / AC7 (state half) — a version below the durable floor is refused with its own
+/// named reason and a `ReissueRejected` row, and no window opens. The restart half lives in the
+/// `maos-a2a-tcp` scene `peer_rotation_23_7`, which runs the real pin file.
+#[test]
+fn a_reissue_below_the_durable_floor_is_refused_with_a_named_reason() {
+    let old = fingerprint(0x11);
+    let mesh = Mesh::boot("host_a", &[("host_b", old.clone())]);
+    let local = fingerprint(0xf0);
+    mesh.pins.raise_manifest_floor(5);
+    let error = mesh
+        .state
+        .apply_reissue(&signed_manifest(
+            2,
+            &mesh.signer,
+            &members(&[("host_a", &local), ("host_b", &fingerprint(0x22))]),
+        ))
+        .expect_err("v2 is below the floor of 5");
+    assert!(matches!(
+        error,
+        maos_cohort::CohortError::ECohortManifestFork {
+            reason: maos_cohort::CohortManifestForkReason::VersionBelowDurableFloor,
+            seen_version: 1,
+            rejected_version: 2,
+        }
+    ));
+    assert!(mesh.audit.events().iter().any(|event| matches!(
+        event,
+        CohortAuditEvent::ReissueRejected { rejected_version: 2, reason, .. }
+            if reason.contains("version_below_durable_floor")
+    )));
+    assert!(
+        mesh.pins.rotation_next(&PeerId::new("host_b")).is_none(),
+        "no window opened"
+    );
+    assert!(mesh.open_windows().is_empty());
 }

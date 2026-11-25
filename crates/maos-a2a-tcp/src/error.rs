@@ -4,6 +4,7 @@
 //! identically in BOTH `ca_roots` postures, so the AC-T3 / AC-T4 / AC-T4b /
 //! AC-T5 oracles never alias).
 
+use crate::san::SanRefusal;
 use maos_a2a_core::A2AError;
 use std::fmt;
 
@@ -48,6 +49,13 @@ pub enum TcpTransportError {
         peer: String,
         configured: String,
         promoted: String,
+    },
+    /// Story 23-7 / D-23-7-06 A — under `peer_san = "required"` this host's OWN leaf does not
+    /// carry exactly one SPIFFE URI SAN in the configured trust domain. Boot, and every own-leaf
+    /// swap, refuse it rather than serve a leaf every `required` peer would refuse.
+    OwnLeafSanRefused {
+        refusal: SanRefusal,
+        trust_domain: String,
     },
 }
 
@@ -117,7 +125,8 @@ impl TcpTransportError {
             TcpTransportError::Io(m) => A2AError::Io(m.clone()),
             TcpTransportError::Config(m) => A2AError::ConfigInvalid(m.clone()),
             TcpTransportError::Protocol(m) => A2AError::TransportFailed(m.clone()),
-            TcpTransportError::PinPromotionNotCarried { .. } => {
+            TcpTransportError::PinPromotionNotCarried { .. }
+            | TcpTransportError::OwnLeafSanRefused { .. } => {
                 A2AError::ConfigInvalid(self.to_string())
             }
         }
@@ -180,6 +189,14 @@ impl fmt::Display for TcpTransportError {
                  {configured} (still named by `[[tcp.peer_pins]]`) to {promoted}; carry {promoted} \
                  into `[[tcp.peer_pins]]` and the signed cohort manifest and restart, or delete \
                  a2a-pins.json to boot from the configured pin"
+            ),
+            TcpTransportError::OwnLeafSanRefused {
+                refusal,
+                trust_domain,
+            } => write!(
+                f,
+                "peer_san = \"required\": this host's own leaf is refused ({refusal}); it must \
+                 carry exactly one URI SAN `spiffe://{trust_domain}/maos/peer/<peer_id>`"
             ),
         }
     }

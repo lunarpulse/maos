@@ -1486,6 +1486,8 @@ fn write_daemon_file(
                 .collect(),
             handshake_timeout: Duration::from_secs(30),
             ca_roots: None,
+            peer_san: Default::default(),
+            peer_trust_domain: None,
         },
         peers: peers
             .iter()

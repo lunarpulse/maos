@@ -25,6 +25,7 @@
 //! `None` is NOT a `danger_accept_any` noop (AC-A3 HARD CONDITION 1).
 
 use crate::error::TcpTransportError;
+use crate::san;
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
 use maos_a2a_core::InMemoryTofuPinStore;
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
@@ -76,6 +77,10 @@ pub struct TofuPinningVerifier {
     /// param is ignored so cert validity is judged against the SAME `T0` as the
     /// rotation drill); `None` in production (use rustls's supplied `now`).
     validation_time: Option<UnixTime>,
+    /// Story 23-7 / D-23-7-06 A — `Some(trust_domain)` only on the listening side under
+    /// `peer_san = "required"`: the client leaf's SPIFFE URI SAN selects the pin record the
+    /// fingerprint is verified against. `None` keeps the flat listen-side lookup.
+    san_trust_domain: Option<Arc<str>>,
     sig_algs: WebPkiSupportedAlgorithms,
 }
 
@@ -106,8 +111,16 @@ impl TofuPinningVerifier {
             direction,
             expected_peer,
             validation_time,
+            san_trust_domain: None,
             sig_algs,
         }
+    }
+
+    /// Story 23-7 — scope the LISTEN side to the peer the client leaf's SAN names (`required`).
+    #[must_use]
+    pub fn with_peer_san(mut self, trust_domain: Option<Arc<str>>) -> Self {
+        self.san_trust_domain = trust_domain;
+        self
     }
 
     fn now(&self, rustls_now: UnixTime) -> UnixTime {
@@ -171,32 +184,81 @@ impl TofuPinningVerifier {
             Some(peer) => self
                 .pins
                 .verify_pinned_sync(peer, &observed)
-                .map_err(|e| reject("PIN_MISMATCH", e.to_string())),
-            // Listen side: peer identity is learned from the cert — accept any
-            // active pin (TOFU first-contact). The receiver-side allowlist/consent
+                .map_err(|e| reject_with(Some(peer.clone()), "PIN_MISMATCH", e.to_string())),
+            // Listen side, `peer_san = "off"`: peer identity is learned from the cert —
+            // accept any active pin (TOFU first-contact). The receiver-side allowlist/consent
             // checks in `handle_intake` bind the wire identity downstream.
-            None => match self.pins.find_active_pin_by_fingerprint(&observed) {
-                Some(_peer) => Ok(()),
-                None => Err(reject(
-                    "PIN_MISMATCH",
-                    format!(
-                        "no active TOFU pin matches observed leaf fingerprint {}",
-                        observed.wire()
-                    ),
-                )),
+            None => match &self.san_trust_domain {
+                None => match self.pins.find_active_pin_by_fingerprint(&observed) {
+                    Some(_peer) => Ok(()),
+                    None => Err(reject(
+                        "PIN_MISMATCH",
+                        format!(
+                            "no active TOFU pin matches observed leaf fingerprint {}",
+                            observed.wire()
+                        ),
+                    )),
+                },
+                // Listen side, `required`: the SAN SELECTS the record, the fingerprint
+                // DECIDES. A missing, doubled or foreign SAN names no subject.
+                Some(domain) => {
+                    let subject =
+                        san::peer_from_leaf(end_entity.as_ref(), domain).map_err(|refusal| {
+                            reject("PIN_MISMATCH", format!("SAN_REFUSED: {refusal}"))
+                        })?;
+                    self.pins
+                        .verify_pinned_sync(&subject, &observed)
+                        .map_err(|e| {
+                            reject_with(Some(subject.clone()), "PIN_MISMATCH", e.to_string())
+                        })
+                }
             },
         }
     }
+}
+
+/// Story 23-7 / D-23-7-07 A — the typed carrier a handshake refusal travels in: the classified
+/// error plus the subject peer the verifier scoped the check to (the dial target, or the peer a
+/// listen-side SAN named). `Display` is the classified error's, so every string classification
+/// stays byte for byte.
+#[derive(Debug)]
+pub struct SubjectRefusal {
+    pub subject: Option<PeerId>,
+    pub error: TcpTransportError,
+}
+
+impl std::fmt::Display for SubjectRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.error, f)
+    }
+}
+
+impl std::error::Error for SubjectRefusal {}
+
+/// The subject a verifier refusal carried, read back from the I/O error a failed handshake
+/// surfaces (`tokio-rustls` wraps the `rustls::Error` in an `io::Error`).
+pub fn refusal_subject(error: &std::io::Error) -> Option<PeerId> {
+    let rustls_error = error.get_ref()?.downcast_ref::<RustlsError>()?;
+    let RustlsError::InvalidCertificate(rustls::CertificateError::Other(other)) = rustls_error
+    else {
+        return None;
+    };
+    other.0.downcast_ref::<SubjectRefusal>()?.subject.clone()
 }
 
 /// Build a tagged `rustls::Error` whose Display carries a stable sentinel so the
 /// dialer can classify it via [`TcpTransportError::classify_handshake`]
 /// regardless of rustls's own wording (AC-A3 shared taxonomy).
 fn reject(tag: &str, detail: String) -> RustlsError {
+    reject_with(None, tag, detail)
+}
+
+fn reject_with(subject: Option<PeerId>, tag: &str, detail: String) -> RustlsError {
     RustlsError::InvalidCertificate(rustls::CertificateError::Other(rustls::OtherError(
-        Arc::new(TcpTransportError::classify_handshake(&format!(
-            "{tag}: {detail}"
-        ))),
+        Arc::new(SubjectRefusal {
+            subject,
+            error: TcpTransportError::classify_handshake(&format!("{tag}: {detail}")),
+        }),
     )))
 }
 
