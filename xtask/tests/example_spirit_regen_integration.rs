@@ -63,6 +63,10 @@ fn check_mode_fails_on_drift() {
         stderr.contains("src/lib.rs"),
         "expected the drifted file in the error output. stderr:\n{stderr}"
     );
+    assert!(
+        stderr.contains("xtask -- bless"),
+        "a stale example must name the one command that regenerates it. stderr:\n{stderr}"
+    );
     let regenerated = xtask()
         .args(["templates-regen", "--lang", "rust"])
         .current_dir(root)

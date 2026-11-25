@@ -1155,7 +1155,7 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
         )?;
         if normalize_md(&existing) != normalize_md(&generated) {
             return Err(format!(
-                "abi reference page {} is stale; regenerate with `cargo run -p xtask -- gen-abi-docs`",
+                "abi reference page {} is stale; regenerate with `cargo run -p xtask -- bless`",
                 constants_path.display()
             ));
         }
@@ -1197,7 +1197,7 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
                 assemble_page_text(mod_name, &body, partial.exists().then_some(&partial))?;
             if normalize_md(&existing) != normalize_md(&generated) {
                 return Err(format!(
-                    "abi reference page {} is stale; regenerate with `cargo run -p xtask -- gen-abi-docs`",
+                    "abi reference page {} is stale; regenerate with `cargo run -p xtask -- bless`",
                     out_path.display()
                 ));
             }
@@ -1225,7 +1225,7 @@ pub fn run(out_dir: Option<&str>, check: bool) -> Result<(), String> {
     if check {
         if let Some((fname, _path)) = orphaned.first() {
             return Err(format!(
-                "abi reference output contains orphan page {}; regenerate with `cargo run -p xtask -- gen-abi-docs`",
+                "abi reference output contains orphan page {}; regenerate with `cargo run -p xtask -- bless`",
                 output_dir.join(fname).display()
             ));
         }

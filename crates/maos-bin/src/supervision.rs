@@ -2903,6 +2903,16 @@ mod worker {
                     );
                     LifecycleReply::Unsupported
                 }
+                // A trigger issued after its session ended never entered the guest (D-22-9-08 B):
+                // dropped, never a panic or a strike. A session that dies INSIDE an export keeps
+                // `SESSION_ENDED` below, and with it `HookOutcome::Panicked`.
+                Err(code) if code == crate::spawned_lifecycle::NOT_ENTERED => {
+                    eprintln!(
+                        "maos: lifecycle trigger dropped: '{}' session ended",
+                        self.core.spirit_id().escape_debug()
+                    );
+                    LifecycleReply::Unsupported
+                }
                 Err(code) => panic!("lifecycle_{code}"),
             }
         }

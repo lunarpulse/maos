@@ -1,5 +1,5 @@
 ---
-Status: ACCEPTED — ratified 2026-10-23 by the operator (Lunarpulse), routing-audit DECIDE-4 option (a) "increase", figure "≤ 23,000 (alarm 22,000)"
+Status: ACCEPTED — ratified 2026-10-23 by the operator (Lunarpulse), routing-audit DECIDE-4 option (a) "increase", figure "≤ 23,000 (alarm 22,000)"; RAISED 2026-11-24 to ≤ 24,000 (alarm 23,000), see the last Amendment
 Gate: `xtask/tests/recovery_lane_ceiling_rule.rs` (`kernel_core_ceiling_stays_inside_the_adr_069_envelope`, `crossing_the_adr_069_alarm_is_acknowledged_in_the_row`) — kloc-free, tree-bound
 Decided: 2026-10-23
 Accepted-in-PR: pending — operator ratification 2026-10-23 (routing audit DECIDE-4)
@@ -101,3 +101,21 @@ The row stood at 20,429 tokei at the ruling, 2,571 below the envelope.
   envelope (23,000), still enforced by `xtask/tests/recovery_lane_ceiling_rule.rs`.
 - **Tooling.** `scripts/repin.py` now re-pins only the kernel exact pin per landing (`--check` / `--apply`); the crate
   rows move only through `--rebase`.
+
+## Amendment — 2026-11-24 (operator ruling "kernel limit increased. non-kernel limit removed.")
+
+- **The kernel limit is raised.** The envelope is now **24,000** production lines (the `maos-kernel-core` row of
+  `xtask/kloc.toml` may not exceed it) and the alarm is **23,000** (a row above 23,000 carries `ENVELOPE ALARM`). The
+  operator gave no figure; the +1,000 step keeps the ratified shape (alarm = envelope − 1,000) and clears the measured
+  tree (22,143 tokei at the ruling, already above the old 22,000 alarm) with 1,857 lines of room. The row is set to the
+  envelope, 24,000. Every number above in this ADR that says 23,000 or 22,000 is the figure at the time it was written;
+  the figures in force are 24,000 and 23,000. Beyond 24,000 is a new operator decision (Decision 4), unchanged.
+- **The non-kernel ceilings are removed** (operator decision 11, lean-gates WP-23). `xtask/kloc.toml` carries only the
+  kernel row; `xtask kloc-check` measures every crate, prints the size table, and fails only when the kernel is above its
+  row. `_aggregate_alarm` and every other crate row are deleted and a config that carries one is refused. The 2026-11-13
+  amendment's "ceilings with stated headroom, re-based at each epic retrospective" and `scripts/repin.py --rebase` no
+  longer exist; growth outside the kernel is visible in the table, not gated.
+- **Tooling.** `cargo run -p xtask -- bless` regenerates the kernel exact pin (and the other derived artefacts) from the
+  source tree; `scripts/repin.py --check` / `--apply` remain for the story-gated pin per landing.
+- **Unchanged.** The kernel exact pin and its gate, and `xtask/tests/recovery_lane_ceiling_rule.rs`, which now pins
+  24,000 and 23,000.

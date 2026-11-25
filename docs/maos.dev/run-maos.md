@@ -308,11 +308,42 @@ environment never stands in for a missing or invalid file. The cast is exactly t
 installed Spirits the file does not name, and Spirits added with `maosctl load`, do not boot. An entry takes
 `manifest` (or `path`) or `installed`, never `host`. `maosctl agents` reads the running cast back.
 
-A missing file, a TOML error, an unknown key, an invalid setting, a cast entry that cannot be admitted, or an
+A missing file, a TOML error, an unknown key, an invalid setting, a cast entry that cannot be admitted, an
+invalid `[[host.a2a_peers]]` table, or an
 older file that disagrees with a key the Host file sets (`operator.toml` `[region]`, the provider in
 `<home>/config.toml`) refuses the boot with exit 78 and one of the kinds `host_config_missing`,
 `host_config_parse`, `host_config_cast_entry`, `host_config_cast_host_key`, `host_config_setting`,
-`host_config_older_file_disagrees`, `host_config_installed_missing` or `host_config_installed_refused`.
+`host_config_older_file_disagrees`, `host_config_installed_missing`, `host_config_installed_refused` or
+`host_config_a2a_peer`.
+
+### Let cast members hand each other evidence
+
+`[[host.a2a_peers]]` declares the consent between cast members that the Host's in-process A2A router
+enforces. It is a table, like `[[host.spirits]]`, so it has no environment name.
+
+```toml
+[[host.a2a_peers]]
+spirit = "mira"                                            # a loaded member's [class].name
+send_allowlist = ["diagnosis-handoff:read-only-evidence"]
+
+[[host.a2a_peers]]
+spirit = "nash"
+accept_allowlist = ["diagnosis-handoff:read-only-evidence"]
+```
+
+A frame from one member to another is admitted only if the sender's `send_allowlist` and the recipient's
+`accept_allowlist` both name its typed intent; a missing or empty list admits nothing. Unknown keys, a spirit
+named twice and an empty intent refuse the file. With no `[[host.a2a_peers]]` no router is built. Mira hands
+Nash her read-only advisory under `diagnosis-handoff:read-only-evidence`: Nash journals the admitted frame, then
+proposes a fix. If Nash's list does not admit it, the router refuses the frame and journals a typed
+`ConsentRupture` row (`maosctl audit query --kind consent.rupture`); Mira's answer then says
+`advisory: "denied:intent_denied"`.
+
+**A halt survives a restart.** Every Spirit termination writes a halt receipt, and the pending-halt list is in
+memory. At each boot, once the Host file's cast is admitted, the Host re-admits the halts a cast member raised
+and nobody resolved: one `halt.carried` row names the old boot and pid and the new pid, the halt id is the same,
+and `maosctl halt resolve` works on it once. A halt you resolved is never carried; a Spirit that is not in the
+file (or was added with `maosctl load`) carries nothing.
 
 **Region is an integrity setting.** `MAOS_REGION_HOME` stamps every memory write. On a cohort host the daemon
 refuses to boot when this tag disagrees with the `region` the signed cohort manifest declares for the host's
@@ -360,11 +391,27 @@ root, so data under a legacy location stays readable in place and a migration pl
 is still consumed. `MAOS_MEMORY_ROOT` and `MAOS_REGISTRY_YANK_CURSOR_PATH` override all three. `maos purge`
 names every location.
 
+### A component with resource caps needs a delegated cgroup
+
+A component whose manifest declares `cpu_max_pct` or `pids_max` (the `templates/spirit-ts` scaffold declares
+`cpu_max_pct = 100`) is launched into a writable, delegated cgroup v2 subtree, and the launch fails closed without
+one: the Spirit never reaches `Running` and the Host's stderr says why. Memory alone falls back to an address-space
+limit with a warning. Start the Host under a delegated scope:
+
+```sh
+systemd-run --user --scope -p Delegate=yes -- maos serve --config host.toml
+```
+
+The packaged `maos.service` unit does not set `Delegate=yes`, so a capped component in that unit's cast is refused
+at launch until the unit changes (`RELEASE-HOLDS.md`, K4). The authoring kit (`kit/spirit-author/AGENTS.md`) is the
+whole path from a scaffold to a Spirit answering `maosctl ask` in such a Host.
+
 ## Hand a Spirit a task
 
-`maosctl ask <spirit> "<text>"` hands a running, installed Spirit one task through the authenticated door and
+`maosctl ask <spirit> "<text>"` hands a running, directable Spirit one task through the authenticated door and
 prints its task id at once. `maosctl task show <id>` reads the Spirit's answer, or the reason it gave none.
-The Host must be a `maos serve` (or `maos shell`) root whose cast includes the installed component:
+The Host must be a `maos serve` (or `maos shell`, or `maos run <topology>`) root whose cast includes an
+installed component, or Mira:
 
 ```sh
 id=$(maosctl ask researcher "Summarise yesterday's incident log")   # exit 0, prints a 26-character task id
@@ -372,6 +419,22 @@ maosctl task show "$id"
 maosctl ask researcher "Summarise it again" --wait                  # waits (default 120 s) and prints the task object
 maosctl ask researcher "Summarise it" --key nightly-2026-11-23      # a retry with this key returns the same task
 ```
+
+**Mira** is directable too. Her task text is an incident: an `AnomalySignal` JSON
+(`{"subject","metric","observed","baseline"}`), or free text when the Host binds an inference provider
+(`inference_mode` set; with it unset only JSON is accepted). She diagnoses it deterministically, keeps one record
+per diagnosed subject in her private memory, raises her diagnostic-confidence scalar at her halt boundary (the
+task then ends `halted`), hands the advisory to the cast's declared peers and answers one JSON object:
+
+```sh
+maosctl ask mira '{"subject":"payments-api","metric":"error_rate","observed":0.42,"baseline":0.02}' --wait
+# result: {"subject":"payments-api","finding":"...","severity":1.0,"confidence":0.85,
+#          "advisory":"delivered","prior_diagnoses":0}
+```
+
+`advisory` is `delivered`, `denied:<code>` (the router refused the frame, e.g. `denied:intent_denied`) or
+`not_routed` (the Host declares no `[[host.a2a_peers]]`). `prior_diagnoses` counts her earlier diagnoses of the
+subject, across restarts. Nash receives the advisory over A2A and is not directable.
 
 `task show` prints one JSON object, `{task_id, spirit_id, origin, state, result?, halt?, reason?, accepted_ns,
 ended_ns?}`. The task id is also the `TaskAssign` frame id, so `maosctl audit query` finds the task's rows by it:
@@ -383,12 +446,12 @@ and, for a task that gave no answer, the terminal row `task.<id>:<state>`.
 | `queued`, `running` | Waiting in the Spirit's queue, or its turn is in progress. |
 | `completed` | The Spirit answered. `result` is the answer as journaled (redacted), the same bytes after a restart. |
 | `halted` | The kernel recorded a halt on the Spirit while the task ran; `halt` is `{halt_id, state}`. |
-| `failed` | No answer; `reason` is one of `deadline_exceeded`, `session_ended`, `session_changed`, `no_answer`, `dispatch_refused`, `spirit_unloaded`, `spirit_quarantined`. |
+| `failed` | No answer; `reason` is one of `deadline_exceeded`, `session_ended`, `session_changed`, `no_answer`, `dispatch_refused`, `spirit_unloaded`, `spirit_quarantined`, or, for Mira, `invalid_task` (the text is not a signal and no provider is bound), `inference_refused`, `memory_refused` or `halt_refused`. |
 | `orphaned` | The Spirit crashed during the task; the kernel's `task.orphaned` row names it. |
 | `interrupted` | The Host stopped (SIGTERM or SIGKILL) while the task was queued or running. It is never delivered again. |
 
 **Refusals mint no task id.** `ask` exits 1 for each of: `spirit_not_loaded` (404), `spirit_not_running` (409; the
-Spirit is Loaded, Paused or quarantined), `spirit_not_directable` (409; a native class, a `cli_wrapper` Worker or
+Spirit is Loaded, Paused or quarantined), `spirit_not_directable` (409; Nash or another native class, a `cli_wrapper` Worker or
 a `maos run` single session, the form named), `invalid_task` (400; empty text), `host_stopping` (409) and a body
 over 64 KiB (413). `task_queue_full` (409) exits **75**, as does a `--wait` that runs out: nothing was accepted,
 retry. Other exits are the door's: 2 for a local id check, 69 for no daemon, 77 for a rejected bearer and 78 for

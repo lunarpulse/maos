@@ -1,3 +1,11 @@
+//! `kloc-check`: measure the production Rust lines of every crate with `tokei`, print the
+//! size table, and fail on exactly one condition: `maos-kernel-core` above its row in
+//! `xtask/kloc.toml` (the ADR-069 envelope; the row's own bound is pinned by
+//! `xtask/tests/recovery_lane_ceiling_rule.rs`).
+//!
+//! Every other crate is measured and printed, never gated: the per-crate ceilings and
+//! `_aggregate_alarm` were removed by operator decision 11 (lean-gates WP-23, confirmed
+//! 2026-11-24). Growth outside the kernel is visible in the table, it does not block a PR.
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -5,6 +13,13 @@ use std::path::Path;
 use std::process::Command;
 
 const TOKEI_VERSION: &str = "14.0.0";
+
+/// The one gated row of `xtask/kloc.toml`.
+const KERNEL_CRATE: &str = "maos-kernel-core";
+
+/// Keys of the retired threshold scheme. A config that still carries one is refused so a
+/// number nothing enforces cannot linger in the file.
+const RETIRED_KEYS: [&str; 2] = ["_aggregate_alarm", "_aggregate_hardfail"];
 
 #[derive(Debug, Deserialize)]
 struct TokeiOutput {
@@ -33,24 +48,17 @@ struct TokeiStats {
 #[derive(Debug, serde::Serialize)]
 pub struct Report {
     pub passed: bool,
-    pub alarm: bool,
     pub aggregate: u64,
-    #[serde(skip)]
-    aggregate_alarm: u64,
+    /// The `maos-kernel-core` row of `xtask/kloc.toml`: the only ceiling.
+    pub kernel_ceiling: u64,
     pub per_crate: BTreeMap<String, u64>,
-    /// The validated budget map the report was judged against. Carried so the
-    /// operator table renders from the SAME parsed-and-validated values the
-    /// verdict used, instead of re-reading and re-parsing the config per crate
-    /// through a lenient second path (Story 15-2 review R-P13).
-    #[serde(skip)]
-    budgets: BTreeMap<String, u64>,
     pub over_budget: Vec<String>,
 }
 
 pub fn run(config: &str, json: bool) -> Result<(), String> {
     // Hard Guardrail #2 (Story 9.5 D2): docs-site is a non-Cargo Docusaurus
     // project and must contribute ZERO Rust source. The spec mandates an
-    // explicit, *enforced* assertion — not reliance on incidence. Fail fast.
+    // explicit, *enforced* assertion, not reliance on incidence. Fail fast.
     assert_docs_site_zero_rust()?;
 
     let report = kloc_check(config)?;
@@ -59,9 +67,7 @@ pub fn run(config: &str, json: bool) -> Result<(), String> {
         println!("{}", serde_json::to_string_pretty(&report).unwrap());
     } else {
         let out = render_operator_output(&report);
-        if let Some(line) = out.alarm {
-            eprintln!("{line}");
-        }
+        println!("{}", out.table);
         if let Some(line) = out.failure {
             eprintln!("{line}");
         }
@@ -77,59 +83,54 @@ pub fn run(config: &str, json: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn format_aggregate_notice(kind: &str, configured_threshold: u64, current: u64) -> String {
-    format!(
-        "workspace aggregate KLOC {kind}: configured threshold={configured_threshold}, current={current}"
-    )
-}
-
 /// Every operator-facing line the non-JSON path emits. `run()` does nothing but
 /// dispatch these to stderr/stdout, so a test on this function covers the CALL
-/// SITES and not merely the formatter — the gap that let AC6(a) ship without a
-/// proven-red control (Story 15-2 review R-P2).
+/// SITES and not merely the formatter.
 #[derive(Debug, Default)]
 struct OperatorOutput {
-    alarm: Option<String>,
+    table: String,
     failure: Option<String>,
     passed: Option<String>,
 }
 
 fn render_operator_output(report: &Report) -> OperatorOutput {
-    let mut out = OperatorOutput::default();
-    if report.alarm {
-        out.alarm = Some(format_aggregate_notice(
-            "alarm",
-            report.aggregate_alarm,
-            report.aggregate,
-        ));
+    let mut rows: Vec<(&String, &u64)> = report.per_crate.iter().collect();
+    rows.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+
+    let mut table = String::from("| Crate | tokei LOC | Ceiling |\n|---|---:|---:|\n");
+    for (crate_name, loc) in rows {
+        let ceiling = if crate_name == KERNEL_CRATE {
+            let status = if *loc > report.kernel_ceiling {
+                " OVER"
+            } else {
+                ""
+            };
+            format!("{}{status}", report.kernel_ceiling)
+        } else {
+            "-".to_string()
+        };
+        table.push_str(&format!("| {crate_name} | {loc} | {ceiling} |\n"));
     }
+    table.push_str(&format!("| (total) | {} | - |", report.aggregate));
+
+    let mut out = OperatorOutput {
+        table,
+        ..OperatorOutput::default()
+    };
     if report.passed {
         out.passed = Some(format!(
-            "kloc-check: PASSED (aggregate={} LOC)",
+            "kloc-check: PASSED ({KERNEL_CRATE} {} <= {}; aggregate={} LOC, measured, not gated)",
+            report.per_crate.get(KERNEL_CRATE).copied().unwrap_or(0),
+            report.kernel_ceiling,
             report.aggregate
         ));
-        return out;
+    } else {
+        out.failure = Some(format!(
+            "kernel envelope breach: {}; xtask/kloc.toml bounds only {KERNEL_CRATE} (ADR-069); \
+             beyond the envelope is an operator decision, not a grant",
+            report.over_budget.join(", ")
+        ));
     }
-
-    // A failure is always a per-crate breach: the aggregate threshold
-    // (`_aggregate_alarm`) is a warning and never fails the gate, so the headline
-    // names the breached crates and prints the aggregate beside the alarm
-    // threshold, never a threshold that was not crossed (Story 15-2 §2d and
-    // review R-P1; SCP 2026-11-12 §5.B7c option A).
-    let headline = format!(
-        "per-crate KLOC ceiling breach: {}; workspace aggregate={} (alarm threshold={})",
-        report.over_budget.join(", "),
-        report.aggregate,
-        report.aggregate_alarm
-    );
-
-    let mut table = String::from("| Crate | LOC | Budget | Status |\n|---|---|---|---|\n");
-    for (crate_name, loc) in &report.per_crate {
-        let budget = report.budgets.get(crate_name).copied().unwrap_or(0);
-        let status = if *loc > budget { "❌ OVER" } else { "✅ ok" };
-        table.push_str(&format!("| {crate_name} | {loc} | {budget} | {status} |\n"));
-    }
-    out.failure = Some(format!("{headline}; per-crate breakdown:\n{table}"));
     out
 }
 
@@ -141,7 +142,7 @@ fn render_operator_output(report: &Report) -> OperatorOutput {
 fn assert_docs_site_zero_rust() -> Result<(), String> {
     let docs_site = Path::new("docs-site");
     if !docs_site.is_dir() {
-        return Ok(()); // docs-site absent — nothing to assert
+        return Ok(()); // docs-site absent: nothing to assert
     }
     let mut offenders = Vec::new();
     walk_rust_files(docs_site, &mut offenders);
@@ -192,56 +193,34 @@ fn validate_tokei_version(output: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn required_nonnegative_integer(config: &toml::Table, key: &str) -> Result<u64, String> {
-    let value = config
-        .get(key)
-        .ok_or_else(|| format!("missing required integer KLOC threshold `{key}`"))?;
-    let integer = value
-        .as_integer()
-        .ok_or_else(|| format!("KLOC threshold `{key}` must be an integer"))?;
-    u64::try_from(integer)
-        .map_err(|_| format!("KLOC threshold `{key}` must be non-negative, found {integer}"))
-}
-
 /// Production entry point: resolve `tokei` from `PATH` (CI installs to
 /// `/usr/local/bin`, devs via `cargo install` to `~/.cargo/bin`).
 fn kloc_check(config_path: &str) -> Result<Report, String> {
     kloc_check_with_tokei(config_path, "tokei")
 }
 
-/// Seam: `tokei_path` is injectable so the version pin can be exercised at its
-/// CALL SITE with a binary that reports a different version, instead of only
-/// unit-testing the parser (Story 15-2 review R-P3).
-fn kloc_check_with_tokei(config_path: &str, tokei_path: &str) -> Result<Report, String> {
-    // Read budget configuration.
-    let config_src =
-        fs::read_to_string(config_path).map_err(|e| format!("cannot read {config_path}: {e}"))?;
-    let config: toml::Table = config_src
-        .parse()
-        .map_err(|e| format!("cannot parse {config_path}: {e}"))?;
-
-    // `_aggregate_hardfail` was retired by SCP 2026-11-12 §5.B7c (option A, ruled
-    // 2026-11-13). A config that still carries it is refused so the retired
-    // blocking threshold cannot silently linger as a number nothing enforces.
-    if config.contains_key("_aggregate_hardfail") {
-        return Err(format!(
-            "KLOC config key `_aggregate_hardfail` was retired by SCP 2026-11-12 B7c (option A, ruled 2026-11-13): delete it from {config_path}; `_aggregate_alarm` remains a warning and per-crate ceilings are the only blocking rows"
-        ));
+/// Read the kernel ceiling from the parsed config, refusing every other budget-shaped key.
+fn kernel_ceiling(config: &toml::Table, config_path: &str) -> Result<u64, String> {
+    for key in RETIRED_KEYS {
+        if config.contains_key(key) {
+            return Err(format!(
+                "KLOC config key `{key}` was retired (operator decision 11, lean-gates WP-23): \
+                 delete it from {config_path}; only the `{KERNEL_CRATE}` row is gated"
+            ));
+        }
     }
-    let aggregate_alarm = required_nonnegative_integer(&config, "_aggregate_alarm")?;
 
-    let mut budgets = BTreeMap::new();
-    for (key, value) in &config {
+    let mut ceiling = None;
+    for (key, value) in config {
         if key.starts_with('_') {
             continue;
         }
         if let Some(table) = value.as_table() {
-            // Iteration walks the document root only, so a budget row written
-            // BELOW a table header becomes that table's sub-key and is silently
-            // inert — no budget, no warning, no error (Story 15-2 §2a, the
-            // ship-blocker). `[in_progress_decomposition]` carries only
-            // `phase_N = { … }` metadata, so any scalar here is a misplaced
-            // budget row and is named rather than swallowed (review R-P7).
+            // Iteration walks the document root only, so a row written BELOW a
+            // table header becomes that table's sub-key and is silently inert.
+            // `[in_progress_decomposition]` carries only `phase_N = { ... }`
+            // metadata, so any scalar here is a misplaced row and is named
+            // rather than swallowed.
             for (nested_key, nested_value) in table {
                 if nested_value.as_integer().is_some() || nested_value.as_str().is_some() {
                     return Err(format!(
@@ -256,8 +235,29 @@ fn kloc_check_with_tokei(config_path: &str, tokei_path: &str) -> Result<Report, 
             .ok_or_else(|| format!("KLOC budget `{key}` must be an integer"))?;
         let budget = u64::try_from(integer)
             .map_err(|_| format!("KLOC budget `{key}` must be non-negative, found {integer}"))?;
-        budgets.insert(key.clone(), budget);
+        if key != KERNEL_CRATE {
+            return Err(format!(
+                "KLOC row `{key}` is a per-crate ceiling, removed by operator decision 11 \
+                 (lean-gates WP-23): delete it from {config_path}; only `{KERNEL_CRATE}` is gated \
+                 and every crate is measured in the printed size table"
+            ));
+        }
+        ceiling = Some(budget);
     }
+    ceiling.ok_or_else(|| format!("missing required `{KERNEL_CRATE}` row in {config_path}"))
+}
+
+/// Seam: `tokei_path` is injectable so the version pin can be exercised at its
+/// CALL SITE with a binary that reports a different version, instead of only
+/// unit-testing the parser (Story 15-2 review R-P3).
+fn kloc_check_with_tokei(config_path: &str, tokei_path: &str) -> Result<Report, String> {
+    // Read the configuration.
+    let config_src =
+        fs::read_to_string(config_path).map_err(|e| format!("cannot read {config_path}: {e}"))?;
+    let config: toml::Table = config_src
+        .parse()
+        .map_err(|e| format!("cannot parse {config_path}: {e}"))?;
+    let kernel_ceiling = kernel_ceiling(&config, config_path)?;
 
     // Determine workspace root from config path.
     let workspace_root = {
@@ -332,44 +332,21 @@ fn kloc_check_with_tokei(config_path: &str, tokei_path: &str) -> Result<Report, 
         }
         *per_crate.entry(crate_name).or_insert(0) += report.stats.code;
     }
-
-    for crate_name in per_crate.keys() {
-        if !budgets.contains_key(crate_name) {
-            return Err(format!(
-                "missing KLOC budget for measured crate `{crate_name}`"
-            ));
-        }
-    }
-
-    // Also include crates with 0 LOC that have budgets.
-    for crate_name in budgets.keys() {
-        per_crate.entry(crate_name.clone()).or_insert(0);
-    }
+    // The gated crate always has a row in the table, even when it measures 0.
+    per_crate.entry(KERNEL_CRATE.to_string()).or_insert(0);
 
     let aggregate: u64 = per_crate.values().sum();
-    let alarm = aggregate >= aggregate_alarm;
     let mut over_budget = Vec::new();
-
-    // `_aggregate_alarm` is a warning only (SCP 2026-11-12 §5.B7c option A): the
-    // aggregate never fails the gate on its own; only a per-crate ceiling does.
-
-    for (crate_name, loc) in &per_crate {
-        if let Some(&budget) = budgets.get(crate_name) {
-            if *loc > budget {
-                over_budget.push(format!("{crate_name} {loc} > {budget}"));
-            }
-        }
+    let kernel_loc = per_crate[KERNEL_CRATE];
+    if kernel_loc > kernel_ceiling {
+        over_budget.push(format!("{KERNEL_CRATE} {kernel_loc} > {kernel_ceiling}"));
     }
 
-    let passed = over_budget.is_empty();
-
     Ok(Report {
-        passed,
-        alarm,
+        passed: over_budget.is_empty(),
         aggregate,
-        aggregate_alarm,
+        kernel_ceiling,
         per_crate,
-        budgets,
         over_budget,
     })
 }

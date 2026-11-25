@@ -83,7 +83,7 @@ on_confidence_below = 0.6
 
 ## Discussion
 
-`manifest_schema_version` must be within the kernel's supported range. [Schema v8](../manifest/v8) is the latest ratified schema; its range is `1..=8`. This v5 example remains supported because it declares neither `on_telemetry_event` nor `[lifecycle.telemetry]`.
+`manifest_schema_version` must be within the kernel's supported range. [Schema v8](../manifest/v8) is the latest ratified schema and [schema v9](../manifest/v9) is proposed; the range is `1..=9`. This v5 example remains supported because it declares neither `on_telemetry_event`, `[lifecycle.telemetry]` nor `[consent]`.
 
 This example's `my-spirit` name is not a built-in daemon class. Its manifest is structurally valid, but a real first-party class must be compiled and registered with the daemon before the daemon can admit it.
 

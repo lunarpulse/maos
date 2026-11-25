@@ -119,25 +119,47 @@ pub fn build_signed_package(args: &PublishArgs) -> Result<SignedPackage, CliErro
         });
     }
 
+    sign_package(
+        &signing_pair,
+        publisher_pubkey,
+        manifest_toml,
+        artifact_bytes,
+        spirit_id,
+        version,
+        args.compliance_claim.as_deref(),
+    )
+}
+
+/// Steps 5-7 of the flow: sign, load or auto-populate the ComplianceClaim, assemble the package.
+/// Shared with `validate`, which signs the same package shape with an ephemeral key.
+pub(crate) fn sign_package(
+    signing_pair: &ring::signature::Ed25519KeyPair,
+    publisher_pubkey: [u8; 32],
+    manifest_toml: Vec<u8>,
+    artifact_bytes: Vec<u8>,
+    spirit_id: SpiritId,
+    version: String,
+    claim: Option<&std::path::Path>,
+) -> Result<SignedPackage, CliError> {
     // 5. Compute Ed25519 signature over sha256(manifest_len_u64 || manifest || artifact_len_u64 || artifact).
     // Domain-separated to prevent collision attacks. Uses u64::to_le_bytes for cross-arch compatibility.
     let mut hasher = sha2::Sha256::new();
-    hasher.update(&(manifest_toml.len() as u64).to_le_bytes());
+    hasher.update((manifest_toml.len() as u64).to_le_bytes());
     hasher.update(&manifest_toml);
-    hasher.update(&(artifact_bytes.len() as u64).to_le_bytes());
+    hasher.update((artifact_bytes.len() as u64).to_le_bytes());
     hasher.update(&artifact_bytes);
     let msg = hasher.finalize();
     let signature_bytes = signing_pair.sign(&msg);
     let signature = ed25519_sig_to_array(signature_bytes.as_ref())?;
 
     // 6. Load or auto-populate ComplianceClaim envelope.
-    let compliance_envelope = match &args.compliance_claim {
+    let compliance_envelope = match claim {
         Some(p) => compliance_claim::load_envelope(p)?,
         None => compliance_claim::auto_populate(
             &manifest_toml,
             &version,
             &publisher_pubkey,
-            &signing_pair,
+            signing_pair,
         )?,
     };
 
@@ -150,6 +172,17 @@ pub fn build_signed_package(args: &PublishArgs) -> Result<SignedPackage, CliErro
         signature,
         publisher_pubkey,
         compliance_envelope,
+    ))
+}
+
+/// Read the manifest and artifact with the publish size limits.
+pub(crate) fn read_inputs(
+    manifest: &PathBuf,
+    artifact: &PathBuf,
+) -> Result<(Vec<u8>, Vec<u8>), CliError> {
+    Ok((
+        read_limited_file(manifest, MAX_MANIFEST_SIZE, "manifest")?,
+        read_limited_file(artifact, MAX_ARTIFACT_SIZE, "artifact")?,
     ))
 }
 

@@ -47,6 +47,10 @@ Schemas 1–7 remain supported for non-listeners. An explicit `on_telemetry_even
 listing or `[lifecycle.telemetry]` table below schema 8 is refused rather than
 ignored with a warning. See the [schema 8 contract](../manifest/v8).
 
+Schemas 1–8 remain supported for manifests that declare no `[consent]` table. A
+`[consent]` table below schema 9 is refused rather than ignored with a warning. See
+the [schema 9 contract](../manifest/v9) (proposed, Story 22-9).
+
 ## ABI Version vs. Manifest Schema Version
 
 These are independent version numbers:

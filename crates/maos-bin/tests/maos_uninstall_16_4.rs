@@ -1679,24 +1679,39 @@ fn snapshot_restore_undoes_lock_acquisition_on_dry_run_and_contention_paths() {
         "the dry run must materialize and then remove the missing store root"
     );
 
+    // Wait for the REPL banner, not for store files: the FIRST boot's stores
+    // already exist, and the live shell opens the Transparency Log in WAL mode
+    // AFTER it re-materializes the proofs dir (the -wal sidecar appears, then
+    // -shm). A snapshot taken on the proofs dir alone can land between those
+    // two creations and then differ from the post-refusal tree by the -shm
+    // alone. The banner is printed only after every boot write, so no startup
+    // write can race the snapshot (same readiness gate as
+    // `purge_refuses_live_store_without_changing_filesystem_identity`). The
+    // stdout goes to a file so the capture stays outside the identity sample.
+    let shell_stdout = tempfile::NamedTempFile::new().expect("capture shell readiness");
     let mut live_root = maos_command(root)
         .args(["shell", "--plain"])
         .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
+        .stdout(shell_stdout.reopen().expect("open shell stdout"))
         .stderr(Stdio::piped())
         .spawn()
         .expect("start live MAOS root");
-    let audit = root.join("maos-home/audit/transparency.sqlite");
-    let journal = root.join("maos-home/journal/lifecycle.ndjson");
-    // The FIRST boot's stores already exist, so waiting on audit/journal
-    // alone races the live shell's own lock acquisition; also wait for the
-    // proofs dir it re-materializes before deleting it again.
     let deadline = Instant::now() + Duration::from_secs(10);
-    while !audit.exists() || !journal.exists() || !proofs.exists() {
-        assert!(
-            Instant::now() < deadline,
-            "live root did not finish materializing its locked stores"
-        );
+    loop {
+        let stdout = std::fs::read(shell_stdout.path()).expect("read shell stdout");
+        if String::from_utf8_lossy(&stdout).contains("maos shell — type @hello-spirit") {
+            break;
+        }
+        if live_root.try_wait().expect("check shell status").is_some() || Instant::now() >= deadline
+        {
+            let _ = live_root.kill();
+            let output = live_root.wait_with_output().expect("reap unready shell");
+            panic!(
+                "live root did not reach the REPL: status={} stderr={}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
         std::thread::sleep(Duration::from_millis(20));
     }
     std::fs::remove_dir_all(&proofs).expect("delete the proofs root again");

@@ -346,3 +346,13 @@ summary = "maos-spirit-abi CLI_WRAPPER_SCHEMA_VERSION = 2 (window 1..=2); [cli_w
 adr_ref = "ADR-045,ADR-069"
 status = "proposed"
 covered_changes = ["CLI_WRAPPER_SCHEMA_VERSION", "MAX_SUPPORTED_CLI_WRAPPER_SCHEMA_VERSION", "CliWrapperConfig::take_worker_identity", "ClassSection::for_worker"]
+
+# Story 22-9 D-22-9-04 A (recommended answer; operator not yet confirmed) — PROPOSED (never
+# self-ratified). `[consent]` is refused below schema 9 (no degradation, as 21-9 did for
+# `[lifecycle.telemetry]`); admission refuses a `[consent.recall]` recipient the Host does not know.
+[[ratification]]
+proposal_id = "22-9-manifest-schema-9"
+summary = "MANIFEST_SCHEMA_VERSION 8→9; a [consent] table is refused below schema 9 with a typed manifest-section error (no degradation); admission refuses a [consent.recall] recipient id that is not an installed package, a host-file cast or topology member, or a loaded Spirit, typed consent_recipient_unknown; ABI_VERSION and the guest wire are unchanged"
+adr_ref = "ADR-045,ADR-069"
+status = "proposed"
+covered_changes = ["MANIFEST_SCHEMA_VERSION", "CONSENT_SINCE_SCHEMA", "ConsentSection::from_toml_str_at", "AdmissionRefusal::ConsentRecipientUnknown"]

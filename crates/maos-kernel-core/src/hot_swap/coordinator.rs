@@ -23,6 +23,7 @@ use std::sync::{Arc, RwLock, Weak};
 use parking_lot::Mutex;
 use std::time::Instant;
 
+use maos_domain::frame::ConsentRecall;
 use maos_domain::hot_swap::{HotSwapError, HotSwapResult, PostSwapInvariantViolation};
 use maos_domain::invariants::i1::Scope;
 use maos_domain::invariants::i10::{JournalEntry, LifecycleEntry, LifecycleEvent};
@@ -66,6 +67,9 @@ struct PendingRevert {
     /// `Some(displaced)` only when the verified policy replaced the PID's promotion
     /// registration; `displaced` is the exact prior set (`None`: there was none).
     promotion: Option<Option<AllowedPromotionSet>>,
+    /// The id's consent declaration when this swap committed (the predecessor's), restored
+    /// by a revert unless another pid has since installed its own.
+    consent: Option<(u32, Arc<BTreeMap<String, ConsentRecall>>)>,
 }
 
 /// The one current post-swap window of a PID: its exact deadline, its task, and the
@@ -543,6 +547,10 @@ impl HotSwapCoordinator {
                                         set,
                                     )
                                 });
+                                let consent = self
+                                    .iac
+                                    .consent_policy()
+                                    .snapshot(&predecessor_scb.spirit_id);
                                 // Step 10: the HotSwap journal entry precedes the
                                 // window, so a revert can never be journaled first.
                                 self.journal.append_transition(JournalEntry::Lifecycle(
@@ -568,6 +576,7 @@ impl HotSwapCoordinator {
                                         predecessor,
                                         scope_install,
                                         promotion,
+                                        consent,
                                     },
                                 );
                                 Ok(())
@@ -943,6 +952,7 @@ impl HotSwapCoordinator {
             predecessor,
             scope_install,
             promotion,
+            consent,
             ..
         } = claimed.take().expect("claimed window");
 
@@ -975,6 +985,13 @@ impl HotSwapCoordinator {
                                     .unregister_promotion_set_for_pid(&scb.spirit_id, spirit_pid),
                             }
                         }
+                        // 22-9: the predecessor's consent declaration comes back with
+                        // it, unless another pid has since installed its own.
+                        self.iac.consent_policy().restore_if_installed(
+                            &scb.spirit_id,
+                            spirit_pid,
+                            consent,
+                        );
                     })
                     .is_ok(),
                 _ => false,

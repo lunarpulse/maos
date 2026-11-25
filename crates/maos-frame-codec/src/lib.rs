@@ -105,6 +105,20 @@ pub fn write_frame<W: Write + ?Sized>(writer: &mut W, body: &[u8]) -> io::Result
     writer.flush()
 }
 
+/// Written by a lifecycle runner to stderr, on the same fd and in program order, immediately
+/// before it writes a lifecycle stage reply frame (Story 22-9 F2). Guest stdio and the runner's
+/// own diagnostics share fd 2 and every write is synchronous, so a host that has read this line
+/// from stderr has read every line the guest wrote before that reply, whichever of the two
+/// reader threads enqueued first. It is a control marker, never a diagnostic row.
+pub const STAGE_END_SENTINEL: &str = "maos-stage-end";
+
+/// The guest bytes in front of a stage-end sentinel at the end of `line` (a stderr line without
+/// its LF), or `None` when `line` is no sentinel line. The prefix is non-empty only when the guest
+/// left its last line unterminated, so the sentinel joined it.
+pub fn split_stage_end(line: &[u8]) -> Option<&[u8]> {
+    line.strip_suffix(STAGE_END_SENTINEL.as_bytes())
+}
+
 /// Appended to a diagnostic line cut at the bound; its length is reserved in the record.
 pub const DIAGNOSTIC_TRUNCATION_MARKER: &[u8] = b" [maos: diagnostic truncated]";
 /// Length at which a lowercase-hex run is a Transparency Log capability-token secret.

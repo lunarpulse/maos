@@ -26,6 +26,8 @@ tempfile = "3"
 tokio = { version = "1", features = ["rt", "time", "macros", "signal", "sync"] }
 tracing = { version = "0.1", optional = true }
 url = "2.5"
+# Story 22-7 — component-shape check for `maos-spirit validate`. The version wasmtime 48.0.10 resolves (Cargo.lock).
+wasmparser = { version = "0.254.2", default-features = false, features = ["std", "component-model"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 rustls-pemfile = { version = "2.2", optional = true }
 webpki-roots = { version = "0.26", optional = true }

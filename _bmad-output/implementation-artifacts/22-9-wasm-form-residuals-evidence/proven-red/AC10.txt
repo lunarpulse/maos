@@ -1,0 +1,12 @@
+AC10 plant: crates/maos-bin/src/spawned_lifecycle.rs spawned_successor: the probe wait back to a fixed 5 s (the PROBE_WAIT refusal). Command: cargo nextest run --locked -p maos-bin --test spawned_swap_20_9 -E 'test(a_hot_swap_of_a_still_starting_component_waits_for_readiness)'. Result: FAILS (spawned_swap_not_ready after 5 s against the 6 s probe). Plant reverted.
+
+        FAIL [   5.468s] (1/1) maos-bin::spawned_swap_20_9 a_hot_swap_of_a_still_starting_component_waits_for_readiness
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 29 filtered out; finished in 5.46s
+    thread 'a_hot_swap_of_a_still_starting_component_waits_for_readiness' (690827) panicked at crates/maos-bin/tests/spawned_swap_20_9.rs:1469:10:
+    the swap waits for the probe and completes with no retry: "successor factory failed: spawned_swap_not_ready: the running Spirit did not finish starting within the attempt wall"
+    thread 'tokio-rt-worker' (690844) panicked at crates/maos-bin/src/supervision.rs:2907:30:
+    thread 'tokio-rt-worker' (690845) panicked at crates/maos-bin/src/supervision.rs:2907:30:
+     Summary [   5.469s] 1 test run: 0 passed, 1 failed, 29 skipped
+        FAIL [   5.468s] (1/1) maos-bin::spawned_swap_20_9 a_hot_swap_of_a_still_starting_component_waits_for_readiness
+error: test run failed
+rc=100

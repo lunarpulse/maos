@@ -1,8 +1,5 @@
-//! `maos-spirit` — Spirit-author publish CLI per FR35 (Story 7.2 v1.0).
-//!
-//! At v1.0 ships the `publish` subcommand only. `validate` + `inspect`
-//! are v0.7+ stubs that exit 1 with a deterministic "not yet implemented"
-//! diagnostic.
+//! `maos-spirit` — Spirit-author CLI per FR35 (Story 7.2 v1.0): `publish`, `vet`, `yank`, and
+//! (Story 22-7) `validate`, which reports what the Host would refuse before anything is published.
 
 use std::path::PathBuf;
 
@@ -10,7 +7,7 @@ use clap::{Parser, Subcommand};
 use maos_spirit_cli::errors::CliError;
 use maos_spirit_cli::publish::{run_publish, PublishArgs};
 
-/// Spirit-author CLI for publishing, validating, and inspecting Spirit packages.
+/// Spirit-author CLI for validating, publishing, vetting and yanking Spirit packages.
 #[derive(Parser, Debug)]
 #[command(name = "maos-spirit", version, about, long_about = None)]
 struct Cli {
@@ -26,10 +23,8 @@ enum Command {
     Vet(maos_spirit_cli::vet::VetArgs),
     /// Withdraw a release as its publisher or an enrolled vetter.
     Yank(maos_spirit_cli::yank::YankArgs),
-    /// Validate a Spirit package locally without publishing (v0.7+).
-    Validate(StubArgs),
-    /// Inspect a published Spirit's metadata (v0.7+).
-    Inspect(StubArgs),
+    /// Check a package against the install gate, the boot gate and the component shape, without publishing.
+    Validate(maos_spirit_cli::validate::ValidateArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -86,9 +81,6 @@ impl From<PublishArgsCli> for PublishArgs {
     }
 }
 
-#[derive(Parser, Debug)]
-struct StubArgs {}
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let cli = Cli::parse();
@@ -104,14 +96,7 @@ async fn main() {
         },
         Command::Vet(args) => report_result(maos_spirit_cli::vet::run(args)),
         Command::Yank(args) => report_result(maos_spirit_cli::yank::run(args)),
-        Command::Validate(_) => {
-            eprintln!("maos-spirit validate: not yet implemented (v0.7+)");
-            1
-        }
-        Command::Inspect(_) => {
-            eprintln!("maos-spirit inspect: not yet implemented (v0.7+)");
-            1
-        }
+        Command::Validate(args) => maos_spirit_cli::validate::run(args),
     };
     std::process::exit(exit);
 }

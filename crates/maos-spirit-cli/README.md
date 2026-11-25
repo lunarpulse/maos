@@ -1,6 +1,6 @@
 # maos-spirit-cli
 
-Spirit-author CLI for publishing, validating, and inspecting Spirit packages (Story 7.2, FR35).
+Spirit-author CLI for validating, publishing, vetting and yanking Spirit packages (Story 7.2, FR35).
 
 ## 30-Minute Publish Path
 
@@ -34,8 +34,12 @@ maos-spirit publish \
 ## Subcommands
 
 - `publish` — Sign and publish a Spirit package to a registry (v1.0)
-- `validate` — Validate a Spirit package locally without publishing (v0.7+)
-- `inspect` — Inspect a published Spirit's metadata (v0.7+)
+- `validate` — Check a package locally, before `publish`: the install gate, the Host's boot-gate manifest checks
+  and the component shape (Story 22-7). `maos-spirit validate --manifest manifest.toml --artifact dist/spirit.wasm [--json]`
+  exits 0 when the package would pass, 1 with one `[check] code: detail` finding per failed check, 2 on an
+  unreadable input. It needs no registry, daemon or signing key (an ephemeral key signs the in-memory package)
+  and writes nothing.
+- `vet`, `yank` — vetting attestations and withdrawing a release.
 
 ## Signing Key Precedence
 

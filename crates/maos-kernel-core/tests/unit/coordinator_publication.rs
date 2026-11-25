@@ -320,10 +320,60 @@ async fn the_window_keeps_the_deadline_fixed_at_publication_however_late_it_open
         predecessor: runtime,
         scope_install: None,
         promotion: None,
+        consent: None,
     };
     rig.coordinator.open_window(monitor, deadline, pending);
 
     let opened = rig.coordinator.active_monitors.lock()[&PID].deadline;
     assert_eq!(opened, deadline, "opening later does not extend the window");
     assert!(opened < tokio::time::Instant::now() + window);
+}
+
+fn consent(recall: ConsentRecall) -> BTreeMap<String, ConsentRecall> {
+    BTreeMap::from([("peer".to_string(), recall)])
+}
+
+/// Swap with a registered predecessor declaration, then play the bin's outcome callback: the
+/// successor registers its (narrower) declaration for the same pid.
+async fn swap_narrowing_consent(rig: &Rig) {
+    let policy = rig.coordinator.iac.consent_policy();
+    policy.register(ID, PID, Some(consent(ConsentRecall::Full)));
+    rig.coordinator
+        .initiate_with_policy(ID, &manifest(), spirit(&rig.swap_outs), Some((&[], None)))
+        .await
+        .expect("the swap commits");
+    policy.register(ID, PID, Some(consent(ConsentRecall::Withheld)));
+}
+
+#[tokio::test]
+async fn revert_restores_the_predecessors_consent_declaration() {
+    let rig = rig();
+    swap_narrowing_consent(&rig).await;
+    rig.coordinator
+        .auto_revert(PID, violation())
+        .await
+        .expect("the revert applies");
+    let (owner, grants) = rig
+        .coordinator
+        .iac
+        .consent_policy()
+        .snapshot(ID)
+        .expect("declared");
+    assert_eq!(owner, PID);
+    assert_eq!(*grants, consent(ConsentRecall::Full));
+}
+
+#[tokio::test]
+async fn revert_leaves_a_consent_declaration_a_later_swap_installed() {
+    let rig = rig();
+    swap_narrowing_consent(&rig).await;
+    let policy = rig.coordinator.iac.consent_policy();
+    policy.register(ID, OTHER_PID, Some(consent(ConsentRecall::HeaderOnly)));
+    rig.coordinator
+        .auto_revert(PID, violation())
+        .await
+        .expect("the revert applies");
+    let (owner, grants) = policy.snapshot(ID).expect("declared");
+    assert_eq!(owner, OTHER_PID, "the other incarnation's entry survives");
+    assert_eq!(*grants, consent(ConsentRecall::HeaderOnly));
 }

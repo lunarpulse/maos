@@ -1,12 +1,12 @@
 # Exact kernel pin: src_lines (physical, formatted), per-file digests and set_hash of crates/maos-kernel-core/src.
 # Regenerate with `xtask check-kernel-baseline --emit-pin` and `scripts/repin.py`; history is `git log -p`, not prose here.
-src_lines = 28324
+src_lines = 28339
 
 
 
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "a7fe3f91d00aae45ff0eb4f27fd65fb3861cc0b75165614a36e88ef63672ac3f"
+set_hash = "978cb02e1a71c63adced620a065a3db20a1f592d9d9180720322b99609ee3eef"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -25,12 +25,12 @@ set_hash = "a7fe3f91d00aae45ff0eb4f27fd65fb3861cc0b75165614a36e88ef63672ac3f"
 "halt/resolver.rs" = "522ae90543382e1aa6a17839731b48eb57c64a76255f41fbc258a8f0e91e8a08"
 "halt/termination.rs" = "ad56de586651f8f69a9c860374a0a0c0b7242501a25792a54423cfb9ec278097"
 "hot_swap/archive.rs" = "8c3cf3dbdd1b4fa926ecccf130afa2d6628d1ce7c0e257731d75fb2e23e86b7e"
-"hot_swap/coordinator.rs" = "e1f411153f8ccaa49a8c969af3dbff4696e62645cc1e895099dd659d4cf2deda"
+"hot_swap/coordinator.rs" = "9316265a329a2d704250321e4f14ea934db6c25fb2ed1017086bcdd786c71dc7"
 "hot_swap/migrator.rs" = "1c72d4b472310fcc36f80521d25ab3da72691fc99b79c1b258bdd75ab5a53b88"
 "hot_swap/mod.rs" = "d378c979b9338914bdb50d507ddc7826c0f5852a4364e4736fde3a7d9e35e5a6"
 "hot_swap/post_swap_monitor.rs" = "8ff52c742acd29339d2f37af3065f879c8a16c88481033ee810c6f374c913dc7"
 "hot_swap/precheck.rs" = "043d1c77bbdc978d955e4d9f9d136547ace1aea17b6b66e35dc6edf304e44ea1"
-"hot_swap/saga.rs" = "886994c9ab553372c85df2caf8de395c0b712b888656c030674babf12f8efc77"
+"hot_swap/saga.rs" = "81259c7b07376f4f41be6b7634d34667dcf94e2afe4d3413a55255ff0da40dc6"
 "hot_swap/state_codec.rs" = "8d1c62a7486582eb329b208bd4dca5280ac62d1462c89cdfb1d8691aaa3861dd"
 "iac.rs" = "18c0b4e562376fd5b6170fac0544bb3465c4fc452b46c702a8bc1c070d7a08bf"
 "inference/mod.rs" = "864778ae4df25be04404c707b81fb73147e22af98d2dc2ac16d74ea3eaea21d0"
