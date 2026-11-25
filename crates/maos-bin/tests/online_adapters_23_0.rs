@@ -56,7 +56,7 @@ fn the_umbrella_is_in_default_and_enables_network() {
     // external KMS adapter of maos-secrets, and no other feature of this crate.
     assert_eq!(
         features[UMBRELLA],
-        ["network", "maos-secrets/http-kms"],
+        ["network", "maos-secrets/http-kms", "maos-sso/discovery"],
         "{UMBRELLA} enables network and the KMS adapter (23-8) and nothing else"
     );
     for kept in ["network", "wasm-host"] {

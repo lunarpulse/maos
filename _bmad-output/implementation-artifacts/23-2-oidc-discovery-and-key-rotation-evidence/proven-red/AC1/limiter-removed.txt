@@ -1,0 +1,9 @@
+Plant E232-PLANT-limiter: crates/maos-sso/src/discovery.rs `Shared::limiter_open` returned `true` (every unknown kid, and every stale read, fetches).
+Command: cargo test --locked -p maos-sso --features discovery --test oidc_discovery_23_2
+Failing lines of that run (2 failed, 16 passed):
+
+test an_unknown_kid_inside_the_interval_causes_no_fetch ... FAILED
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:255:5: left: 3, right: 1   (fetch counter: no fetch inside 30 s expected)
+test past_the_ttl_every_assertion_fails_closed_until_the_fetch_recovers ... FAILED
+  panicked at crates/maos-sso/tests/oidc_discovery_23_2.rs:304:5: left: 4, right: 2   (no fetch inside the interval expected)
+test result: FAILED. 16 passed; 2 failed

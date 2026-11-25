@@ -1,0 +1,5 @@
+Plant E232-PLANT-accept-row: crates/maos-bin/src/directed_task.rs `accept` set the record's `actor` (written into the accept row) to the assertion text.
+Failing:
+ - cargo test -p maos-bin --test directed_task_22_4 -- an_asks : an_asks_assertion_appears_in_no_row_reply_or_error FAILED (panicked at tests/directed_task_22_4.rs:877:9, a row carries the assertion)
+ - cargo test -p maos-bin --test assertion_scope_23_2 : the_assertion_appears_in_no_record_row_or_debug FAILED (tests/assertion_scope_23_2.rs:280:5)
+Plant removed afterwards.

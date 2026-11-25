@@ -167,7 +167,12 @@ struct GatedRunner {
 }
 
 impl TaskRunner for GatedRunner {
-    fn run(&self, task_id: [u8; 16], text: &str) -> Result<String, RunFailure> {
+    fn run(
+        &self,
+        task_id: [u8; 16],
+        text: &str,
+        _assertion: Option<&maos_control::Assertion>,
+    ) -> Result<String, RunFailure> {
         let id = ulid::Ulid::from_bytes(task_id).to_string();
         self.events.lock().unwrap().push(format!("run:{id}"));
         self.gate.started.fetch_add(1, Ordering::SeqCst);
@@ -197,7 +202,12 @@ struct ScriptedRunner {
 }
 
 impl TaskRunner for ScriptedRunner {
-    fn run(&self, task_id: [u8; 16], _text: &str) -> Result<String, RunFailure> {
+    fn run(
+        &self,
+        task_id: [u8; 16],
+        _text: &str,
+        _assertion: Option<&maos_control::Assertion>,
+    ) -> Result<String, RunFailure> {
         let id = ulid::Ulid::from_bytes(task_id).to_string();
         self.host.events.lock().unwrap().push(format!("run:{id}"));
         if let Some(during) = &self.during {
@@ -268,13 +278,13 @@ fn queue_refuses_past_its_bound_and_never_blocks() {
     let (host, tasks) = world();
     let gate = gated(&host, &tasks, "probe");
 
-    let first = tasks.accept("probe", "task 0", None).unwrap();
+    let first = tasks.accept("probe", "task 0", None, None).unwrap();
     wait_until("the first task to run", || {
         gate.started.load(Ordering::SeqCst) == 1
     });
     for n in 1..=32 {
         tasks
-            .accept("probe", &format!("task {n}"), None)
+            .accept("probe", &format!("task {n}"), None, None)
             .unwrap_or_else(|error| panic!("queued task {n} refused: {error:?}"));
     }
     assert_eq!(host.count("accepted:"), 33, "one running plus 32 queued");
@@ -282,7 +292,7 @@ fn queue_refuses_past_its_bound_and_never_blocks() {
     // The 33rd queued ask is refused while the Spirit is stuck mid-turn: the door handler
     // never waits on the Spirit, the mailbox or the pump.
     let before = Instant::now();
-    let refused = tasks.accept("probe", "one too many", None);
+    let refused = tasks.accept("probe", "one too many", None, None);
     assert!(
         before.elapsed() < Duration::from_secs(2),
         "the refusal waited {:?}",
@@ -334,20 +344,20 @@ fn the_host_wide_bound_refuses_across_spirits() {
     );
     let a = gated(&host, &tasks, "alpha");
     let b = gated(&host, &tasks, "beta");
-    tasks.accept("alpha", "a0", None).unwrap();
-    tasks.accept("beta", "b0", None).unwrap();
+    tasks.accept("alpha", "a0", None, None).unwrap();
+    tasks.accept("beta", "b0", None, None).unwrap();
     wait_until("both to run", || {
         a.started.load(Ordering::SeqCst) == 1 && b.started.load(Ordering::SeqCst) == 1
     });
     for n in 0..32 {
-        tasks.accept("alpha", &format!("a{n}"), None).unwrap();
+        tasks.accept("alpha", &format!("a{n}"), None, None).unwrap();
     }
     for n in 0..6 {
-        tasks.accept("beta", &format!("b{n}"), None).unwrap();
+        tasks.accept("beta", &format!("b{n}"), None, None).unwrap();
     }
     // 33 + 7 = 40 queued and running; beta's own queue has room, the host does not.
     assert_eq!(
-        tasks.accept("beta", "over", None).unwrap_err(),
+        tasks.accept("beta", "over", None, None).unwrap_err(),
         AcceptError::QueueFull {
             scope: "host",
             limit: 40
@@ -363,8 +373,12 @@ fn a_repeated_key_returns_the_same_task() {
     let gate = gated(&host, &tasks, "probe");
     scripted(&host, &tasks, "other", Ok("ok".into()), None);
 
-    let first = tasks.accept("probe", "do it", Some("retry-1")).unwrap();
-    let second = tasks.accept("probe", "do it", Some("retry-1")).unwrap();
+    let first = tasks
+        .accept("probe", "do it", Some("retry-1"), None)
+        .unwrap();
+    let second = tasks
+        .accept("probe", "do it", Some("retry-1"), None)
+        .unwrap();
     assert!(!first.replayed);
     assert!(second.replayed, "the repeat is marked");
     assert_eq!(first.task_id, second.task_id, "the same task id");
@@ -378,10 +392,14 @@ fn a_repeated_key_returns_the_same_task() {
     );
 
     // A key is scoped to its Spirit and to its value; no key is always a new task.
-    let other_key = tasks.accept("probe", "do it", Some("retry-2")).unwrap();
-    let other_spirit = tasks.accept("other", "do it", Some("retry-1")).unwrap();
-    let keyless_a = tasks.accept("probe", "do it", None).unwrap();
-    let keyless_b = tasks.accept("probe", "do it", None).unwrap();
+    let other_key = tasks
+        .accept("probe", "do it", Some("retry-2"), None)
+        .unwrap();
+    let other_spirit = tasks
+        .accept("other", "do it", Some("retry-1"), None)
+        .unwrap();
+    let keyless_a = tasks.accept("probe", "do it", None, None).unwrap();
+    let keyless_b = tasks.accept("probe", "do it", None, None).unwrap();
     let ids: HashSet<&str> = [
         first.task_id.as_str(),
         other_key.task_id.as_str(),
@@ -415,7 +433,7 @@ fn a_repeated_key_returns_the_same_task() {
         .insert(ask_replay_key("probe", "from-last-boot"), earlier.clone());
     let before = host.count("accepted:");
     let replay = tasks
-        .accept("probe", "do it", Some("from-last-boot"))
+        .accept("probe", "do it", Some("from-last-boot"), None)
         .unwrap();
     assert_eq!(replay.task_id, earlier);
     assert!(replay.replayed);
@@ -473,7 +491,7 @@ fn a_halt_on_the_target_during_the_task_is_reported() {
             .unwrap();
         })),
     );
-    let accepted = tasks.accept("probe", "risky", None).unwrap();
+    let accepted = tasks.accept("probe", "risky", None, None).unwrap();
     let record = finished(&tasks, &accepted.task_id);
     assert_eq!(record.state, TaskState::Halted, "{record:?}");
     assert_eq!(
@@ -515,7 +533,7 @@ fn a_halt_before_the_task_started_is_not() {
     *host.halts.lock().unwrap() = Some((registry, PID));
     scripted(&host, &tasks, "probe", Ok("fine".into()), None);
 
-    let accepted = tasks.accept("probe", "calm", None).unwrap();
+    let accepted = tasks.accept("probe", "calm", None, None).unwrap();
     let record = finished(&tasks, &accepted.task_id);
     assert_eq!(
         record.state,
@@ -536,7 +554,7 @@ fn the_journaled_answer_wins_and_a_completed_task_reads_the_same_after_eviction(
     let (host, tasks) = world();
     let gate = gated(&host, &tasks, "probe");
     gate.release();
-    let accepted = tasks.accept("probe", "hello", None).unwrap();
+    let accepted = tasks.accept("probe", "hello", None, None).unwrap();
     let record = finished(&tasks, &accepted.task_id);
     assert_eq!(record.state, TaskState::Completed);
     // The runner returned "live answer to hello"; the reply row said otherwise, and the row is
@@ -556,7 +574,7 @@ fn every_task_is_journaled_before_it_is_delivered() {
     let (host, tasks) = world();
     scripted(&host, &tasks, "probe", Ok("ok".into()), None);
     for n in 0..20 {
-        tasks.accept("probe", &format!("t{n}"), None).unwrap();
+        tasks.accept("probe", &format!("t{n}"), None, None).unwrap();
     }
     wait_until("the tasks to run", || host.count("run:") == 20);
     let trace = host.trace();
@@ -577,12 +595,12 @@ fn a_refused_accept_row_queues_nothing_and_frees_its_key() {
     scripted(&host, &tasks, "probe", Ok("ok".into()), None);
     *host.fail_accept_row.lock().unwrap() = true;
     assert_eq!(
-        tasks.accept("probe", "x", Some("k")).unwrap_err(),
+        tasks.accept("probe", "x", Some("k"), None).unwrap_err(),
         AcceptError::Log("the log refused the row".into())
     );
     assert_eq!(tasks.counts().queued, 0);
     *host.fail_accept_row.lock().unwrap() = false;
-    let retried = tasks.accept("probe", "x", Some("k")).unwrap();
+    let retried = tasks.accept("probe", "x", Some("k"), None).unwrap();
     assert!(!retried.replayed, "the failed accept left no key behind");
     assert_eq!(
         finished(&tasks, &retried.task_id).state,
@@ -596,7 +614,7 @@ fn an_unregistered_spirit_is_not_directable_and_mints_nothing() {
     let (host, tasks) = world();
     assert!(!tasks.is_directable("nash"));
     assert_eq!(
-        tasks.accept("nash", "x", None).unwrap_err(),
+        tasks.accept("nash", "x", None, None).unwrap_err(),
         AcceptError::NotDirectable
     );
     assert_eq!(host.count("accepted:"), 0);
@@ -606,12 +624,12 @@ fn an_unregistered_spirit_is_not_directable_and_mints_nothing() {
 fn unloading_a_spirit_ends_its_queued_tasks_failed_and_not_the_running_one() {
     let (host, tasks) = world();
     let gate = gated(&host, &tasks, "probe");
-    let running = tasks.accept("probe", "running", None).unwrap();
+    let running = tasks.accept("probe", "running", None, None).unwrap();
     wait_until("it to run", || gate.started.load(Ordering::SeqCst) == 1);
     let queued: Vec<String> = (0..3)
         .map(|n| {
             tasks
-                .accept("probe", &format!("q{n}"), None)
+                .accept("probe", &format!("q{n}"), None, None)
                 .unwrap()
                 .task_id
         })
@@ -645,7 +663,7 @@ fn a_paused_spirit_holds_its_queue_and_a_quarantined_or_unloaded_one_fails_it() 
     let (host, tasks) = world();
     scripted(&host, &tasks, "probe", Ok("ok".into()), None);
     host.state("probe", SpiritRunState::NotRunning("Paused"));
-    let held = tasks.accept("probe", "wait for me", None).unwrap();
+    let held = tasks.accept("probe", "wait for me", None, None).unwrap();
     std::thread::sleep(Duration::from_millis(700));
     assert_eq!(tasks.get(&held.task_id).unwrap().state, TaskState::Queued);
     assert_eq!(
@@ -657,14 +675,14 @@ fn a_paused_spirit_holds_its_queue_and_a_quarantined_or_unloaded_one_fails_it() 
     assert_eq!(finished(&tasks, &held.task_id).state, TaskState::Completed);
 
     host.state("probe", SpiritRunState::Quarantined);
-    let quarantined = tasks.accept("probe", "x", None).unwrap();
+    let quarantined = tasks.accept("probe", "x", None, None).unwrap();
     let record = finished(&tasks, &quarantined.task_id);
     assert_eq!(
         (record.state, record.reason.as_deref()),
         (TaskState::Failed, Some("spirit_quarantined"))
     );
     host.state("probe", SpiritRunState::Unloaded);
-    let gone = tasks.accept("probe", "x", None).unwrap();
+    let gone = tasks.accept("probe", "x", None, None).unwrap();
     let record = finished(&tasks, &gone.task_id);
     assert_eq!(
         (record.state, record.reason.as_deref()),
@@ -696,7 +714,7 @@ fn a_turn_that_gave_no_answer_ends_with_its_typed_reason() {
             }),
             None,
         );
-        let accepted = tasks.accept("probe", "x", None).unwrap();
+        let accepted = tasks.accept("probe", "x", None, None).unwrap();
         let record = finished(&tasks, &accepted.task_id);
         assert_eq!(record.state, TaskState::Failed, "{reason}");
         assert_eq!(record.reason.as_deref(), Some(reason));
@@ -719,13 +737,13 @@ fn a_session_that_ended_on_a_crash_reads_orphaned_from_the_kernel_row() {
         None,
     );
     *host.orphan_all.lock().unwrap() = true;
-    let crashed = tasks.accept("probe", "x", None).unwrap();
+    let crashed = tasks.accept("probe", "x", None, None).unwrap();
     let record = finished(&tasks, &crashed.task_id);
     assert_eq!(record.state, TaskState::Orphaned, "{record:?}");
 
     // Without the kernel's `task.orphaned` row the same end is a plain session end.
     *host.orphan_all.lock().unwrap() = false;
-    let ended = tasks.accept("probe", "x", None).unwrap();
+    let ended = tasks.accept("probe", "x", None, None).unwrap();
     let record = finished(&tasks, &ended.task_id);
     assert_eq!(
         (record.state, record.reason.as_deref()),
@@ -742,7 +760,7 @@ fn the_finished_record_cache_never_exceeds_its_bound_and_evicted_tasks_read_from
         for n in 0..30 {
             ids.push(
                 tasks
-                    .accept("probe", &format!("b{burst} t{n}"), None)
+                    .accept("probe", &format!("b{burst} t{n}"), None, None)
                     .unwrap()
                     .task_id,
             );

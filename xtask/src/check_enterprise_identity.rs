@@ -191,6 +191,7 @@ fn run_oidc_verify_leg() -> LegResult {
             ("maos-sso", "oidc_verify", "", None),
             ("maos-sso", "alg_negatives", "", None),
             ("maos-sso", "claims_failclosed", "", None),
+            ("maos-sso", "oidc_discovery_23_2", "", Some("discovery")),
         ],
     )
 }

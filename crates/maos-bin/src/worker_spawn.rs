@@ -417,7 +417,7 @@ pub fn issue_enterprise_governed_capability(
     let capability_key = scope_action_key(&scope).to_string();
     let principal = match enterprise_runtime {
         Some(runtime) if runtime.sso_configured() => {
-            let assertion = std::env::var("MAOS_SSO_ASSERTION").map_err(|_| {
+            let assertion = crate::assertion_supply::supply(spirit_pid).ok_or_else(|| {
                 GovernedMintError::SsoAssertionMissing(format!(
                     "enterprise SSO is configured but MAOS_SSO_ASSERTION is absent for {capability_key}"
                 ))

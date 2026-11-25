@@ -11,6 +11,9 @@ compile_error!("sso-fault-inject is dev/CI-only and MUST NOT ship in release bui
 
 use std::collections::{HashMap, HashSet};
 
+#[cfg(feature = "discovery")]
+pub mod discovery;
+
 use base64::Engine;
 use jsonwebtoken::errors::ErrorKind;
 use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
@@ -56,9 +59,102 @@ pub enum OidcVerifierError {
 #[derive(Debug, Clone)]
 pub struct OidcVerifier {
     keys: HashMap<String, Jwk>,
+    rules: Rules,
+}
+
+/// The claim and algorithm rules shared by the static and the discovering
+/// verifier (Story 23-2): one copy, so the two cannot drift apart.
+#[derive(Debug, Clone)]
+struct Rules {
     allowed_algorithms: HashSet<OidcAlgorithm>,
     trusted_issuers: HashSet<String>,
     expected_audience: String,
+}
+
+impl Rules {
+    fn new(
+        allowed_algorithms: &[OidcAlgorithm],
+        trusted_issuers: &[&str],
+        expected_audience: &str,
+    ) -> Result<Self, OidcVerifierError> {
+        if allowed_algorithms.is_empty() {
+            return Err(OidcVerifierError::EmptyAlgorithmAllowlist);
+        }
+        if trusted_issuers.is_empty() {
+            return Err(OidcVerifierError::EmptyTrustedIssuers);
+        }
+        if expected_audience.is_empty() {
+            return Err(OidcVerifierError::EmptyAudience);
+        }
+        Ok(Self {
+            allowed_algorithms: allowed_algorithms.iter().copied().collect(),
+            trusted_issuers: trusted_issuers
+                .iter()
+                .map(|issuer| (*issuer).to_string())
+                .collect(),
+            expected_audience: expected_audience.to_string(),
+        })
+    }
+
+    fn configured(&self) -> bool {
+        !self.allowed_algorithms.is_empty() && !self.trusted_issuers.is_empty()
+    }
+
+    /// `key_for` is called with the `kid` only after the algorithm allowlist
+    /// passed, so a disallowed algorithm never reaches a key source.
+    fn verify(
+        &self,
+        assertion: &str,
+        key_for: impl FnOnce(&str) -> Option<Jwk>,
+    ) -> Result<AuthenticatedPrincipal, IdentityError> {
+        let header = parse_header(assertion)?;
+        let algorithm = parse_algorithm(&header.alg)?;
+        if !self.allowed_algorithms.contains(&algorithm) {
+            return Err(IdentityError::AlgorithmRejected);
+        }
+
+        let kid = header.kid.ok_or(IdentityError::JwksUnavailable)?;
+        let jwk = key_for(&kid).ok_or(IdentityError::JwksUnavailable)?;
+        if let Some(jwk_alg) = &jwk.alg {
+            if jwk_alg != algorithm.header_name() {
+                return Err(IdentityError::AlgorithmRejected);
+            }
+        }
+
+        let decoding_key = decoding_key_for(&jwk, algorithm)?;
+        let mut validation = Validation::new(algorithm.jwt_alg());
+        // P2: fail-closed clock-skew — no 60s library default. An assertion
+        // valid only inside the default leeway window is still rejected.
+        validation.leeway = 0;
+        // P2: validate_exp explicit (do not rely on the library default).
+        validation.validate_exp = true;
+        // The header algorithm passed the allowlist above. The library refuses a validation
+        // whose algorithms span key families (RS256 beside ES256), which made the default
+        // `RS256,ES256` allowlist verify nothing; the one algorithm the assertion claims, and
+        // the allowlist already admitted, is what it is decoded under.
+        validation.algorithms = vec![algorithm.jwt_alg()];
+        validation.set_audience(&[self.expected_audience.as_str()]);
+        validation.set_issuer(
+            &self
+                .trusted_issuers
+                .iter()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+        );
+        validation.validate_nbf = true;
+
+        let data =
+            decode::<Claims>(assertion, &decoding_key, &validation).map_err(map_jwt_error)?;
+        let claims = data.claims;
+        if !self.trusted_issuers.contains(&claims.iss) {
+            return Err(IdentityError::IssuerUntrusted);
+        }
+        if !claims.aud.iter().any(|aud| aud == &self.expected_audience) {
+            return Err(IdentityError::AudienceMismatch);
+        }
+
+        Ok(claims.into_principal())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -131,15 +227,7 @@ impl OidcVerifier {
         trusted_issuers: &[&str],
         expected_audience: &str,
     ) -> Result<Self, OidcVerifierError> {
-        if allowed_algorithms.is_empty() {
-            return Err(OidcVerifierError::EmptyAlgorithmAllowlist);
-        }
-        if trusted_issuers.is_empty() {
-            return Err(OidcVerifierError::EmptyTrustedIssuers);
-        }
-        if expected_audience.is_empty() {
-            return Err(OidcVerifierError::EmptyAudience);
-        }
+        let rules = Rules::new(allowed_algorithms, trusted_issuers, expected_audience)?;
 
         let jwks: Jwks = serde_json::from_str(jwks_json)
             .map_err(|e| OidcVerifierError::MalformedJwks(e.to_string()))?;
@@ -153,15 +241,7 @@ impl OidcVerifier {
             return Err(OidcVerifierError::NoKeys);
         }
 
-        Ok(Self {
-            keys,
-            allowed_algorithms: allowed_algorithms.iter().copied().collect(),
-            trusted_issuers: trusted_issuers
-                .iter()
-                .map(|issuer| (*issuer).to_string())
-                .collect(),
-            expected_audience: expected_audience.to_string(),
-        })
+        Ok(Self { keys, rules })
     }
 
     pub fn govern_authorization(
@@ -185,53 +265,8 @@ impl OidcVerifier {
     }
 
     fn verify_real(&self, assertion: &str) -> Result<AuthenticatedPrincipal, IdentityError> {
-        let header = parse_header(assertion)?;
-        let algorithm = parse_algorithm(&header.alg)?;
-        if !self.allowed_algorithms.contains(&algorithm) {
-            return Err(IdentityError::AlgorithmRejected);
-        }
-
-        let kid = header.kid.ok_or(IdentityError::JwksUnavailable)?;
-        let jwk = self.keys.get(&kid).ok_or(IdentityError::JwksUnavailable)?;
-        if let Some(jwk_alg) = &jwk.alg {
-            if jwk_alg != algorithm.header_name() {
-                return Err(IdentityError::AlgorithmRejected);
-            }
-        }
-
-        let decoding_key = decoding_key_for(jwk, algorithm)?;
-        let mut validation = Validation::new(algorithm.jwt_alg());
-        // P2: fail-closed clock-skew — no 60s library default. An assertion
-        // valid only inside the default leeway window is still rejected.
-        validation.leeway = 0;
-        // P2: validate_exp explicit (do not rely on the library default).
-        validation.validate_exp = true;
-        validation.algorithms = self
-            .allowed_algorithms
-            .iter()
-            .map(|alg| alg.jwt_alg())
-            .collect();
-        validation.set_audience(&[self.expected_audience.as_str()]);
-        validation.set_issuer(
-            &self
-                .trusted_issuers
-                .iter()
-                .map(String::as_str)
-                .collect::<Vec<_>>(),
-        );
-        validation.validate_nbf = true;
-
-        let data =
-            decode::<Claims>(assertion, &decoding_key, &validation).map_err(map_jwt_error)?;
-        let claims = data.claims;
-        if !self.trusted_issuers.contains(&claims.iss) {
-            return Err(IdentityError::IssuerUntrusted);
-        }
-        if !claims.aud.iter().any(|aud| aud == &self.expected_audience) {
-            return Err(IdentityError::AudienceMismatch);
-        }
-
-        Ok(claims.into_principal())
+        self.rules
+            .verify(assertion, |kid| self.keys.get(kid).cloned())
     }
 }
 
@@ -250,9 +285,7 @@ impl IdentityAssertionPort for OidcVerifier {
     }
 
     fn is_healthy(&self) -> bool {
-        !self.keys.is_empty()
-            && !self.allowed_algorithms.is_empty()
-            && !self.trusted_issuers.is_empty()
+        !self.keys.is_empty() && self.rules.configured()
     }
 }
 
@@ -265,6 +298,9 @@ struct Jwks {
 struct Jwk {
     kty: String,
     kid: String,
+    /// RFC 7517 `use`; the discovery path drops a key marked for encryption.
+    #[serde(default, rename = "use")]
+    key_use: Option<String>,
     #[serde(default)]
     alg: Option<String>,
     #[serde(default)]

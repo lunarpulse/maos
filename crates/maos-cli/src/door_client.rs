@@ -527,6 +527,18 @@ pub fn print_body(body: &[u8]) {
     let _ = out.write_all(b"\n");
 }
 
+/// Story 23-2 (D-23-2-09 A) — the assertion in an ask body. A credential: `Debug` prints
+/// `<redacted>`, so no derived `Debug` of a request can leak it.
+#[derive(PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
+pub struct CarriedAssertion(pub String);
+
+impl std::fmt::Debug for CarriedAssertion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("<redacted>")
+    }
+}
+
 /// Story 22-4 (D-22-4-05 A) — `POST /v1/spirits/<id>/ask` body, twin of the maos-control
 /// `"ask"` arm.
 #[derive(Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -535,6 +547,8 @@ pub struct AskRequest {
     pub text: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotency_key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assertion: Option<CarriedAssertion>,
 }
 
 /// Story 19-2 (D-19-2-07 A) — `POST /v1/spirits/<id>/pick` body, twin of the

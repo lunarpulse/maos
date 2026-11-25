@@ -378,6 +378,55 @@ fn dispatch_status() -> ExitCode {
     )
 }
 
+/// Story 23-2 (D-23-2-09 A) — the longest assertion file `--assertion-file` reads.
+const MAX_ASSERTION_FILE_BYTES: u64 = 16 * 1024;
+
+/// Read one compact JWT from `path`: a regular file (checked before it is opened, so a FIFO
+/// cannot block the open), at most [`MAX_ASSERTION_FILE_BYTES`], surrounding whitespace
+/// trimmed, the compact-JWT alphabet only. No error text carries the file's content, and the
+/// content is never printed.
+fn read_assertion_file(path: &std::path::Path) -> Result<String, String> {
+    use std::io::Read;
+    let meta = std::fs::metadata(path)
+        .map_err(|error| format!("cannot read the assertion file: {}", error.kind()))?;
+    if !meta.is_file() {
+        return Err("the assertion file is not a regular file".to_owned());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if meta.permissions().mode() & 0o077 != 0 {
+            eprintln!("maosctl: ask — warning: the assertion file is readable by group or others");
+        }
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .and_then(|file| {
+            file.take(MAX_ASSERTION_FILE_BYTES + 1)
+                .read_to_end(&mut bytes)
+        })
+        .map_err(|error| format!("cannot read the assertion file: {}", error.kind()))?;
+    if bytes.len() as u64 > MAX_ASSERTION_FILE_BYTES {
+        return Err(format!(
+            "the assertion file is larger than {MAX_ASSERTION_FILE_BYTES} bytes"
+        ));
+    }
+    let text =
+        String::from_utf8(bytes).map_err(|_| "the assertion file is not UTF-8 text".to_owned())?;
+    let text = text.trim();
+    let compact_jwt = !text.is_empty()
+        && text
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'));
+    if !compact_jwt {
+        return Err(
+            "the assertion file must hold one compact JWT (A-Z a-z 0-9 . _ -) and nothing else"
+                .to_owned(),
+        );
+    }
+    Ok(text.to_owned())
+}
+
 /// Story 22-4 (AC1, AC4) — `maosctl ask <spirit> "<text>" [--wait[=SECS]] [--key K]`.
 ///
 /// The door answers at once with a task id (200) or a typed refusal; none of the refusals
@@ -393,9 +442,18 @@ fn dispatch_ask(args: &AskArgs) -> ExitCode {
             return code;
         }
     }
+    let assertion = match args.assertion_file.as_deref().map(read_assertion_file) {
+        Some(Ok(assertion)) => Some(door_client::CarriedAssertion(assertion)),
+        Some(Err(reason)) => {
+            eprintln!("maosctl: {verb} — {reason}");
+            return ExitCode::from(2);
+        }
+        None => None,
+    };
     let body = match serde_json::to_vec(&door_client::AskRequest {
         text: args.text.clone(),
         idempotency_key: args.key.clone(),
+        assertion,
     }) {
         Ok(body) => body,
         Err(error) => {
@@ -5817,6 +5875,78 @@ mod tests {
     use crate::accessibility::ColorChoice;
     use crate::cli::{Cli, ForgetArgs, InstallArgs, RunArgs, Subcommand};
     use clap::Parser;
+
+    const CANARY_JWT: &str = "canary-head.canary-claims.canary-sig";
+
+    fn assertion_file(contents: &[u8], mode: u32) -> (tempfile::TempDir, std::path::PathBuf) {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("assertion");
+        std::fs::write(&path, contents).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode)).unwrap();
+        (dir, path)
+    }
+
+    /// Story 23-2 AC3 (D-23-2-09 A): `maosctl ask --assertion-file` carries the file's JWT in the
+    /// body; the value is neither in argv nor in any `Debug` rendering.
+    #[test]
+    fn ask_assertion_file_is_read_into_the_body_and_never_into_argv_or_debug() {
+        let (dir, path) = assertion_file(format!("{CANARY_JWT}\n").as_bytes(), 0o600);
+        let path_text = path.to_str().unwrap().to_owned();
+        let cli = Cli::try_parse_from([
+            "maosctl",
+            "ask",
+            "mira",
+            "do the thing",
+            "--assertion-file",
+            &path_text,
+        ])
+        .unwrap();
+        let Subcommand::Ask(args) = &cli.command else {
+            panic!("expected Ask");
+        };
+        assert_eq!(args.assertion_file.as_deref(), Some(path.as_path()));
+        assert!(!format!("{args:?}").contains("canary"), "{args:?}");
+        let assertion = read_assertion_file(path.as_path()).unwrap();
+        assert_eq!(assertion, CANARY_JWT);
+        let request = door_client::AskRequest {
+            text: "do the thing".into(),
+            idempotency_key: None,
+            assertion: Some(door_client::CarriedAssertion(assertion)),
+        };
+        let body: serde_json::Value = serde_json::to_value(&request).unwrap();
+        assert_eq!(body["assertion"], CANARY_JWT);
+        assert!(!format!("{request:?}").contains("canary"), "{request:?}");
+        // Without the flag the body has no `assertion` member at all.
+        let bare = serde_json::to_value(door_client::AskRequest {
+            text: "t".into(),
+            idempotency_key: None,
+            assertion: None,
+        })
+        .unwrap();
+        assert!(bare.get("assertion").is_none());
+        drop(dir);
+    }
+
+    /// The reader refuses what is not one bounded compact JWT in a regular file, and never
+    /// echoes the content.
+    #[test]
+    fn read_assertion_file_refuses_bad_files_without_echo() {
+        let (_dir, empty) = assertion_file(b"  \n", 0o600);
+        let (_dir2, spaced) = assertion_file(b"canary one two", 0o600);
+        let (_dir3, binary) = assertion_file(&[0xff, 0xfe, b'c'], 0o600);
+        let (_dir4, oversize) = assertion_file(&vec![b'a'; 16 * 1024 + 1], 0o600);
+        let (_dir5, exactly) = assertion_file(&vec![b'a'; 16 * 1024], 0o600);
+        for path in [&empty, &spaced, &binary, &oversize] {
+            let error = read_assertion_file(path).unwrap_err();
+            assert!(!error.contains("canary"), "{error}");
+        }
+        assert_eq!(read_assertion_file(&exactly).unwrap().len(), 16 * 1024);
+        let missing = empty.with_file_name("absent");
+        assert!(read_assertion_file(&missing).is_err());
+        // A directory is not a regular file; so is no path at all.
+        assert!(read_assertion_file(empty.parent().unwrap()).is_err());
+    }
 
     #[test]
     fn dispatch_run_hello_spirit() {

@@ -30,7 +30,6 @@
 //! read-only `maos-audit` crate (Story 9.2 Decision A.2 / `maos-audit-read-only`
 //! gate).
 
-use std::net::{IpAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -39,7 +38,7 @@ use maos_audit::AuditError;
 pub use maos_audit::AuditFilter;
 #[cfg(feature = "online-adapters")]
 use maos_domain::outbound::OutboundPolicy;
-use maos_domain::outbound::{ResolveFailed, ResolveHost};
+use maos_domain::outbound::ResolveHost;
 #[cfg(feature = "online-adapters")]
 use maos_domain::ports::KmsError;
 use maos_domain::ports::{
@@ -161,6 +160,9 @@ pub struct EnterpriseRuntime {
     boot_nonce: u64,
     /// Probe of the external KMS endpoint (`None` for a local master key).
     kms_probe: Option<KmsProbeFn>,
+    /// Why SSO was demoted to `ConfiguredDown` at build time (Story 23-2), so
+    /// a denial can say which rule refused the configuration.
+    sso_down_reason: Option<SsoDownReason>,
 }
 
 impl EnterpriseRuntime {
@@ -178,6 +180,7 @@ impl EnterpriseRuntime {
             siem_sink_path: None,
             boot_nonce: 0,
             kms_probe: None,
+            sso_down_reason: None,
         })
     }
 
@@ -191,18 +194,52 @@ impl EnterpriseRuntime {
         boot_nonce: u64,
         kms: Option<&ConfiguredKms>,
     ) -> Result<Self, EnterpriseFailure> {
+        #[cfg(feature = "online-adapters")]
+        let discovery = DiscoveryWiring::production;
+        #[cfg(not(feature = "online-adapters"))]
+        let discovery = || -> Result<DiscoveryWiring, SsoDownReason> {
+            Err(SsoDownReason::DiscoveryUnsupportedBuild)
+        };
+        Self::from_env_with(
+            &SsoEnv::from_process(),
+            &discovery,
+            crypto,
+            audit_db_path,
+            boot_nonce,
+            kms,
+        )
+    }
+
+    /// [`Self::from_env`] with the `MAOS_SSO_*` values and the discovery
+    /// wiring injected (Story 23-2), so tests drive the real constructor
+    /// without mutating the process environment. `discovery` is called only
+    /// when a discovery issuer is configured.
+    pub fn from_env_with(
+        sso_env: &SsoEnv,
+        discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
+        crypto: Arc<dyn CryptoProvider>,
+        audit_db_path: PathBuf,
+        boot_nonce: u64,
+        kms: Option<&ConfiguredKms>,
+    ) -> Result<Self, EnterpriseFailure> {
         let mut config = EnterpriseConfig::from_env();
+        if sso_env.any() {
+            config = config.with_sso_available();
+        }
         let mut identity_port: Option<Arc<dyn IdentityAssertionPort>> = None;
+        let mut sso_down_reason: Option<SsoDownReason> = None;
         let mut kms_port: Option<Arc<dyn KeyManagementPort>> = None;
         let mut siem_port: Option<Arc<dyn SiemProjectionPort>> = None;
         let mut siem_sink_path: Option<PathBuf> = None;
 
         if config.sso_configured() {
-            match build_sso_verifier() {
-                Ok(verifier) if verifier.is_healthy() => {
-                    identity_port = Some(Arc::new(verifier));
+            match build_sso_identity(sso_env, discovery) {
+                Ok(port) => identity_port = Some(port),
+                Err(reason) => {
+                    eprintln!("maos: SSO is configured but down: {reason}");
+                    sso_down_reason = Some(reason);
+                    config = config.with_sso_down();
                 }
-                _ => config = config.with_sso_down(),
             }
         }
 
@@ -226,7 +263,7 @@ impl EnterpriseRuntime {
             }
         }
 
-        let runtime = Self::from_ports(
+        let mut runtime = Self::from_ports(
             config,
             identity_port,
             kms_port,
@@ -236,6 +273,7 @@ impl EnterpriseRuntime {
             siem_sink_path,
             boot_nonce,
         );
+        runtime.sso_down_reason = sso_down_reason;
         Ok(match kms.and_then(ConfiguredKms::probe) {
             Some(probe) => runtime.with_kms_probe(probe),
             None => runtime,
@@ -268,6 +306,33 @@ impl EnterpriseRuntime {
             siem_sink_path,
             boot_nonce,
             kms_probe: None,
+            sso_down_reason: None,
+        }
+    }
+
+    /// Why SSO is `ConfiguredDown` when the build refused its configuration.
+    #[must_use]
+    pub fn sso_down_reason(&self) -> Option<&SsoDownReason> {
+        self.sso_down_reason.as_ref()
+    }
+
+    /// Record why SSO is down (a posture constructor that refused SSO).
+    #[must_use]
+    pub fn with_sso_down_reason(mut self, reason: SsoDownReason) -> Self {
+        self.sso_down_reason = Some(reason);
+        self
+    }
+
+    /// Story 23-2 (D-23-2-04 A) — verify an assertion a door request carries, at accept. `Ok`
+    /// only when SSO is configured, healthy, and the assertion verifies; a Host without SSO
+    /// refuses it (nothing could ever use it). Carries no reason: the door never echoes one.
+    ///
+    /// # Errors
+    /// `()` for every refusal.
+    pub fn check_carried_assertion(&self, assertion: &str) -> Result<(), ()> {
+        match self.verify_principal_for_issuance(0, assertion) {
+            Ok(Some(_)) => Ok(()),
+            _ => Err(()),
         }
     }
 
@@ -352,7 +417,14 @@ impl EnterpriseRuntime {
             }
             SubsystemState::ConfiguredDown => Err(EnterpriseFailure::SsoIssuanceDenied {
                 spirit_pid,
-                reason: "MAOS_SSO_* configured but identity provider is unavailable".to_string(),
+                reason: match &self.sso_down_reason {
+                    Some(why) => {
+                        format!("MAOS_SSO_* configured but identity provider is unavailable: {why}")
+                    }
+                    None => {
+                        "MAOS_SSO_* configured but identity provider is unavailable".to_string()
+                    }
+                },
             }),
         }
     }
@@ -535,6 +607,27 @@ impl EnterpriseRuntime {
     ) -> Option<tokio::task::JoinHandle<()>> {
         self.kms_probe()
             .map(|probe| spawn_kms_probe(probe, KMS_PROBE_INTERVAL, cancel))
+    }
+}
+
+/// Story 23-2 — the verifier [`crate::directed_task::DirectedTasks`] checks a door-carried
+/// assertion with at accept: this Host's own SSO verifier.
+struct RuntimeAssertionCheck(Arc<EnterpriseRuntime>);
+
+impl crate::directed_task::AssertionCheck for RuntimeAssertionCheck {
+    fn check(&self, assertion: &maos_control::Assertion) -> Result<(), ()> {
+        self.0.check_carried_assertion(assertion.expose())
+    }
+}
+
+/// Install the carried-assertion check on `tasks`. Without an enterprise runtime nothing is
+/// installed, so a task that carries an assertion is refused (`AssertionInvalid`).
+pub fn install_assertion_check(
+    tasks: &crate::directed_task::DirectedTasks,
+    enterprise: Option<&Arc<EnterpriseRuntime>>,
+) {
+    if let Some(runtime) = enterprise {
+        tasks.set_assertion_check(Arc::new(RuntimeAssertionCheck(Arc::clone(runtime))));
     }
 }
 
@@ -751,26 +844,6 @@ pub struct KmsEnv<'a> {
     pub any_kms_variable: bool,
 }
 
-/// Name resolution for the boot-time endpoint check, bounded by a 2 s deadline.
-struct SystemResolver;
-
-impl ResolveHost for SystemResolver {
-    fn resolve(&self, host: &str, port: u16) -> Result<Vec<IpAddr>, ResolveFailed> {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let host = host.to_owned();
-        std::thread::spawn(move || {
-            let answers = (host.as_str(), port)
-                .to_socket_addrs()
-                .map(|addresses| addresses.map(|address| address.ip()).collect::<Vec<_>>());
-            let _ = sender.send(answers);
-        });
-        match receiver.recv_timeout(Duration::from_secs(2)) {
-            Ok(Ok(addresses)) => Ok(addresses),
-            _ => Err(ResolveFailed),
-        }
-    }
-}
-
 /// Select the KMS (D-23-8-04 A, D-23-8-07 A). `Ok(None)` only when no
 /// `MAOS_KMS_*` variable is set (the byte-identical Option-A plaintext
 /// default). An invalid configuration is a refusal, never a silent downgrade:
@@ -815,7 +888,7 @@ pub fn configure_kms_from_env() -> Result<Option<ConfiguredKms>, KmsBootRefusal>
             allow_private,
             any_kms_variable: any_env_with_prefix("MAOS_KMS_"),
         },
-        &SystemResolver,
+        &crate::bounded_resolver::system(),
     )
 }
 
@@ -942,15 +1015,158 @@ pub fn spawn_kms_probe(
     })
 }
 
-/// Build the static-JWKS OIDC verifier from `MAOS_SSO_JWKS` /
-/// `MAOS_SSO_ISSUERS` (comma-separated) / `MAOS_SSO_AUDIENCE` /
-/// `MAOS_SSO_ALGS` (optional, default RS256+ES256).
-fn build_sso_verifier() -> Result<OidcVerifier, String> {
-    let jwks = std::env::var("MAOS_SSO_JWKS").map_err(|_| "MAOS_SSO_JWKS absent")?;
-    let issuers_raw = std::env::var("MAOS_SSO_ISSUERS").map_err(|_| "MAOS_SSO_ISSUERS absent")?;
-    let audience = std::env::var("MAOS_SSO_AUDIENCE").map_err(|_| "MAOS_SSO_AUDIENCE absent")?;
-    let algs_raw = std::env::var("MAOS_SSO_ALGS").unwrap_or_else(|_| "RS256,ES256".to_string());
-    let algs: Vec<OidcAlgorithm> = algs_raw
+/// The `MAOS_SSO_*` configuration values (not the per-request assertion), read
+/// once so tests drive the build without touching the process environment.
+#[derive(Debug, Clone, Default)]
+pub struct SsoEnv {
+    pub jwks: Option<String>,
+    pub issuers: Option<String>,
+    pub audience: Option<String>,
+    pub algs: Option<String>,
+    /// Story 23-2 (D-23-2-06 A).
+    pub discovery_issuer: Option<String>,
+    pub jwks_ttl_secs: Option<String>,
+    pub jwks_min_refresh_secs: Option<String>,
+}
+
+impl SsoEnv {
+    #[must_use]
+    pub fn from_process() -> Self {
+        let var = |name: &str| std::env::var(name).ok();
+        Self {
+            jwks: var("MAOS_SSO_JWKS"),
+            issuers: var("MAOS_SSO_ISSUERS"),
+            audience: var("MAOS_SSO_AUDIENCE"),
+            algs: var("MAOS_SSO_ALGS"),
+            discovery_issuer: var("MAOS_SSO_DISCOVERY_ISSUER"),
+            jwks_ttl_secs: var("MAOS_SSO_JWKS_TTL_SECS"),
+            jwks_min_refresh_secs: var("MAOS_SSO_JWKS_MIN_REFRESH_SECS"),
+        }
+    }
+
+    /// Whether any configuration value is present.
+    #[must_use]
+    pub fn any(&self) -> bool {
+        self.jwks.is_some()
+            || self.issuers.is_some()
+            || self.audience.is_some()
+            || self.algs.is_some()
+            || self.discovery_issuer.is_some()
+            || self.tuning_set()
+    }
+
+    fn tuning_set(&self) -> bool {
+        self.jwks_ttl_secs.is_some() || self.jwks_min_refresh_secs.is_some()
+    }
+}
+
+/// Why the SSO configuration was refused. Carries no URL, key or assertion.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SsoDownReason {
+    #[error("{0} absent")]
+    Missing(&'static str),
+    #[error("MAOS_SSO_ALGS resolved to no supported algorithms")]
+    NoAlgorithms,
+    #[error("{0}")]
+    StaticVerifier(String),
+    #[error("static verifier holds no usable key")]
+    Unhealthy,
+    /// `MAOS_SSO_JWKS` and `MAOS_SSO_DISCOVERY_ISSUER` are exclusive.
+    #[error("sso_key_sources_exclusive")]
+    KeySourcesConflict,
+    /// A tuning knob without `MAOS_SSO_DISCOVERY_ISSUER`.
+    #[error("sso_tuning_without_discovery")]
+    TuningWithoutDiscovery,
+    #[error("sso_tuning_invalid: {0}")]
+    TuningInvalid(&'static str),
+    #[error("sso_discovery_needs_online_adapters")]
+    DiscoveryUnsupportedBuild,
+    /// The outbound policy could not be armed (the port does not declare no-follow).
+    #[error("sso_discovery_outbound_unavailable: {0}")]
+    Outbound(&'static str),
+    #[cfg(feature = "online-adapters")]
+    #[error("{0}")]
+    Discovery(maos_sso::discovery::DiscoveryError),
+}
+
+/// What discovery fetches through and reads time from. The production value
+/// is [`Self::production`]; tests inject a scripted fetcher and a manual clock.
+pub struct DiscoveryWiring {
+    #[cfg(feature = "online-adapters")]
+    fetcher: Arc<dyn maos_sso::discovery::Fetcher>,
+    #[cfg(feature = "online-adapters")]
+    clock: Arc<dyn maos_sso::discovery::Clock>,
+}
+
+#[cfg(feature = "online-adapters")]
+impl DiscoveryWiring {
+    #[must_use]
+    pub fn new(
+        fetcher: Arc<dyn maos_sso::discovery::Fetcher>,
+        clock: Arc<dyn maos_sso::discovery::Clock>,
+    ) -> Self {
+        Self { fetcher, clock }
+    }
+
+    /// The kernel HTTP adapter behind the shared outbound policy (strict:
+    /// public https only, no redirect, host names bound to the vetted
+    /// addresses) and the bounded resolver.
+    ///
+    /// # Errors
+    /// [`SsoDownReason::Outbound`] when the policy cannot wrap the adapter.
+    pub fn production() -> Result<Self, SsoDownReason> {
+        let policed = maos_domain::outbound::PolicedIo::new(
+            maos_kernel_core::api::IoSubsystemAdapter::new(),
+            crate::bounded_resolver::system(),
+            OutboundPolicy::strict(),
+        )
+        .map_err(|refusal| SsoDownReason::Outbound(refusal.code()))?;
+        Ok(Self::new(
+            Arc::new(maos_sso::discovery::IoFetcher::new(policed)),
+            Arc::new(maos_sso::discovery::MonotonicClock::new()),
+        ))
+    }
+}
+
+/// Build the SSO verifier from `MAOS_SSO_*` (D-23-2-06 A): the static
+/// `MAOS_SSO_JWKS` path, or discovery of `MAOS_SSO_DISCOVERY_ISSUER`. Both
+/// together, a tuning knob without discovery, and a discovery issuer missing
+/// from `MAOS_SSO_ISSUERS` are refusals. A discovering verifier is returned
+/// even though it holds no key yet (D-23-2-08 A): it reports unhealthy until
+/// the first fetch succeeds, and issuance is denied meanwhile.
+///
+/// # Errors
+/// The [`SsoDownReason`] of the first rule that fails.
+pub fn build_sso_identity(
+    env: &SsoEnv,
+    discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
+) -> Result<Arc<dyn IdentityAssertionPort>, SsoDownReason> {
+    if env.jwks.is_some() && env.discovery_issuer.is_some() {
+        return Err(SsoDownReason::KeySourcesConflict);
+    }
+    if env.discovery_issuer.is_none() && env.tuning_set() {
+        return Err(SsoDownReason::TuningWithoutDiscovery);
+    }
+    let jwks = match env.discovery_issuer {
+        Some(_) => None,
+        None => Some(
+            env.jwks
+                .as_deref()
+                .ok_or(SsoDownReason::Missing("MAOS_SSO_JWKS"))?,
+        ),
+    };
+    let issuers_raw = env
+        .issuers
+        .as_deref()
+        .ok_or(SsoDownReason::Missing("MAOS_SSO_ISSUERS"))?;
+    let audience = env
+        .audience
+        .as_deref()
+        .ok_or(SsoDownReason::Missing("MAOS_SSO_AUDIENCE"))?;
+    let algs: Vec<OidcAlgorithm> = env
+        .algs
+        .as_deref()
+        .unwrap_or("RS256,ES256")
         .split(',')
         .filter_map(|s| match s.trim() {
             "RS256" => Some(OidcAlgorithm::Rs256),
@@ -959,14 +1175,75 @@ fn build_sso_verifier() -> Result<OidcVerifier, String> {
         })
         .collect();
     if algs.is_empty() {
-        return Err("MAOS_SSO_ALGS resolved to no supported algorithms".to_string());
+        return Err(SsoDownReason::NoAlgorithms);
     }
     let issuers: Vec<&str> = issuers_raw
         .split(',')
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .collect();
-    OidcVerifier::from_static_jwks(&jwks, &algs, &issuers, &audience).map_err(|e| e.to_string())
+    match (jwks, env.discovery_issuer.as_deref()) {
+        (Some(jwks), _) => {
+            let verifier = OidcVerifier::from_static_jwks(jwks, &algs, &issuers, audience)
+                .map_err(|e| SsoDownReason::StaticVerifier(e.to_string()))?;
+            if !verifier.is_healthy() {
+                return Err(SsoDownReason::Unhealthy);
+            }
+            Ok(Arc::new(verifier))
+        }
+        (None, Some(issuer)) => {
+            start_discovering(env, issuer, &algs, &issuers, audience, discovery)
+        }
+        (None, None) => Err(SsoDownReason::Missing("MAOS_SSO_JWKS")),
+    }
+}
+
+#[cfg(feature = "online-adapters")]
+fn start_discovering(
+    env: &SsoEnv,
+    issuer: &str,
+    algs: &[OidcAlgorithm],
+    issuers: &[&str],
+    audience: &str,
+    discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
+) -> Result<Arc<dyn IdentityAssertionPort>, SsoDownReason> {
+    use maos_sso::discovery::{DiscoveringVerifier, DiscoveryConfig};
+
+    let seconds = |raw: &str, name: &'static str| {
+        raw.trim()
+            .parse::<u64>()
+            .map_err(|_| SsoDownReason::TuningInvalid(name))
+    };
+    let mut config = DiscoveryConfig::new(issuer);
+    if let Some(raw) = env.jwks_ttl_secs.as_deref() {
+        config = config.with_ttl_secs(seconds(raw, "MAOS_SSO_JWKS_TTL_SECS")?);
+    }
+    if let Some(raw) = env.jwks_min_refresh_secs.as_deref() {
+        config = config.with_min_refresh_secs(seconds(raw, "MAOS_SSO_JWKS_MIN_REFRESH_SECS")?);
+    }
+    let wiring = discovery()?;
+    let verifier = DiscoveringVerifier::start(
+        config,
+        algs,
+        issuers,
+        audience,
+        wiring.fetcher,
+        wiring.clock,
+    )
+    .map_err(SsoDownReason::Discovery)?;
+    Ok(Arc::new(verifier))
+}
+
+#[cfg(not(feature = "online-adapters"))]
+fn start_discovering(
+    _env: &SsoEnv,
+    _issuer: &str,
+    _algs: &[OidcAlgorithm],
+    _issuers: &[&str],
+    _audience: &str,
+    _discovery: &dyn Fn() -> Result<DiscoveryWiring, SsoDownReason>,
+) -> Result<Arc<dyn IdentityAssertionPort>, SsoDownReason> {
+    Err(SsoDownReason::DiscoveryUnsupportedBuild)
 }
 
 fn now_ns() -> Result<u64, std::time::SystemTimeError> {
@@ -1182,6 +1459,7 @@ mod available_arm_tests {
             siem_sink_path,
             boot_nonce: 7,
             kms_probe: None,
+            sso_down_reason: None,
         }
     }
 

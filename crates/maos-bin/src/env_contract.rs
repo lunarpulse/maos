@@ -599,6 +599,21 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
         stability: EnvStability::UserFacing,
     },
     EnvVar {
+        name: "MAOS_SSO_DISCOVERY_ISSUER",
+        purpose: "OIDC issuer URL (https, no userinfo/query/fragment) whose discovery document and rotating keys the verifier follows instead of MAOS_SSO_JWKS; must also be listed in MAOS_SSO_ISSUERS; setting it together with MAOS_SSO_JWKS leaves SSO configured-down; needs the online-adapters build (Story 23-2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_JWKS_TTL_SECS",
+        purpose: "Seconds a discovered key set is trusted (default 3600, 1..=604800); past it assertions fail closed until a refresh succeeds; only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
+        name: "MAOS_SSO_JWKS_MIN_REFRESH_SECS",
+        purpose: "Minimum seconds between two discovery refresh attempts (default 30, at most the TTL); only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
+        stability: EnvStability::UserFacing,
+    },
+    EnvVar {
         name: "MAOS_PDP_POLICY_FILE",
         purpose: "Explicit path to a Cedar (.cedar) PDP policy file (Story 11.4a)",
         stability: EnvStability::UserFacing,

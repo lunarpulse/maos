@@ -7,9 +7,14 @@
 /// than a re-implementation of them.
 #[cfg(feature = "network")]
 pub mod admission;
+/// Story 23-2 (D-23-2-04 A) — the `SupplyAssertion` seam: per-pid turn scope, then the environment.
+pub mod assertion_supply;
 /// Story 22-6 (ADR-072) — audit-store rotation on the Host: the cut-floor registry, the 60 s
 /// policy task and the `audit rotate` door verb.
 pub mod audit_rotation;
+/// Story 23-2 — the production bounded `ResolveHost` (one worker, bounded queue, deadline,
+/// capped answers) shared by every caller that resolves a name the outbound policy vets.
+pub mod bounded_resolver;
 /// Story 18-1 — the `--once` Butler pass verdict.
 #[cfg(feature = "network")]
 pub mod butler_root;

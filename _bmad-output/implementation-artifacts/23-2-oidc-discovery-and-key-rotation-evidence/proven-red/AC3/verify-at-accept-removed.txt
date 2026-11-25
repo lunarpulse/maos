@@ -1,0 +1,2 @@
+Plant E232-PLANT-no-verify: crates/maos-bin/src/directed_task.rs `accept` never refused a carried assertion (`if false && ...`).
+Failing: assertion_scope_23_2: an_invalid_assertion_is_refused_before_anything_is_queued, a_replay_with_a_different_assertion_does_not_rebind_the_task (2 failed, 4 passed); directed_task_22_4: an_invalid_assertion_is_refused_before_anything_is_queued FAILED. Plant removed afterwards.

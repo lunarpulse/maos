@@ -950,6 +950,13 @@ pub struct AskArgs {
     /// task instead of a new one.
     #[arg(long, value_name = "KEY")]
     pub key: Option<String>,
+    /// Story 23-2 (D-23-2-09 A) — read the asking principal's OIDC assertion (a compact JWT) from
+    /// this file and send it in the request body. The value never appears in argv. The Host
+    /// verifies it at accept and uses it for the capability mints of this task's turn; without
+    /// it the task uses the Host's environment assertion. The file must be a regular file of at
+    /// most 16 KiB.
+    #[arg(long, value_name = "PATH")]
+    pub assertion_file: Option<std::path::PathBuf>,
 }
 
 /// Story 22-4 — `maosctl task <op>`.

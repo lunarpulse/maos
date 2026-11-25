@@ -4662,6 +4662,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
             maos_bin::directed_task::TaskLimits::default(),
         );
+        maos_bin::enterprise_identity::install_assertion_check(&tasks, enterprise_runtime.as_ref());
         door.set_directed_tasks(Arc::clone(&tasks));
         directed_tasks = Some(tasks);
     }
@@ -6347,6 +6348,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                                     Arc::clone(&transparency_log),
                                 ),
                                 maos_bin::directed_task::TaskLimits::default(),
+                            );
+                            maos_bin::enterprise_identity::install_assertion_check(
+                                &tasks,
+                                enterprise_runtime.as_ref(),
                             );
                             door.set_directed_tasks(Arc::clone(&tasks));
                             tasks

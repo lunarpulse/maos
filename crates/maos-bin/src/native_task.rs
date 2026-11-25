@@ -195,10 +195,20 @@ impl MiraRunner {
 }
 
 impl TaskRunner for MiraRunner {
-    fn run(&self, task_id: [u8; 16], text: &str) -> Result<String, RunFailure> {
+    fn run(
+        &self,
+        task_id: [u8; 16],
+        text: &str,
+        assertion: Option<&maos_control::Assertion>,
+    ) -> Result<String, RunFailure> {
         let pid = (self.pid_of)().ok_or_else(|| RunFailure {
             reason: "dispatch_refused",
             detail: "Mira has no admitted pid".into(),
+        })?;
+        // The task's assertion governs the mints for Mira's pid for this turn (Story 23-2).
+        let _scope = crate::assertion_supply::enter(pid, assertion).map_err(|_| RunFailure {
+            reason: "dispatch_refused",
+            detail: "an assertion scope is already active for this Spirit".into(),
         })?;
         let answer = self
             .mira

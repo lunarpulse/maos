@@ -1047,9 +1047,15 @@ impl DoorInner {
                 spirit_id,
                 text,
                 idempotency_key,
+                assertion,
             } => {
-                self.ask_command(&spirit_id, &text, idempotency_key.as_deref())
-                    .await
+                self.ask_command(
+                    &spirit_id,
+                    &text,
+                    idempotency_key.as_deref(),
+                    assertion.as_ref(),
+                )
+                .await
             }
             OperatorCommand::RevokeToken { token_id } => self.revoke_token_command(&token_id).await,
             OperatorCommand::ImportRevocations { crl } => {
@@ -2884,6 +2890,7 @@ impl DoorInner {
         spirit_id: &str,
         text: &str,
         idempotency_key: Option<&str>,
+        assertion: Option<&maos_control::Assertion>,
     ) -> OperatorOutcome {
         let Some(pid) = self.scheduler.resolve_pid(spirit_id) else {
             return Self::spirit_not_loaded(spirit_id);
@@ -2938,15 +2945,17 @@ impl DoorInner {
             return Self::not_directable(spirit_id, form);
         }
         let accepted = {
-            let (tasks, spirit_id, text, key) = (
+            let (tasks, spirit_id, text, key, assertion) = (
                 Arc::clone(&tasks),
                 spirit_id.to_owned(),
                 text.to_owned(),
                 idempotency_key.map(str::to_owned),
+                assertion.cloned(),
             );
-            // The accept row and the key lookup read and write the Transparency Log.
+            // The accept row and the key lookup read and write the Transparency Log; a carried
+            // assertion is verified here too, which may wait on the identity provider.
             match tokio::task::spawn_blocking(move || {
-                tasks.accept(&spirit_id, &text, key.as_deref())
+                tasks.accept(&spirit_id, &text, key.as_deref(), assertion.as_ref())
             })
             .await
             {
@@ -2980,6 +2989,11 @@ impl DoorInner {
             Err(crate::directed_task::AcceptError::Log(error)) => OperatorOutcome::Failed {
                 code: "task_log_failed".into(),
                 detail: format!("{error}; nothing was queued"),
+            },
+            // Typed, and no echo of the assertion or of why it failed (Story 23-2 AC3).
+            Err(crate::directed_task::AcceptError::AssertionInvalid) => OperatorOutcome::Invalid {
+                code: "sso_assertion_invalid".into(),
+                detail: "the carried assertion was refused; nothing was queued".into(),
             },
         }
     }

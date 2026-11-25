@@ -1,0 +1,2 @@
+Plant E232-PLANT-both-keys: crates/maos-bin/src/enterprise_identity.rs `build_sso_identity` exclusivity check disabled (`if false && ...`), so discovery is taken when both MAOS_SSO_JWKS and MAOS_SSO_DISCOVERY_ISSUER are set.
+cargo test -p maos-bin --test enterprise_identity_wiring: jwks_and_discovery_together_are_configured_down FAILED (tests/enterprise_identity_wiring.rs:278:5); 9 passed, 1 failed. Plant removed afterwards.

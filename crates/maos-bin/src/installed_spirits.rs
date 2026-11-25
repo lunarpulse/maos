@@ -256,6 +256,7 @@ impl InstalledSpirits {
                 maos_iac::adapter::mailbox::ReplyLabel::Shell,
                 iac,
                 &runtime,
+                None,
             )
         })
         .map_err(|failure| match failure {
@@ -345,10 +346,18 @@ pub fn run_turn(
     label: maos_iac::adapter::mailbox::ReplyLabel,
     iac: &maos_iac::adapter::IacBusAdapter,
     runtime: &tokio::runtime::Handle,
+    assertion: Option<&maos_control::Assertion>,
 ) -> Result<String, TurnFailure> {
     use crate::spirit_session::TurnError;
     let _serial = port.serialize();
     let (pid, generation) = port.await_ready().map_err(TurnFailure::Turn)?;
+    // The task's assertion governs the mints for this pid for exactly this turn (Story 23-2,
+    // D-23-2-04 A): `_scope` is dropped on every exit path below.
+    let _scope = crate::assertion_supply::enter(pid, assertion).map_err(|_| {
+        TurnFailure::DispatchRefused(
+            "an assertion scope is already active for this Spirit".to_owned(),
+        )
+    })?;
     let deadline = std::time::Instant::now() + port.turn_budget();
     let turn = port
         .arm_labelled(label, frame_id, name, pid, generation, deadline)
@@ -411,6 +420,7 @@ impl crate::directed_task::TaskRunner for PortRunner {
         &self,
         task_id: [u8; 16],
         text: &str,
+        assertion: Option<&maos_control::Assertion>,
     ) -> Result<String, crate::directed_task::RunFailure> {
         run_turn(
             &self.port,
@@ -420,6 +430,7 @@ impl crate::directed_task::TaskRunner for PortRunner {
             maos_iac::adapter::mailbox::ReplyLabel::Task,
             &self.iac,
             &self.runtime,
+            assertion,
         )
         .map_err(|failure| crate::directed_task::RunFailure {
             reason: failure.reason(),

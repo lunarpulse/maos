@@ -7,6 +7,8 @@
 #![cfg(all(target_os = "linux", feature = "network", feature = "wasm-host"))]
 #![forbid(unsafe_code)]
 
+#[path = "support/sso_principals_23_2.rs"]
+mod sso;
 #[path = "../../../tests/harness/registry_20_1.rs"]
 mod support;
 
@@ -69,6 +71,8 @@ struct Host {
     child: Option<Child>,
     /// The cast holds the native class `nash` beside the probe.
     native: bool,
+    /// Extra environment for `maos serve` only (Story 23-2: the SSO configuration).
+    serve_env: Vec<(&'static str, String)>,
 }
 
 impl Host {
@@ -131,6 +135,7 @@ impl Host {
             config,
             child: None,
             native,
+            serve_env: Vec::new(),
         }
     }
 
@@ -145,7 +150,14 @@ impl Host {
             .env_remove("MAOS_LOOM_POSTGRES")
             .env_remove("MAOS_LOOM_HOME_TEAM")
             .env_remove("MAOS_CROSS_TEAM_SHARE_PEER")
+            // Story 23-2 hygiene: no ambient SSO configuration and no ambient audit key.
+            .env_remove("MAOS_AUDIT_KEY")
             .current_dir(root());
+        for (name, _) in std::env::vars_os() {
+            if name.to_string_lossy().starts_with("MAOS_SSO_") {
+                command.env_remove(&name);
+            }
+        }
         command
     }
 
@@ -162,6 +174,11 @@ impl Host {
             .env(
                 "MAOS_REPLAY_CASSETTE",
                 root().join("crates/maos-journey-test/cassettes/j-butler/on-idle-halt.json"),
+            )
+            .envs(
+                self.serve_env
+                    .iter()
+                    .map(|(name, value)| (*name, value.as_str())),
             )
             .stdout(Stdio::null())
             .stderr(log)
@@ -647,5 +664,260 @@ fn task_show_reads_the_audit_trail_after_a_restart() {
         1,
         "a stop never re-runs a running task"
     );
+    host.stop("-TERM");
+}
+
+// ── Story 23-2 AC3 — the per-request assertion, against a real daemon ───────────────────────
+//
+// The Host runs with SSO configured over a static JWKS and `MAOS_SSO_ASSERTION` = the environment
+// principal. Every capability mint during a turn writes one `identity.asserted` row (kind 30)
+// naming the principal it verified. `maosctl ask --assertion-file` carries a different one.
+
+impl Host {
+    fn with_sso(mut self) -> Self {
+        self.serve_env = vec![
+            ("MAOS_SSO_JWKS", sso::JWKS.to_owned()),
+            ("MAOS_SSO_ISSUERS", sso::ISS.to_owned()),
+            ("MAOS_SSO_AUDIENCE", sso::AUD.to_owned()),
+            ("MAOS_SSO_ASSERTION", sso::TOKEN_ENV.to_owned()),
+        ];
+        self
+    }
+
+    /// A private (0600) file holding `token`, for `--assertion-file`.
+    fn assertion_file(&self, name: &str, token: &str) -> String {
+        use std::os::unix::fs::PermissionsExt;
+        let path = self.scratch.0.join(name);
+        std::fs::write(&path, format!("{token}\n")).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
+    /// Every `identity.asserted` row so far, oldest first: (spirit pid, subject, issuer).
+    fn identities(&self) -> Vec<(i64, String, String)> {
+        let conn = self.journal();
+        let mut statement = conn
+            .prepare(
+                "SELECT spirit_pid, payload_redacted FROM transparency_log \
+                 WHERE kind = 30 ORDER BY rowid",
+            )
+            .unwrap();
+        let rows = statement
+            .query_map([], |row| {
+                let pid: i64 = row.get(0)?;
+                let payload: rusqlite::types::Value = row.get(1)?;
+                Ok((pid, payload))
+            })
+            .unwrap();
+        rows.map(|row| {
+            let (pid, payload) = row.unwrap();
+            let bytes = match payload {
+                rusqlite::types::Value::Blob(bytes) => bytes,
+                rusqlite::types::Value::Text(text) => text.into_bytes(),
+                other => panic!("unexpected payload column: {other:?}"),
+            };
+            let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            (
+                pid,
+                json["subject"].as_str().unwrap().to_owned(),
+                json["issuer"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect()
+    }
+
+    /// `maosctl ask --wait`, expecting a completed task.
+    fn ask_completed(&self, args: &[&str]) -> serde_json::Value {
+        let mut full = vec!["ask", ID];
+        full.extend_from_slice(args);
+        full.push("--wait");
+        let out = self.ctl(&full);
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "ask {args:?}: {}\n{}",
+            text(&out),
+            self.stderr()
+        );
+        let shown: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert_eq!(shown["state"], "completed", "{shown}");
+        shown
+    }
+
+    /// Rows of the audit store whose text columns contain `needle`.
+    fn rows_containing(&self, needle: &str) -> i64 {
+        self.count(
+            "SELECT COUNT(*) FROM transparency_log WHERE \
+             instr(CAST(payload_redacted AS TEXT), ?1) > 0 OR instr(intent, ?1) > 0 \
+             OR instr(COALESCE(correlation_id, ''), ?1) > 0 \
+             OR instr(CAST(capability_token AS TEXT), ?1) > 0",
+            [needle],
+        )
+    }
+
+    fn accepted_rows(&self) -> i64 {
+        self.count(
+            "SELECT COUNT(*) FROM transparency_log WHERE intent LIKE 'task.%:accepted'",
+            [],
+        )
+    }
+}
+
+/// AC3 attribution: the mints of a task's turn verify THAT task's assertion and their
+/// `identity.asserted` rows carry its `sub` and `iss`.
+#[test]
+fn an_ask_with_its_own_assertion_mints_under_that_principal() {
+    let mut host = Host::new(false).with_sso();
+    host.boot();
+    let before = host.identities().len();
+    let file = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
+    host.ask_completed(&["on my behalf", "--assertion-file", &file]);
+    let rows = host.identities();
+    let turn = &rows[before..];
+    assert!(
+        !turn.is_empty(),
+        "the turn minted at least once\n{}",
+        host.stderr()
+    );
+    for (_, subject, issuer) in turn {
+        assert_eq!(subject, sso::SUB_ALICE, "{rows:?}");
+        assert_eq!(issuer, sso::ISS);
+    }
+    // A mint outside that turn, on the same Host, is the environment's principal again.
+    let after = host.identities().len();
+    host.ask_completed(&["on the Host's behalf"]);
+    let rows = host.identities();
+    assert!(rows.len() > after, "the second turn minted too");
+    for (_, subject, _) in &rows[after..] {
+        assert_eq!(subject, sso::SUB_ENV, "{rows:?}");
+    }
+    host.stop("-TERM");
+}
+
+/// D-23-2-05 A: a task without an assertion uses the environment's, as before this story.
+#[test]
+fn an_ask_without_an_assertion_uses_the_environment() {
+    let mut host = Host::new(false).with_sso();
+    host.boot();
+    let before = host.identities().len();
+    host.ask_completed(&["no assertion carried"]);
+    let rows = host.identities();
+    assert!(rows.len() > before, "the turn minted\n{}", host.stderr());
+    for (_, subject, issuer) in &rows[before..] {
+        assert_eq!(subject, sso::SUB_ENV, "{rows:?}");
+        assert_eq!(issuer, sso::ISS);
+    }
+    host.stop("-TERM");
+}
+
+/// AC3 refusal: an assertion that does not verify, or that a Host without SSO cannot verify, is
+/// refused typed at accept and nothing is queued.
+#[test]
+fn an_invalid_assertion_is_refused_before_anything_is_queued() {
+    for configured in [true, false] {
+        let mut host = Host::new(false);
+        if configured {
+            host = host.with_sso();
+        }
+        host.boot();
+        let token = if configured {
+            sso::TOKEN_FORGED
+        } else {
+            sso::TOKEN_ALICE
+        };
+        let file = host.assertion_file("refused.jwt", token);
+        let out = host.ctl(&["ask", ID, "refuse me", "--assertion-file", &file]);
+        assert_eq!(out.status.code(), Some(1), "{}", text(&out));
+        assert!(
+            text(&out).contains("sso_assertion_invalid"),
+            "{}",
+            text(&out)
+        );
+        assert!(!text(&out).contains(token.split('.').nth(2).unwrap()));
+        assert_eq!(host.accepted_rows(), 0, "nothing was queued");
+        assert_eq!(
+            host.count(
+                "SELECT COUNT(*) FROM transparency_log WHERE intent LIKE ?1",
+                ["operator.ask.%:sso_assertion_invalid"],
+            ),
+            1,
+            "the receipt names the typed refusal"
+        );
+        // The Host is unharmed: an ask without an assertion still completes.
+        host.ask_completed(&["still serving"]);
+        host.stop("-TERM");
+    }
+}
+
+/// AC3 confidentiality (canary): the carried assertion appears in no Transparency Log row (accept,
+/// `TaskAssign`, reply, terminal, the `operator.ask` receipt), in no task body, no reply, no
+/// error and no stderr; and it never reaches the Spirit: the `TaskAssign` payload is the one an
+/// ask without an assertion produces.
+#[test]
+fn an_asks_assertion_appears_in_no_row_reply_or_error() {
+    let mut host = Host::new(false).with_sso();
+    host.boot();
+    let file = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
+    let parts: Vec<&str> = sso::TOKEN_ALICE.split('.').collect();
+    let words = "identical words for both asks";
+
+    let with = host.ask(&[words, "--assertion-file", &file]);
+    let (shown_with, _) = host.finished(&with);
+    let without = host.ask(&[words]);
+    let (shown_without, _) = host.finished(&without);
+
+    // The Spirit sees the same TaskAssign either way.
+    let payload = |id: &str| -> Vec<u8> {
+        let bytes = ulid::Ulid::from_string(id).unwrap().to_bytes();
+        host.journal()
+            .query_row(
+                "SELECT CAST(payload_redacted AS BLOB) FROM transparency_log \
+                 WHERE frame_id = ?1 AND kind = 0",
+                [&bytes[..]],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+    assert_eq!(payload(&with), payload(&without));
+
+    // No row carries the token or either of its secret-bearing segments.
+    for needle in [sso::TOKEN_ALICE, parts[1], parts[2]] {
+        assert_eq!(
+            host.rows_containing(needle),
+            0,
+            "a row carries the assertion"
+        );
+    }
+    // No task body, no stderr.
+    for surface in [&shown_with, &shown_without, &host.stderr()] {
+        for needle in [sso::TOKEN_ALICE, parts[1], parts[2]] {
+            assert!(!surface.contains(needle), "{surface}");
+        }
+    }
+    host.stop("-TERM");
+}
+
+/// AC3 replay: an idempotent replay with a different assertion returns the first task and does
+/// not re-bind it.
+#[test]
+fn a_replay_with_a_different_assertion_returns_the_first_task() {
+    let mut host = Host::new(false).with_sso();
+    host.boot();
+    let alice = host.assertion_file("alice.jwt", sso::TOKEN_ALICE);
+    let bob = host.assertion_file("bob.jwt", sso::TOKEN_BOB);
+    let before = host.identities().len();
+    let first = host.ask(&["once", "--key", "replay-23-2", "--assertion-file", &alice]);
+    let second = host.ask(&["once", "--key", "replay-23-2", "--assertion-file", &bob]);
+    assert_eq!(first, second, "the replay returns the first task");
+    host.finished(&first);
+    let rows = host.identities();
+    assert!(rows.len() > before);
+    for (_, subject, _) in &rows[before..] {
+        assert_eq!(
+            subject,
+            sso::SUB_ALICE,
+            "bob never bound the task: {rows:?}"
+        );
+    }
     host.stop("-TERM");
 }

@@ -933,7 +933,7 @@ fn composition_root_does_not_seed_manifest_scopes() {
     // Story 20-9 — 39 → 40: `spawned_lifecycle.rs` joins it.
     // Story 20-9 (round 4) — 40 → 41: `invocation.rs` joins it.
     // Ring the doorbell, do not widen the wall.
-    const SCANNED_SOURCE_FILES: [(&str, &str); 49] = [
+    const SCANNED_SOURCE_FILES: [(&str, &str); 51] = [
         ("main.rs", include_str!("../src/main.rs")),
         ("workflow.rs", include_str!("../src/workflow.rs")),
         ("invocation.rs", include_str!("../src/invocation.rs")),
@@ -1121,6 +1121,18 @@ fn composition_root_does_not_seed_manifest_scopes() {
         // Inference Port). It reads only its own pid-bound memory and never seeds the
         // manifest-derived policy table.
         ("native_task.rs", include_str!("../src/native_task.rs")),
+        // Story 23-2 — the per-pid assertion scope registry. It reads only the process
+        // environment and never seeds the manifest-derived policy table.
+        (
+            "assertion_supply.rs",
+            include_str!("../src/assertion_supply.rs"),
+        ),
+        // Story 23-2 — the bounded name resolver. It reads only DNS answers and never seeds the
+        // manifest-derived policy table.
+        (
+            "bounded_resolver.rs",
+            include_str!("../src/bounded_resolver.rs"),
+        ),
         // Story 22-8 — the in-process A2A cast. It reads only declared peers and journals only
         // the advisory rows; it never seeds the manifest-derived policy table.
         ("loopback_cast.rs", include_str!("../src/loopback_cast.rs")),

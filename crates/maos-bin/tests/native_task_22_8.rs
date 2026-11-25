@@ -243,6 +243,7 @@ fn mira_answers_a_directed_task_and_its_reply_row_is_journaled() {
             "mira",
             "payments-api is throwing errors since the deploy",
             None,
+            None,
         )
         .expect("mira is directable");
     let record = finished(&tasks, &accepted.task_id);
@@ -269,7 +270,7 @@ fn mira_answers_a_directed_task_and_its_reply_row_is_journaled() {
     assert_eq!(again.result, record.result);
 
     // The second diagnosis of the subject counts the first (her own pid-bound memory).
-    let second = tasks.accept("mira", KNOWN, None).unwrap();
+    let second = tasks.accept("mira", KNOWN, None, None).unwrap();
     let second = finished(&tasks, &second.task_id);
     let answer: serde_json::Value =
         serde_json::from_str(second.result.as_deref().unwrap()).unwrap();
@@ -286,7 +287,7 @@ fn a_low_confidence_task_ends_halted() {
     let kernel = Kernel::new();
     let tasks = kernel.tasks();
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
-    let accepted = tasks.accept("mira", SEVERE_UNKNOWN, None).unwrap();
+    let accepted = tasks.accept("mira", SEVERE_UNKNOWN, None, None).unwrap();
     let record = finished(&tasks, &accepted.task_id);
     assert_eq!(record.state, TaskState::Halted, "{record:?}");
     let halt = record.halt.expect("the task names its halt");
@@ -312,9 +313,9 @@ fn the_registry_exists_without_installed_members() {
     assert!(!tasks.is_directable("mira"));
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
     assert!(tasks.is_directable("mira"));
-    let accepted = tasks.accept("mira", KNOWN, Some("idem-1")).unwrap();
+    let accepted = tasks.accept("mira", KNOWN, Some("idem-1"), None).unwrap();
     assert!(!accepted.replayed);
-    let replayed = tasks.accept("mira", KNOWN, Some("idem-1")).unwrap();
+    let replayed = tasks.accept("mira", KNOWN, Some("idem-1"), None).unwrap();
     assert!(
         replayed.replayed,
         "22-4's idempotency key applies unchanged"
@@ -328,7 +329,9 @@ fn a_task_that_is_not_a_signal_ends_failed_with_a_typed_reason() {
     let kernel = Kernel::new();
     let tasks = kernel.tasks();
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
-    let accepted = tasks.accept("mira", "the database is slow", None).unwrap();
+    let accepted = tasks
+        .accept("mira", "the database is slow", None, None)
+        .unwrap();
     let record = finished(&tasks, &accepted.task_id);
     assert_eq!(record.state, TaskState::Failed);
     assert_eq!(record.reason.as_deref(), Some("invalid_task"));
@@ -341,7 +344,7 @@ fn nash_stays_not_directable() {
     tasks.register("mira", Arc::new(kernel.mira_runner(None)));
     assert!(!tasks.is_directable("nash"));
     assert_eq!(
-        tasks.accept("nash", "architect something", None),
+        tasks.accept("nash", "architect something", None, None),
         Err(AcceptError::NotDirectable)
     );
 }
