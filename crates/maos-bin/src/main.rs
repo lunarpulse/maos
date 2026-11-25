@@ -818,35 +818,27 @@ fn eval_failed(error: String) -> i32 {
 /// Story 18-1 / 18-3 — the door-staged TARGET manifest, gated (its declared
 /// providers name a successor's token).
 #[cfg(feature = "network")]
-fn gate_staged(staged: &std::path::Path) -> Result<maos_bin::admission::GatedManifest, String> {
+fn gate_staged(text: &str) -> Result<maos_bin::admission::GatedManifest, String> {
     // Provider declarations only: constructor callers never use this value's
     // storage_identity; ownership is bound by the load/admit/start boundary.
-    maos_bin::admission::read_manifest(staged)
-        .and_then(|text| {
-            maos_bin::admission::gate_manifest(&text, &|name| classify_spirit(name).is_some())
-        })
-        .map_err(|refusal| format!("staged manifest {}: {refusal}", staged.display()))
+    maos_bin::admission::gate_manifest(text, &|name| classify_spirit(name).is_some())
+        .map_err(|refusal| format!("target manifest: {refusal}"))
 }
 
 /// Story 16-1 (D-16-1-W) — re-parse `[epistemic_policy]` from the TARGET
-/// manifest for the successor factory's butler arm.
+/// manifest text for the successor factory's butler arm.
 /// `SpiritManifestBundle` carries no such section (widening it is a kernel
-/// byte), so the factory needs the file the door staged.
+/// byte), so the factory needs the text the caller gated.
 #[cfg(feature = "network")]
 fn read_butler_epistemic_policy(
-    path: &std::path::Path,
+    text: &str,
 ) -> Result<
     maos_kernel_core::security::manifest::EpistemicPolicySection,
     maos_kernel_core::lifecycle::UpgradeError,
 > {
-    let text = std::fs::read_to_string(path).map_err(|error| {
+    let root: toml::Value = toml::from_str(text).map_err(|error| {
         maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
-            reason: format!("read {}: {error}", path.display()),
-        }
-    })?;
-    let root: toml::Value = toml::from_str(&text).map_err(|error| {
-        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
-            reason: format!("parse {}: {error}", path.display()),
+            reason: format!("parse target manifest: {error}"),
         }
     })?;
     let section = root.get("epistemic_policy").ok_or_else(|| {
@@ -921,15 +913,17 @@ type ResearcherSlot = Arc<std::sync::Mutex<Option<maos_bin::researcher_root::Res
 /// inference bindings, mira's boot-loud scalar transport) that only exist in
 /// that composition root.
 ///
-/// `target_manifest` is the target manifest path: a faithful butler re-parses
-/// `[epistemic_policy]` from the file, because `SpiritManifestBundle` carries
-/// no such section and widening it is a kernel byte. A bare `Butler::new()`
-/// silently loses the halt.
+/// `target_manifest` is the TEXT of the target manifest, the very bytes the
+/// caller gated and admitted (never a pathname reread: a file that changes
+/// between the two reads must not change the bound model). A faithful butler
+/// re-parses `[epistemic_policy]` from it, because `SpiritManifestBundle`
+/// carries no such section and widening it is a kernel byte. A bare
+/// `Butler::new()` silently loses the halt.
 #[cfg(feature = "network")]
 fn build_spirit_obj(
     deps: &SpiritBuildDeps,
     class_name: &str,
-    target_manifest: Option<&std::path::Path>,
+    target_manifest: Option<&str>,
 ) -> Result<Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>, String> {
     use maos_kernel_core::scheduler::make_spirit_obj;
 
@@ -1091,6 +1085,59 @@ fn build_spirit_obj(
             make_spirit_obj(butler)
         }
     })
+}
+
+/// The door's gate-then-build step over ONE manifest text: the text that is gated,
+/// pin-checked and admitted is the same text the class constructor binds from. The
+/// pathname only locates a registry package; it is never reread for a binding, so a file
+/// that changes between the door's read and the build cannot change the bound model.
+#[cfg(feature = "network")]
+fn prepare_spirit_from(
+    catalog: Option<&maos_bin::admission::ProviderCatalog>,
+    build: &SpiritBuildDeps,
+    manifest: &std::path::Path,
+    manifest_toml: &str,
+) -> Result<
+    (
+        maos_bin::admission::GatedManifest,
+        Arc<dyn maos_kernel_core::scheduler::control_block::AnySpiritObj>,
+    ),
+    maos_bin::admission::AdmissionRefusal,
+> {
+    let mut gated =
+        maos_bin::admission::gate_manifest(manifest_toml, &|name| classify_spirit(name).is_some())?;
+    gated.bind_registry_package_at(manifest)?;
+    maos_bin::admission::check_gated_pins(&gated, catalog)?;
+    gated.require_in_process("operator door")?;
+    if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
+        && classify_spirit(&gated.class_section.name) == Some(LoadedSpiritKind::Mira)
+    {
+        return Err(
+            maos_bin::admission::AdmissionRefusal::EpistemicPortRequired {
+                detail: format!(
+                    "{} requires a synchronous epistemic halt port",
+                    gated.class_section.name
+                ),
+            },
+        );
+    }
+    let spirit_obj = build_spirit_obj(build, &gated.class_section.name, Some(manifest_toml))
+        .map_err(|detail| maos_bin::admission::AdmissionRefusal::ClassBuild { detail })?;
+    Ok((gated, spirit_obj))
+}
+
+/// The text a door `load` gates, pin-checks and builds from: the bytes the door already read
+/// when it keyed the Spirit lock, and only when it read none, the pathname. The pathname is
+/// never reread over a pre-read text.
+#[cfg(feature = "network")]
+fn door_manifest_text(
+    manifest: &std::path::Path,
+    pread: Option<Arc<String>>,
+) -> Result<Arc<String>, maos_bin::admission::AdmissionRefusal> {
+    match pread {
+        Some(text) => Ok(text),
+        None => Ok(Arc::new(maos_bin::admission::read_manifest(manifest)?)),
+    }
 }
 #[cfg(feature = "network")]
 /// Story 8.14b — Live MCP port for Butler. Wraps the kernel's
@@ -3322,10 +3369,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // factory creates a new concrete Spirit for every successor manifest;
     // upgrade code is never given the predecessor object.
     // Story 16-1 (D-16-1-W) — where the door's upgrade handler stages the
-    // TARGET manifest path for the factory's butler arm: the kernel factory
-    // signature passes only the parsed bundle, which carries no source path,
-    // but a FAITHFUL butler successor must re-parse `[epistemic_policy]` from
-    // the target file. The door stages before the upgrade and clears after.
+    // TARGET manifest path for the factory: the kernel factory signature
+    // passes only the parsed bundle, which carries no source path, but a
+    // FAITHFUL butler successor must re-parse `[epistemic_policy]` from the
+    // target manifest. The in-process factory reads the staged file once and
+    // builds from that text; the door stages before the upgrade and clears after.
     let successor_manifest_slot = maos_bin::operator_door::SuccessorManifestSlot::default();
     // Moved clones for the factory closure (`SuccessorSpiritFactory` is
     // 'static; it cannot borrow the composition root).
@@ -3372,20 +3420,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // S1 (Q6) — the successor's model pins are validated before anything is built, so a
             // refused pin leaves the predecessor serving. Every swap policy, hop and form
             // (in-process or spawned) is created here; the staged text is what the door vetted.
-            if let Some(staged) = factory_successor_slot.peek() {
-                maos_bin::admission::read_manifest(&staged)
-                    .and_then(|text| {
-                        maos_bin::admission::check_staged_pins(
-                            &text,
-                            factory_provider_catalog.get(),
-                        )
-                    })
-                    .map_err(|refusal| {
-                        maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
-                            reason: refusal.to_string(),
-                        }
-                    })?;
-            }
+            // The one read of the staged text: it is checked here and the same bytes build the
+            // successor below, so a file that changes in between cannot change the bound model.
+            let staged_text = match factory_successor_slot.peek() {
+                Some(staged) => Some(
+                    maos_bin::admission::read_manifest(&staged)
+                        .and_then(|text| {
+                            maos_bin::admission::check_staged_pins(
+                                &text,
+                                factory_provider_catalog.get(),
+                            )
+                            .map(|()| text)
+                        })
+                        .map_err(|refusal| {
+                            maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory {
+                                reason: refusal.to_string(),
+                            }
+                        })?,
+                ),
+                None => None,
+            };
             // Story 20-9 — a swap replaces a spawned Spirit with a spawned successor, and an
             // in-process one with an in-process successor; the form never changes at a pid.
             let successor_spawned = !class.forms.iter().any(|form| form == "rust-inproc");
@@ -3467,7 +3521,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     redistill_sink: Arc::clone(&factory_redistill_sink),
                 },
                 &class.name,
-                factory_successor_slot.peek().as_deref(),
+                staged_text.as_deref(),
             )
             .map_err(|reason| {
                 maos_kernel_core::lifecycle::UpgradeError::SuccessorFactory { reason }
@@ -10969,31 +11023,12 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         ),
         maos_bin::admission::AdmissionRefusal,
     > {
-        let mut gated = maos_bin::admission::gate_manifest(&manifest_toml, &|name| {
-            classify_spirit(name).is_some()
-        })?;
-        gated.bind_registry_package_at(manifest)?;
-        maos_bin::admission::check_gated_pins(&gated, self.provider_catalog.get())?;
-        gated.require_in_process("operator door")?;
-        if requires_epistemic_halt_port(gated.epistemic_policy.as_ref())
-            && classify_spirit(&gated.class_section.name) == Some(LoadedSpiritKind::Mira)
-        {
-            return Err(
-                maos_bin::admission::AdmissionRefusal::EpistemicPortRequired {
-                    detail: format!(
-                        "{} requires a synchronous epistemic halt port",
-                        gated.class_section.name
-                    ),
-                },
-            );
-        }
-        let spirit_obj = build_spirit_obj(
+        prepare_spirit_from(
+            self.provider_catalog.get(),
             &self.spirit_build,
-            &gated.class_section.name,
-            Some(manifest),
+            manifest,
+            manifest_toml,
         )
-        .map_err(|detail| maos_bin::admission::AdmissionRefusal::ClassBuild { detail })?;
-        Ok((gated, spirit_obj))
     }
 
     async fn load_spirit(
@@ -11001,10 +11036,7 @@ impl maos_bin::operator_door::BinPrivateOps for BinPrivateOpsImpl {
         manifest: &std::path::Path,
         pread: Option<std::sync::Arc<String>>,
     ) -> Result<maos_bin::admission::Admitted, maos_bin::admission::AdmissionRefusal> {
-        let manifest_toml = match pread {
-            Some(text) => text,
-            None => std::sync::Arc::new(maos_bin::admission::read_manifest(manifest)?),
-        };
+        let manifest_toml = door_manifest_text(manifest, pread)?;
         let (gated, spirit_obj) =
             self.prepare_spirit(manifest, &manifest_toml)
                 .map_err(|refusal| {
@@ -18544,3 +18576,7 @@ mod provider_config_review {
 #[cfg(all(test, feature = "network"))]
 #[path = "../tests/support/uninstall_review_20_11.rs"]
 mod uninstall_review_20_11;
+
+#[cfg(all(test, feature = "network"))]
+#[path = "../tests/support/door_bind_27_1.rs"]
+mod door_bind_27_1;
