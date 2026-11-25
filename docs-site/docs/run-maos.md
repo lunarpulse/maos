@@ -161,7 +161,8 @@ breaking TLS) can keep a withdrawn key valid for the full TTL. A key set that is
 malformed (as opposed to validly empty) keeps the old keys. A fetch that does not answer
 within 30 s is abandoned; an issuer that never answers at all leaves discovery down until
 it does. A cohort digest read is verified inside the cohort lock without ever waiting for
-the identity provider, so the first digest request after an IdP key rotation is refused.
+the identity provider, so the first digest request after an IdP key rotation can be refused
+(unless a refresh has already published the key).
 A retry usually recovers only after the refresh limiter has reopened (a new key id that
 arrives within the minimum refresh interval of the previous refresh is refused without
 scheduling a refresh) and a refresh has started and published, so repeated refusals are
@@ -175,7 +176,7 @@ on the next successful publication, normally the half-TTL idle refresh (about ha
 a completion bound). A token's key is rechecked just before it is minted; a key withdrawn
 by a publication after that check and before the token is stored (the duration of the
 mint, with no fixed bound) is not detected, which is small against the TTL-long
-revocation window above and is an operator-accepted residual. A `MAOS_SSO_*`
+revocation window above; this residual needs operator acceptance (item I, not yet ruled). A `MAOS_SSO_*`
 variable that is not valid UTF-8 leaves SSO configured-down
 (`sso_env_not_unicode: <NAME>`). The principal is asserted, not authenticated, at the
 door.

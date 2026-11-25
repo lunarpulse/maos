@@ -12,7 +12,8 @@
 //! verification (`issue_enterprise_governed_capability_no_wait`): an unknown key id or a stale
 //! key set is refused at once, fail-closed, and nudges the key refresher without waiting.
 //! No thread ever waits for discovery inside the cohort critical section. The cost: a request
-//! whose key the cache lacks is refused. Recovery depends on timing and is not one refusal: the
+//! whose key the cache lacks can be refused (unless a refresh has already published the key).
+//! Recovery depends on timing and is not one refusal: the
 //! refusal nudges the refresher only when the limiter is open and no refresh is pending (a
 //! dropped nudge is not queued); if an already-running refresh publishes the key before the
 //! limiter reopens, a retry can succeed while the limiter is still closed; if the idle refresh
@@ -27,7 +28,7 @@
 //! before `issue_with_mediation`, so a key set that expired or a `kid` retired between the
 //! signature check and the mint is refused with the same generic denial.
 //!
-//! Residual (operator accept I, RELEASE-HOLDS 23-2.e/23-2.f): the token is published inside the
+//! Residual (item I, operator acceptance NEEDED; RELEASE-HOLDS 23-2.e/23-2.f): the token is published inside the
 //! kernel capability registry (policy, context, quota shard, token store), which this crate
 //! cannot change. A key retired by a publication after the recheck and before the token is
 //! inserted is not detected. That window is the duration of `issue_with_mediation`: it can

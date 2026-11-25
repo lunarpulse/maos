@@ -610,7 +610,7 @@ pub const MAOS_ENV_REGISTRY: &[EnvVar] = &[
     },
     EnvVar {
         name: "MAOS_SSO_JWKS_MIN_REFRESH_SECS",
-        purpose: "Minimum seconds between two discovery refresh attempts (default 30, at most the TTL); an unknown-kid refresh request that arrives inside the interval is dropped, not queued, so a cohort digest read signed by a newly rotated key stays refused until a later request after the interval; only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
+        purpose: "Minimum seconds between two discovery refresh attempts (default 30, at most the TTL); an unknown-kid refresh nudge that arrives inside the interval is dropped, not queued, so the read is refused again; an already-running refresh may publish the key earlier, and a retry after publication succeeds; a reused kid on a fresh cache does not itself nudge (recovery is on the next successful publication); only with MAOS_SSO_DISCOVERY_ISSUER (Story 23-2)",
         stability: EnvStability::UserFacing,
     },
     EnvVar {

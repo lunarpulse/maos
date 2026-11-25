@@ -444,7 +444,7 @@ impl EnterpriseRuntime {
     /// that expired, or a `kid` retired or replaced since, is a denial with the same generic
     /// text as an unavailable identity provider. A proof the runtime's port cannot validate (no
     /// port, or a port that never issued one such as a static key set) is a bug and is refused
-    /// too: a supplied proof fails closed. Residual (operator accept I): a key retired after
+    /// too: a supplied proof fails closed. Residual (item I, operator acceptance NEEDED): a key retired after
     /// this check and before the token is inserted in the kernel registry is not detected; that
     /// window is the duration of `issue_with_mediation`, not a fixed small time.
     ///
