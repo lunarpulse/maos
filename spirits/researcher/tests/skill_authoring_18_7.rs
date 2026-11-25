@@ -57,7 +57,7 @@ impl InferencePort for Model {
         }
         Ok(InferenceResponse {
             text: if !generation {
-                "a model finding"
+                r#"{"finding":"a model finding"}"#
             } else if self.malformed {
                 "not a skill"
             } else if proposal {

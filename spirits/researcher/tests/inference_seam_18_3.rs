@@ -41,19 +41,26 @@ const PID: u32 = 18;
 struct Port {
     seen: Mutex<Vec<InferenceRequest>>,
     error: Option<fn() -> InferenceError>,
+    text: &'static str,
 }
 
 impl Port {
+    /// A compliant model: the one JSON object `{"finding": string}`.
     fn answering() -> Arc<Self> {
+        Self::replying(r#"{"finding":"a model digest sentence"}"#)
+    }
+    fn replying(text: &'static str) -> Arc<Self> {
         Arc::new(Self {
             seen: Mutex::new(Vec::new()),
             error: None,
+            text,
         })
     }
     fn failing(error: fn() -> InferenceError) -> Arc<Self> {
         Arc::new(Self {
             seen: Mutex::new(Vec::new()),
             error: Some(error),
+            text: "",
         })
     }
 }
@@ -65,7 +72,7 @@ impl InferencePort for Port {
             return Err(error());
         }
         Ok(InferenceResponse {
-            text: "a model digest sentence".into(),
+            text: self.text.into(),
             stop_reason: StopReason::StopSequence,
             usage: TokenUsage {
                 input_tokens: 1,
@@ -172,6 +179,44 @@ fn a_bound_pass_mints_once_names_its_provider_and_consumes_one_completion_per_cl
     drop(seen);
     idle(&r);
     assert_eq!(mints.load(Ordering::SeqCst), 2, "the next pass mints again");
+}
+
+/// Review finding 6: a completion that is not exactly one `{"finding": string}`
+/// object (the scorer's strict decoder, shared) is persisted as the
+/// deterministic summary of the SOURCE statement — never as the malformed model
+/// text, whether it is prose, an object with extra, duplicate or missing
+/// fields, or a code fence. The completion is still consumed and counted.
+#[test]
+fn a_malformed_completion_falls_back_to_the_source_summary_not_the_model_text() {
+    let claims = seed_claims();
+    let expected: Vec<String> = Researcher::new()
+        .survey(&frames(&claims))
+        .findings
+        .into_iter()
+        .map(|f| f.statement)
+        .collect();
+    for bad in [
+        "plain model prose that is not JSON",
+        r#"{"summary":"model-written summary"}"#,
+        r#"{"finding":"model-written finding","note":"extra field"}"#,
+        r#"{"finding":"first","finding":"second"}"#,
+        r#"{"finding":42}"#,
+        "```json\n{\"finding\":\"fenced finding\"}\n```",
+        r#"{"finding":"x"} trailing"#,
+    ] {
+        let (port, mints) = (Port::replying(bad), Arc::new(AtomicUsize::new(0)));
+        let r = bound(
+            Researcher::with_frames(frames(&claims)),
+            port,
+            Some(binding("openai", &mints)),
+        );
+        idle(&r);
+        assert!(r.take_pass_error().is_none(), "{bad}");
+        let out = r.last_output().expect("the bound pass surveyed");
+        let got: Vec<String> = out.findings.iter().map(|f| f.statement.clone()).collect();
+        assert_eq!(got, expected, "{bad}");
+        assert_eq!(r.completions_consumed(), claims.len(), "{bad}");
+    }
 }
 
 #[test]
@@ -411,7 +456,11 @@ fn the_exit_line_3_cassette_pins_real_prompt_hashes_and_no_wildcard() {
     }
     let mut output = Researcher::new().survey(&frames(&claims));
     for (finding, entry) in output.findings.iter_mut().zip(entries) {
-        finding.statement = entry["response"]["text"].as_str().unwrap().into();
+        // The seed completions are the v1 schema: the finding is the JSON's.
+        let text = entry["response"]["text"].as_str().unwrap();
+        finding.statement = maos_domain::distillation::parse_finding_completion(text)
+            .expect("a v1 seed completion")
+            .into_owned();
     }
     let prompt = researcher::skill_author::authoring_prompt(&output, None, None);
     let author = &entries[claims.len()];

@@ -6,8 +6,63 @@
 //! These are the pure domain shape types consumed by `DistillationPort` and
 //! implemented by `DistillateWriter` in `maos-kernel-core`.
 
+use std::borrow::Cow;
+
 use crate::invariants::i13::IntentLineage;
 use thiserror::Error;
+
+/// Story 28-3 (D-28-3-04 C) — the one strict reading of a survey completion,
+/// shared by the Researcher Spirit and the eval scorer so they cannot
+/// disagree: exactly one JSON object whose only field `finding` is a string.
+/// Unknown, duplicate or missing fields, arrays, scalars, code fences and
+/// trailing material are all `None` (never a panic). The string borrows from
+/// `text` unless it held escapes. It checks SHAPE only: a schema-valid string
+/// may still hold several sentences or meta-text.
+pub fn parse_finding_completion(text: &str) -> Option<Cow<'_, str>> {
+    serde_json::from_str::<StrictFinding<'_>>(text)
+        .ok()
+        .map(|f| f.0)
+}
+
+/// A JSON string borrowed when escape-free.
+#[derive(serde::Deserialize)]
+struct JsonStr<'a>(#[serde(borrow)] Cow<'a, str>);
+
+struct StrictFinding<'a>(Cow<'a, str>);
+
+impl<'de> serde::Deserialize<'de> for StrictFinding<'de> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::{Error, MapAccess, Visitor};
+
+        struct V;
+        impl<'de> Visitor<'de> for V {
+            type Value = StrictFinding<'de>;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("an object with a single string field `finding`")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+                let mut finding = None;
+                while let Some(JsonStr(key)) = map.next_key::<JsonStr<'de>>()? {
+                    if key != "finding" {
+                        return Err(A::Error::custom("unknown field"));
+                    }
+                    if finding.is_some() {
+                        return Err(A::Error::duplicate_field("finding"));
+                    }
+                    finding = Some(map.next_value::<JsonStr<'de>>()?.0);
+                }
+                finding
+                    .map(StrictFinding)
+                    .ok_or_else(|| A::Error::missing_field("finding"))
+            }
+        }
+        // `deserialize_map`, not `deserialize_struct`: a struct would also
+        // accept a JSON array as positional fields.
+        deserializer.deserialize_map(V)
+    }
+}
 
 /// A Spirit's request to persist a digest with kernel-enforced I11 audit chain.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -252,5 +307,47 @@ mod tests {
                 digest_frame_id: [0u8; 16]
             },
         );
+    }
+
+    #[test]
+    fn finding_completion_accepts_one_object_with_a_string_finding() {
+        assert_eq!(
+            parse_finding_completion(r#"{"finding":"plain"}"#).as_deref(),
+            Some("plain")
+        );
+        // Escapes decode (owned); surrounding JSON whitespace is legal.
+        assert_eq!(
+            parse_finding_completion(" {\"finding\":\"a \\\"q\\\" \\u00e9\\n\"}\n").as_deref(),
+            Some("a \"q\" é\n")
+        );
+        assert!(matches!(
+            parse_finding_completion(r#"{"finding":"plain"}"#),
+            Some(Cow::Borrowed(_))
+        ));
+    }
+
+    #[test]
+    fn finding_completion_rejects_every_other_shape_without_panicking() {
+        for bad in [
+            "",
+            "plain text",
+            r#"{}"#,
+            r#"{"summary":"x"}"#,
+            r#"{"other":"x"}"#,
+            r#"{"finding":"x","extra":1}"#,
+            r#"{"extra":1,"finding":"x"}"#,
+            r#"{"finding":"x","finding":"y"}"#,
+            r#"{"finding":1}"#,
+            r#"{"finding":null}"#,
+            r#"["x"]"#,
+            r#"[{"finding":"x"}]"#,
+            r#""x""#,
+            "```json\n{\"finding\":\"x\"}\n```",
+            r#"{"finding":"x"} trailing"#,
+            r#"{"finding":"x"}{"finding":"y"}"#,
+            r#"{"finding":"x""#,
+        ] {
+            assert!(parse_finding_completion(bad).is_none(), "{bad}");
+        }
     }
 }

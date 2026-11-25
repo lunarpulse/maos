@@ -31,3 +31,8 @@ maos-mcp = { path = "../maos-mcp" }
 # Story 18-8 AC2.4 — the conformance tests take the bearer from an `EnvSecretStore`.
 maos-secrets = { path = "../maos-secrets", default-features = false }
 rusqlite = "0.31"
+# Story 28-3 review (finding 10): the standalone pin test derives its expected
+# prompt hashes from `seed_claims()` / `synthesis_prompt()`, as the Researcher's
+# own inference-seam test does (workspace path crate and a version already locked).
+researcher = { path = "../../spirits/researcher" }
+sha2 = "0.10"

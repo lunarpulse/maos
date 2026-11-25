@@ -275,6 +275,19 @@ pub fn fully_consumed(cassette: &serde_json::Value, consumed: usize) -> Result<(
 #[derive(Debug, Clone)]
 pub struct JudgeReply(pub String, pub String, pub InferenceResponse);
 
+/// One judge reply's verdict: refused unless its provider attributes it to the
+/// pinned `model` (R3) and it is one of the two words. Applied to EVERY reply
+/// of a judge-only repeat, not only the first.
+pub fn judge_reply_verdict(response: &InferenceResponse, model: &str) -> Result<bool, String> {
+    let attributed = response.provider_attribution.model_id.as_deref();
+    if attributed != Some(model) {
+        return Err(format!(
+            "judge reply attributed to {attributed:?}, not the pinned {model}"
+        ));
+    }
+    judge_verdict(&response.text)
+}
+
 /// Parse every reply into its scenario's verdicts. A reply its provider
 /// attributes to any model but the pinned `model` is refused (R3), as is a
 /// reply that is not one of the two words.
@@ -285,13 +298,7 @@ pub fn apply_judge(
 ) -> Result<(), String> {
     for JudgeReply(scenario_id, claim_id, response) in replies {
         let at = format!("{scenario_id}/{claim_id}");
-        let attributed = response.provider_attribution.model_id;
-        if attributed.as_deref() != Some(model) {
-            return Err(format!(
-                "{at}: judge reply attributed to {attributed:?}, not the pinned {model}"
-            ));
-        }
-        let verdict = judge_verdict(&response.text).map_err(|e| format!("{at}: {e}"))?;
+        let verdict = judge_reply_verdict(&response, model).map_err(|e| format!("{at}: {e}"))?;
         facts
             .iter_mut()
             .find(|f| f.scenario_id == scenario_id)
@@ -463,52 +470,18 @@ pub fn keeps_hedge(statement: &str, hedge: &str) -> bool {
 
 /// The floors `m` misses, each named with its value (empty = pass).
 pub fn missed_floors(m: &FiveMetrics) -> Vec<String> {
-    let checks = [
-        ("recall", m.recall, RECALL_FLOOR, m.recall >= RECALL_FLOOR),
-        (
-            "faithfulness",
-            m.faithfulness,
-            FAITHFULNESS_FLOOR,
-            m.faithfulness >= FAITHFULNESS_FLOOR,
-        ),
-        (
-            "hedge_preservation",
-            m.hedge_preservation,
-            HEDGE_PRESERVATION_FLOOR,
-            m.hedge_preservation >= HEDGE_PRESERVATION_FLOOR,
-        ),
-        (
-            "traceability",
-            m.traceability,
-            TRACEABILITY_FLOOR,
-            m.traceability >= TRACEABILITY_FLOOR,
-        ),
-        (
-            "secret_leakage",
-            m.secret_leakage,
-            SECRET_LEAKAGE_CEILING,
-            m.secret_leakage <= SECRET_LEAKAGE_CEILING,
-        ),
-    ];
-    checks
-        .into_iter()
-        .filter(|(.., held)| !held)
-        .map(|(name, value, floor, _)| format!("{name} {value:.3} misses its floor {floor}"))
-        .collect()
+    missed_floors_with(m, &DistillFloors::spec())
 }
 
 /// Story 28-3 (D-28-3-04 C) — a survey completion that is not the one JSON
-/// object `{"finding": string}` (no code fence, no extra fields, `finding` a
-/// string). Counted from the replayed/recorded cassette; the floor is 0.
+/// object `{"finding": string}` (no code fence, no missing, extra or duplicate
+/// field, `finding` a string): the SAME strict decoder the Researcher uses
+/// (`maos_domain::distillation::parse_finding_completion`). It checks shape
+/// only; a schema-valid string may still hold several sentences or meta-text,
+/// which only the judge rubric (support/contradiction) can catch. Counted from
+/// the replayed/recorded cassette; the floor is 0.
 pub fn is_finding_completion(text: &str) -> bool {
-    serde_json::from_str::<serde_json::Value>(text)
-        .ok()
-        .and_then(|value| {
-            value
-                .as_object()
-                .map(|object| object.len() == 1 && object["finding"].is_string())
-        })
-        .unwrap_or(false)
+    maos_domain::distillation::parse_finding_completion(text).is_some()
 }
 
 /// The distill floors of one run: the four NFR-Aud-7 lower-bound metrics.
@@ -542,27 +515,101 @@ impl DistillFloors {
     }
 }
 
-/// Story 28-3 (AC6) — the Researcher's calibrated-floor record,
-/// `spirits/researcher/eval/floors.toml`, same shape and rule as Butler's
+/// Story 28-3 (AC1) — the pinned judge a Researcher floor record rests on and
+/// its raw repeat agreement counts, copied from the archived judge-only run.
+/// The counts are disclosure only: they never set a floor minimum and never
+/// gate a run.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct JudgeEvidence {
+    /// The pinned judge's wire model id (`[judge.researcher-faithfulness]`).
+    pub model: String,
+    /// SHA-256 of [`JUDGE_PROMPT`] the repeats were judged under.
+    pub prompt_sha256: String,
+    /// Judge repeats per finding.
+    pub k: usize,
+    /// Findings judged.
+    pub findings: usize,
+    /// Judge calls made: `k * findings`.
+    pub calls: usize,
+    /// Repeats agreeing with their finding's first verdict, summed (every
+    /// finding's first verdict agrees with itself).
+    pub agree: usize,
+    /// The archived judge-only result this evidence was read from.
+    pub result_file: String,
+    pub rule: String,
+    pub rationale: String,
+}
+
+impl JudgeEvidence {
+    /// Refuse evidence that is not the pinned judge's, whose counts do not
+    /// cohere, or that points at no archived result.
+    fn check(&self, pinned_model: &str) -> Result<(), String> {
+        if self.model.trim().is_empty() || self.model != pinned_model {
+            return Err(format!(
+                "judge model '{}' is not the pinned {pinned_model}",
+                self.model
+            ));
+        }
+        let prompt = crate::onboarding_gate_corpus::sha256_hex(JUDGE_PROMPT.as_bytes());
+        if self.prompt_sha256 != prompt {
+            return Err("judge prompt_sha256 is not the pinned judge prompt's".into());
+        }
+        if self.k < 2 || self.findings == 0 {
+            return Err("judge evidence needs k >= 2 over at least one finding".into());
+        }
+        if self.k.checked_mul(self.findings) != Some(self.calls) {
+            return Err("judge calls must equal k * findings".into());
+        }
+        if self.agree > self.calls || self.agree < self.findings {
+            return Err("judge agree must be in [findings, calls]".into());
+        }
+        let path = std::path::Path::new(&self.result_file);
+        let traceable = !self.result_file.trim().is_empty()
+            && path.is_relative()
+            && path
+                .components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)));
+        if !traceable {
+            return Err("judge result_file must be a relative archived path".into());
+        }
+        if self.rule.trim().is_empty() || self.rationale.trim().is_empty() {
+            return Err("judge evidence needs a rule and a rationale".into());
+        }
+        Ok(())
+    }
+}
+
+/// Story 28-3 (AC1, AC6) — the Researcher's calibrated-floor record,
+/// `spirits/researcher/eval/floors.toml`, same floor rule as Butler's
 /// (28-1 D-28-1-04 A): floor = the larger of the spec minimum, the compiled
 /// floor and the recorded Wilson lower bound rounded down to 0.01; a floor
-/// below that requires an `operator_ruling`.
+/// below that requires a non-blank `operator_ruling`. Unlike Butler's, the
+/// record also carries its required [`JudgeEvidence`] (judge model, prompt and
+/// repeat agreement).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DistillFloorRecord {
     pub schema: String,
+    pub judge: JudgeEvidence,
     pub floor: Vec<crate::halt_replay::FloorEntry>,
 }
 
 impl DistillFloorRecord {
     /// `base` (the spec minimums) with this record's floors applied. Refused:
-    /// a wrong schema, an unknown or repeated metric, a floor outside [0, 1],
-    /// and, without an `operator_ruling`, a floor below the one its own
-    /// evidence requires.
-    pub fn apply(&self, base: DistillFloors) -> Result<DistillFloors, String> {
+    /// a wrong schema, judge evidence that is not `pinned_judge_model`'s or is
+    /// incoherent, an unknown or repeated metric, evidence that is not a
+    /// finite ordered interval in [0, 1], and, without a non-blank
+    /// `operator_ruling`, a floor below the one its own evidence requires.
+    pub fn apply(
+        &self,
+        base: DistillFloors,
+        pinned_judge_model: &str,
+    ) -> Result<DistillFloors, String> {
         if self.schema != crate::halt_replay::FLOORS_SCHEMA {
             return Err(format!("floor record schema is '{}'", self.schema));
         }
+        self.judge.check(pinned_judge_model)?;
         let mut floors = base;
         let mut seen = Vec::new();
         for e in &self.floor {
@@ -577,17 +624,29 @@ impl DistillFloorRecord {
                 return Err(format!("floor record metric '{}' repeats", e.metric));
             }
             seen.push(e.metric.clone());
-            if !(0.0..=1.0).contains(&e.floor) {
+            let ruled = e
+                .operator_ruling
+                .as_deref()
+                .is_some_and(|r| !r.trim().is_empty());
+            let [lo, hi] = e.wilson95;
+            let unit = |v: f64| (0.0..=1.0).contains(&v);
+            if !(e.spec_minimum.is_finite()
+                && unit(e.floor)
+                && unit(e.measured_mean)
+                && unit(lo)
+                && unit(hi)
+                && lo <= hi)
+            {
                 return Err(format!(
-                    "floor record '{}': floor must be in [0, 1]",
+                    "floor record '{}': floor, measured_mean and wilson95 must be finite and \
+                     within [0, 1] with lo <= hi, and spec_minimum finite",
                     e.metric
                 ));
             }
-            let [lo, _] = e.wilson95;
             let required = compiled
                 .max(e.spec_minimum)
                 .max(crate::halt_replay::round_down_hundredth(lo));
-            if e.floor < required && e.operator_ruling.is_none() {
+            if e.floor < required && !ruled {
                 return Err(format!(
                     "floor record '{}': floor {} is below the one its evidence requires \
                      ({required}); an operator ruling is needed to go lower",
@@ -600,7 +659,9 @@ impl DistillFloorRecord {
     }
 }
 
-/// `missed_floors` against `floors` instead of the compiled spec minimums.
+/// `missed_floors` against `floors` instead of the compiled spec minimums. The
+/// zero-tolerance `secret_leakage` ceiling is never calibrated: it is the
+/// compiled [`SECRET_LEAKAGE_CEILING`] whatever record is applied.
 pub fn missed_floors_with(m: &FiveMetrics, floors: &DistillFloors) -> Vec<String> {
     let checks = [
         ("recall", m.recall, floors.recall, m.recall >= floors.recall),
@@ -621,6 +682,12 @@ pub fn missed_floors_with(m: &FiveMetrics, floors: &DistillFloors) -> Vec<String
             m.traceability,
             floors.traceability,
             m.traceability >= floors.traceability,
+        ),
+        (
+            "secret_leakage",
+            m.secret_leakage,
+            SECRET_LEAKAGE_CEILING,
+            m.secret_leakage <= SECRET_LEAKAGE_CEILING,
         ),
     ];
     checks
@@ -703,4 +770,59 @@ pub fn gate_failures_with(score: &DistillScore, floors: &DistillFloors) -> Vec<S
         )
     }));
     failures
+}
+
+/// Story 28-3 review (finding 4) — what a run decided about one finding of a
+/// clean scenario: the unit `xtask eval-report` takes the per-claim majority
+/// over k repeats of, so the Wilson interval of the agreed unit (claim for
+/// recall/faithfulness/traceability/leakage, hedge for preservation) exists.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FindingDecision {
+    pub faithful: bool,
+    pub resolves: bool,
+    pub leaks: bool,
+    /// One flag per source hedge, in source order: the finding keeps it.
+    pub hedges: Vec<bool>,
+}
+
+/// One clean-scenario source claim's decisions; `finding` is `None` when the
+/// survey carried no finding for it (a recall miss).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ClaimDecision {
+    pub scenario_id: String,
+    pub claim_id: String,
+    pub finding: Option<FindingDecision>,
+}
+
+/// The decisions behind [`metrics`] over the clean scenarios, corpus order.
+/// A finding without a judge verdict is an error, as in [`metrics`].
+pub fn claim_decisions(scenarios: &[ScenarioFacts]) -> Result<Vec<ClaimDecision>, String> {
+    let mut decisions = Vec::new();
+    for s in scenarios.iter().filter(|s| s.control.is_none()) {
+        for (id, source_hedges) in &s.source {
+            let finding = match s.findings.iter().find(|f| &f.claim_id == id) {
+                None => None,
+                Some(f) => Some(FindingDecision {
+                    faithful: *s.verdicts.get(&f.claim_id).ok_or_else(|| {
+                        format!(
+                            "{}: finding {} has no judge verdict",
+                            s.scenario_id, f.claim_id
+                        )
+                    })?,
+                    resolves: f.resolves,
+                    leaks: f.leaks,
+                    hedges: source_hedges
+                        .iter()
+                        .map(|h| keeps_hedge(&f.statement, h))
+                        .collect(),
+                }),
+            };
+            decisions.push(ClaimDecision {
+                scenario_id: s.scenario_id.clone(),
+                claim_id: id.clone(),
+                finding,
+            });
+        }
+    }
+    Ok(decisions)
 }

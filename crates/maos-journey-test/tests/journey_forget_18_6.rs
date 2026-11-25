@@ -5,6 +5,7 @@ mod binaries;
 #[path = "../../../tests/harness/forget_18_6.rs"]
 mod h;
 use serde_json::Value;
+use sha2::Digest;
 use std::path::PathBuf;
 // ADR-064 refuses replay + `--live`. This process witness instead targets
 // the real root's fixed seed-rag-noisy claim: its unique statement fragment
@@ -20,12 +21,14 @@ const SEED_STATEMENTS: [&str; 3] = [
     "Retrieval augmentation does not reduce hallucinated citations over a noisy corpus.",
     "Self-consistency voting may improve factual recall, though gains appear limited to larger models.",
 ];
-const SEED_PROMPT_HASHES: [&str; 3] = [
-    "dd1d32b9c9cdb7d7451042c3a5652af12c1e8ce7ea9fff9b6b530f739de6cb28",
-    "20103b053f84bd8c03a505fa39ff4dfadd325c7569a4881bdb87d1765793eeab",
-    "fc5c451debf6b288aaafe27fc550121564ff42e76ca0659c8aa829233142d01d",
-];
-const SEED_PROMPT_LENS: [usize; 3] = [2539, 2545, 2590];
+/// The prompt the Researcher renders for seed claim `claim`: derived from
+/// `seed_claims()` and `synthesis_prompt()` (a prompt edit moves the expected
+/// hash and length with it; the cassette is the thing that must follow).
+fn seed_prompt(claim: usize) -> String {
+    let seed = researcher::seed_claims();
+    assert_eq!(seed[claim].statement, SEED_STATEMENTS[claim]);
+    researcher::synthesis_prompt(&seed[claim].statement, &seed[claim].hedges)
+}
 const SEED_SUMMARIES: [&str; 3] = [
     "Retrieval augmentation cuts hallucinated citations in literature surveys.",
     "Over a noisy corpus, retrieval augmentation does not cut hallucinated citations.",
@@ -374,10 +377,19 @@ fn seed_cassette_has_only_real_prompt_hashes() {
             5 => 0,
             _ => [0, 2][(i - 6) % 2],
         };
-        let prompt_len = SEED_PROMPT_LENS[claim];
+        let prompt = seed_prompt(claim);
         assert_eq!(entry["sequence"], i);
-        assert_eq!(entry["prompt_len"], prompt_len);
-        assert_eq!(entry["prompt_sha256"], SEED_PROMPT_HASHES[claim]);
-        assert_eq!(entry["response"]["text"], SEED_SUMMARIES[claim]);
+        assert_eq!(entry["prompt_len"], prompt.len());
+        assert_eq!(
+            entry["prompt_sha256"],
+            format!("{:x}", sha2::Sha256::digest(prompt.as_bytes())).as_str()
+        );
+        assert_ne!(entry["prompt_sha256"], "0".repeat(64), "wildcard hash");
+        // The seed completions are the v1 schema: the one JSON object whose
+        // finding is the seed summary.
+        assert_eq!(
+            entry["response"]["text"],
+            serde_json::json!({ "finding": SEED_SUMMARIES[claim] }).to_string()
+        );
     }
 }

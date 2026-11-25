@@ -653,6 +653,70 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
     assert!(str_of(validate, "run").expect("run").contains("-gt 10"));
 }
 
+/// Story 28-3 AC5 (review finding 4): the judge-only repeat has its own
+/// execution and archive step over ONE fixed captured survey; it is not a
+/// full repeat and never appends to `researcher.results.jsonl`.
+#[test]
+fn nightly_researcher_judge_repeats_use_a_fixed_survey() {
+    let nightly: Value = serde_yaml::from_str(
+        &fs::read_to_string(root().join(".github/workflows/journey-nightly.yml"))
+            .expect("read journey-nightly"),
+    )
+    .expect("parse journey-nightly");
+    let rerecord = key(key(&nightly, "jobs"), "tier-2-rerecord");
+    let researcher = &steps(rerecord)[step_index(
+        rerecord,
+        "Re-record the Researcher five-metric cassette and judge (live)",
+    )];
+    assert_eq!(str_of(researcher, "id"), Some("researcher-record"));
+    const JUDGE_STEP: &str = "Measure Researcher judge agreement (fixed survey, k repeats)";
+    let judge = &steps(rerecord)[step_index(rerecord, JUDGE_STEP)];
+    assert_eq!(
+        condition(judge).as_deref(),
+        Some("!cancelled()&&inputs.include_researcher==true&&steps.researcher-record.outcome=='success'")
+    );
+    let env = key(judge, "env");
+    assert_eq!(str_of(env, "MAOS_INFERENCE_MODE"), Some("record"));
+    assert_eq!(str_of(env, "REPEATS"), Some("${{ inputs.repeats }}"));
+    assert_eq!(
+        str_of(env, "MAOS_ANTHROPIC_API_KEY"),
+        str_of(key(researcher, "env"), "MAOS_ANTHROPIC_API_KEY")
+    );
+    // The judge replies are recorded to a sibling DISTINCT from the survey.
+    assert_eq!(
+        str_of(env, "MAOS_REPLAY_CASSETTE"),
+        Some("crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.judge-only.live.json")
+    );
+    let run = str_of(judge, "run").expect("judge-only run");
+    assert!(run.contains(
+        "--cassette crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.1.json"
+    ));
+    assert!(run.contains(
+        "--judge-repeat \"$REPEATS\" > \"$results/researcher.judge-only.json\" || rc=$?"
+    ));
+    assert!(run.contains("if [ \"$rc\" -gt 1 ]; then\n  exit \"$rc\"\nfi"));
+    assert!(run.contains("if [ ! -s \"$results/researcher.judge-only.json\" ]; then"));
+    assert!(
+        !run.contains("researcher.results.jsonl"),
+        "not a full repeat"
+    );
+    assert!(!run.contains("${{"), "no expression inside the script");
+    let (record, upload) = (
+        step_index(
+            rerecord,
+            "Re-record the Researcher five-metric cassette and judge (live)",
+        ),
+        step_index(rerecord, "Upload refreshed cassettes"),
+    );
+    assert!(record < step_index(rerecord, JUDGE_STEP) && step_index(rerecord, JUDGE_STEP) < upload);
+    let uploaded = str_of(key(&steps(rerecord)[upload], "with"), "path").expect("upload path");
+    assert!(
+        "crates/maos-journey-test/cassettes/eval-results/researcher.judge-only.json"
+            .starts_with(uploaded.trim()),
+        "the judge-only result is archived with the cassettes"
+    );
+}
+
 /// The `if:` of the probe job, after normalisation (see [`condition`]).
 const RERECORD_DISPATCH_GUARD: &str =
     "github.event_name=='workflow_dispatch'&&inputs.rerecord==true";

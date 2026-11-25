@@ -1334,23 +1334,20 @@ impl Researcher {
             )?;
             live.consumed.fetch_add(1, Ordering::SeqCst);
             // Story 28-3 (D-28-3-04 C): the completion is one JSON object
-            // `{"finding": string}`. The finding is used verbatim (still
-            // bounded by `summarize`, §9.5). A completion that is NOT that
-            // object is a format error the eval scorer counts from the raw
-            // completion; the Spirit stays alive and falls back to the
-            // bounded deterministic summary rather than dropping the claim.
-            let finding = serde_json::from_str::<serde_json::Value>(&text)
-                .ok()
-                .and_then(|value| {
-                    value
-                        .get("finding")
-                        .and_then(|finding| finding.as_str())
-                        .map(str::to_owned)
-                });
-            match finding {
-                Some(finding) => Ok(summarize(&finding)),
-                None => Ok(summarize(&text)),
-            }
+            // `{"finding": string}`, read by the SAME strict decoder the eval
+            // scorer counts format errors with (no missing, extra or
+            // duplicate field). The finding is used verbatim (still bounded by
+            // `summarize`, §9.5). A completion that is NOT that object is a
+            // format error the scorer counts from the raw completion; the
+            // Spirit stays alive and falls back to the deterministic summary
+            // of the SOURCE statement — never to the malformed model text —
+            // rather than dropping the claim.
+            Ok(
+                match maos_domain::distillation::parse_finding_completion(&text) {
+                    Some(finding) => summarize(&finding),
+                    None => summarize(statement),
+                },
+            )
         })
     }
 

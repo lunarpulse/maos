@@ -139,7 +139,7 @@ fn traceability_and_leakage_hard_gate_pass_on_both_fixture_and_live_paths() {
     // clean model output leaks nothing. Identical verdict to the deterministic path.
     let live = Researcher::new().with_inference_port(
         Arc::new(StubProvider {
-            text: "a clean one-sentence digest of the claim".into(),
+            text: r#"{"finding":"a clean one-sentence digest of the claim"}"#.into(),
         }) as Arc<dyn InferencePort + Send + Sync>,
         "anthropic",
         token(),
@@ -167,7 +167,7 @@ fn digest_secret_leakage_hard_gate_fires_on_live_digest() {
 
     let live = Researcher::new().with_inference_port(
         Arc::new(StubProvider {
-            text: "leaked integration key sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4".into(),
+            text: r#"{"finding":"leaked integration key sk-ant-api03-59c8e3e277515a4ee1fbde7cb68810a4"}"#.into(),
         }) as Arc<dyn InferencePort + Send + Sync>,
         "anthropic",
         token(),

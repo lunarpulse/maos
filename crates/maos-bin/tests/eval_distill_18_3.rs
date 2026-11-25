@@ -626,3 +626,390 @@ fn a_judge_only_repeat_replays_the_survey_and_reports_per_finding_agreement() {
         "surveys plus k-per-finding judge calls were consumed"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Story 28-3 review fixes (findings 2, 3, 4, 5, 7) — the judge-only repeat's
+// artifacts, per-reply attribution, pass statistics and CLI/evaluator bounds.
+// ---------------------------------------------------------------------------
+
+/// What a scripted judge answers to its n-th call (0-based, process order):
+/// the verdict text and, when set, the model its reply is attributed to.
+type Script = Box<dyn Fn(usize) -> (&'static str, Option<&'static str>) + Send + Sync>;
+
+struct ScriptedJudge {
+    calls: Arc<std::sync::atomic::AtomicUsize>,
+    script: Script,
+}
+
+impl maos_providers::Provider for ScriptedJudge {
+    fn complete(
+        &self,
+        req: &InferenceRequest,
+    ) -> Result<InferenceResponse, maos_providers::provider::ProviderError> {
+        assert!(
+            req.prompt.starts_with(JUDGE_PROMPT),
+            "a judge-only repeat sends only judge prompts through the live router"
+        );
+        let n = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let (text, model) = (self.script)(n);
+        Ok(InferenceResponse {
+            text: text.into(),
+            stop_reason: StopReason::StopSequence,
+            usage: TokenUsage {
+                input_tokens: 1,
+                output_tokens: 1,
+            },
+            provider_attribution: ProviderAttribution {
+                provider_id: "anthropic".into(),
+                endpoint_url: "stub://local".into(),
+                model_id: Some(model.unwrap_or(PINNED).to_owned()),
+            },
+        })
+    }
+
+    fn credential_fingerprint(&self) -> u64 {
+        0
+    }
+}
+
+/// One judge-only repeat over a freshly recorded survey: `output` is where the
+/// recorder writes (default: a sibling distinct from the survey).
+struct Repeat {
+    run: Result<DistillRun, String>,
+    survey: PathBuf,
+    output: PathBuf,
+    calls: usize,
+}
+
+fn judge_repeat(dir: &Path, k: usize, output_is_survey: bool, script: Script) -> Repeat {
+    judge_repeat_over(dir, None, k, output_is_survey, script)
+}
+
+/// `survey`: replay this cassette instead of recording a fresh `live-record` one.
+fn judge_repeat_over(
+    dir: &Path,
+    survey: Option<PathBuf>,
+    k: usize,
+    output_is_survey: bool,
+    script: Script,
+) -> Repeat {
+    use maos_bench::distill_eval::{evaluate_with_repeat, JudgeRepeat};
+
+    let survey = survey.unwrap_or_else(|| record(dir, faithful, None).1);
+    let output = if output_is_survey {
+        survey.clone()
+    } else {
+        dir.join("judge-only.live.json")
+    };
+    let recorder = Arc::new(CassetteRecorder::new(
+        output.clone(),
+        "maos".into(),
+        "eval-distill-judge-repeat".into(),
+    ));
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let stub = ScriptedJudge {
+        calls: Arc::clone(&calls),
+        script,
+    };
+    let driver = CassetteRecordProvider::new(Arc::new(stub), recorder.clone());
+    let drivers = [("anthropic".to_owned(), Arc::new(driver) as Arc<_>)].into();
+    let router = Arc::new(MultiProviderRouter::new(drivers, Some("anthropic".into())));
+    let replay = Arc::new(CassetteReplayProvider::from_file(&survey, true).unwrap());
+    std::env::set_current_dir(root()).unwrap();
+    let run = evaluate_with_repeat(
+        Completions::Record {
+            router,
+            cassette: output.clone(),
+            flush: Box::new(move || recorder.flush().map(drop)),
+        },
+        Arc::new(CassetteReplayProvider::from_file(&root().join(CASSETTE), true).unwrap()),
+        Some(JudgeRepeat {
+            k,
+            survey: replay,
+            survey_cassette: survey.clone(),
+        }),
+    );
+    Repeat {
+        run,
+        survey,
+        output,
+        calls: calls.load(std::sync::atomic::Ordering::SeqCst),
+    }
+}
+
+fn sha_of(path: &Path) -> String {
+    format!("{:x}", Sha256::digest(std::fs::read(path).unwrap()))
+}
+
+fn always_faithful() -> Script {
+    Box::new(|_| ("faithful", None))
+}
+
+fn repeat_args(extra: &[&str]) -> Vec<String> {
+    ["distill", "--class", "researcher"]
+        .iter()
+        .chain(extra)
+        .map(|s| (*s).to_owned())
+        .collect()
+}
+
+/// Finding 2 — `cassette` names the judge OUTPUT and `cassette_sha256` is its
+/// digest; the survey input is its own `survey_cassette` with its own digest.
+#[test]
+fn a_judge_repeat_reports_both_artifacts_each_with_its_own_digest() {
+    let home = tempfile::tempdir().unwrap();
+    let r = judge_repeat(home.path(), 2, false, always_faithful());
+    let line: Value = serde_json::from_str(&r.run.unwrap().line).unwrap();
+    assert_ne!(sha_of(&r.survey), sha_of(&r.output));
+    assert_eq!(line["cassette"], r.output.display().to_string());
+    assert_eq!(line["cassette_sha256"], sha_of(&r.output).as_str());
+    let repeat = &line["judge_repeat"];
+    assert_eq!(repeat["survey_cassette"], r.survey.display().to_string());
+    assert_eq!(repeat["survey_cassette_sha256"], sha_of(&r.survey).as_str());
+}
+
+/// Finding 2 — the recorder would overwrite the source survey with judge-only
+/// replies: refused before any inference, the survey untouched.
+#[test]
+fn the_survey_and_the_judge_output_may_not_be_the_same_file() {
+    let home = tempfile::tempdir().unwrap();
+    // Evaluator boundary.
+    let r = judge_repeat(home.path(), 2, true, always_faithful());
+    let error = r.run.unwrap_err();
+    assert!(error.contains("same file"), "{error}");
+    assert_eq!(r.calls, 0, "refused before the live judge is asked");
+    let (_, survey) = (0, &r.survey);
+    let cassette = read_json(survey);
+    assert!(
+        cassette["entries"].as_array().unwrap().len() > 2,
+        "the survey cassette still holds its survey entries"
+    );
+    // CLI boundary: `--cassette` and `MAOS_REPLAY_CASSETTE` are one path,
+    // spelled differently or not.
+    let spelled = home.path().join("./x.json");
+    let alias = home.path().join("x.json");
+    for (flag, env) in [
+        ("x.json", "x.json"),
+        (spelled.to_str().unwrap(), alias.to_str().unwrap()),
+    ] {
+        let parsed = maos_bench::distill_eval::parse_args_with_repeat(
+            &repeat_args(&["--cassette", flag, "--judge-repeat", "3"]),
+            Some("record"),
+            Some(PathBuf::from(env)),
+            None,
+        );
+        let error = parsed.unwrap_err();
+        assert!(error.contains("same file"), "{flag} vs {env}: {error}");
+    }
+    let fine = maos_bench::distill_eval::parse_args_with_repeat(
+        &repeat_args(&["--cassette", "x.json", "--judge-repeat", "3"]),
+        Some("record"),
+        Some(PathBuf::from("y.json")),
+        None,
+    );
+    assert_eq!(fine.unwrap().judge_repeat, Some(3));
+}
+
+/// Finding 7 — the hosted 1-10 bound holds at the CLI and the evaluator; 0 is
+/// refused, never silently dropped into an ordinary paid pass.
+#[test]
+fn the_judge_repeat_count_is_one_to_ten_at_the_cli_and_the_evaluator() {
+    for count in ["0", "11", "100", "-1", "x"] {
+        for extra in [
+            &["--judge-repeat", count][..],
+            &["--cassette", "a.json", "--judge-repeat", count],
+        ] {
+            for mode in [Some("record"), Some("replay"), None] {
+                let parsed = maos_bench::distill_eval::parse_args_with_repeat(
+                    &repeat_args(extra),
+                    mode,
+                    Some(PathBuf::from("b.json")),
+                    None,
+                );
+                assert!(parsed.is_err(), "{extra:?} under {mode:?}: {parsed:?}");
+            }
+        }
+    }
+    for count in ["1", "10"] {
+        let parsed = maos_bench::distill_eval::parse_args_with_repeat(
+            &repeat_args(&["--cassette", "a.json", "--judge-repeat", count]),
+            Some("record"),
+            Some(PathBuf::from("b.json")),
+            None,
+        );
+        assert_eq!(parsed.unwrap().judge_repeat, count.parse().ok());
+    }
+    // A hostile default is bounded the same way.
+    let parsed = maos_bench::distill_eval::parse_args_with_repeat(
+        &repeat_args(&["--cassette", "a.json"]),
+        Some("record"),
+        Some(PathBuf::from("b.json")),
+        Some(0),
+    );
+    assert!(parsed.is_err());
+    // Evaluator boundary: nothing is asked of the live judge.
+    for k in [0, 11] {
+        let home = tempfile::tempdir().unwrap();
+        let r = judge_repeat(home.path(), k, false, always_faithful());
+        let error = r.run.unwrap_err();
+        assert!(error.contains("1-10"), "k={k}: {error}");
+        assert_eq!(r.calls, 0, "k={k}");
+    }
+}
+
+/// Finding 3 — attribution is validated on EVERY reply, not the first per
+/// finding; the recording is flushed before the refusal.
+#[test]
+fn a_later_repeat_reply_from_another_model_is_refused_after_flushing() {
+    let home = tempfile::tempdir().unwrap();
+    // k = 3: call 4 is the SECOND reply of the second finding.
+    let script: Script = Box::new(|n| ("faithful", (n == 4).then_some("claude-haiku-9")));
+    let r = judge_repeat(home.path(), 3, false, script);
+    let error = r.run.unwrap_err();
+    assert!(
+        error.contains("not the pinned claude-sonnet-5-5"),
+        "{error}"
+    );
+    assert!(error.contains("claude-haiku-9"), "{error}");
+    assert_eq!(
+        read_json(&r.output)["provenance"],
+        "live-record",
+        "the recording is flushed before the refusal"
+    );
+}
+
+/// Finding 5 — four findings that each flip once: in ONE pass (that pass is
+/// 4 findings worse) or in FOUR different passes (each pass 1 finding worse).
+/// Per-finding agreement and the mean are equal; the worst pass is not.
+#[test]
+fn faithfulness_statistics_tell_a_one_pass_flip_from_four_passes_flipping() {
+    let k = 5;
+    let stats = |script: Script| {
+        let home = tempfile::tempdir().unwrap();
+        let r = judge_repeat(home.path(), k, false, script);
+        let line: Value = serde_json::from_str(&r.run.unwrap().line).unwrap();
+        line
+    };
+    // Call n judges finding n / k in pass n % k.
+    let same_pass: Script = Box::new(move |n| {
+        (
+            if n % k == 1 && n / k < 4 {
+                "unfaithful"
+            } else {
+                "faithful"
+            },
+            None,
+        )
+    });
+    let different_passes: Script = Box::new(move |n| {
+        (
+            if n / k < 4 && n % k == n / k + 1 {
+                "unfaithful"
+            } else {
+                "faithful"
+            },
+            None,
+        )
+    });
+    let (same, different) = (stats(same_pass), stats(different_passes));
+    let (a, b) = (&same["judge_repeat"], &different["judge_repeat"]);
+    let findings = a["findings"].as_object().unwrap().len() as f64;
+    assert!(findings > 4.0, "{findings} findings judged");
+    assert!(
+        a["findings"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .eq(b["findings"].as_object().unwrap().keys()),
+        "both runs judged the same findings"
+    );
+    for stat in [a, b] {
+        let agree: u64 = stat["findings"]
+            .as_object()
+            .unwrap()
+            .values()
+            .map(|f| f["agree_with_first"].as_u64().unwrap())
+            .sum();
+        assert_eq!(
+            agree as f64,
+            findings * k as f64 - 4.0,
+            "four flips in total"
+        );
+        assert_eq!(stat["faithfulness_per_pass"].as_array().unwrap().len(), k);
+    }
+    let mean = |s: &Value| s["faithfulness_mean"].as_f64().unwrap();
+    let worst = |s: &Value| s["faithfulness_worst_pass"].as_f64().unwrap();
+    assert!(
+        (mean(a) - mean(b)).abs() < 1e-12,
+        "the mean cannot tell them apart"
+    );
+    assert!(
+        (worst(a) - (findings - 4.0) / findings).abs() < 1e-12,
+        "{}",
+        worst(a)
+    );
+    assert!(
+        (worst(b) - (findings - 1.0) / findings).abs() < 1e-12,
+        "{}",
+        worst(b)
+    );
+    // The gate is the FIRST pass (every first verdict is faithful here) and
+    // says so; the repeat statistics never feed it.
+    assert_eq!(same["pass"], different["pass"]);
+    assert_eq!(a["gate_basis"], "first-verdict");
+}
+
+/// Finding 4 — every distill line carries the claim-level decisions the
+/// report's interval is taken over.
+#[test]
+fn the_line_carries_the_decisions_of_every_clean_claim() {
+    let home = tempfile::tempdir().unwrap();
+    let (run, _) = record(home.path(), faithful, None);
+    let line: Value = serde_json::from_str(&run.unwrap().line).unwrap();
+    let decisions = line["decisions"].as_array().expect("decisions");
+    assert_eq!(decisions.len(), 25, "the clean rows' claims");
+    let claim = &decisions[0];
+    assert_eq!(claim["scenario_id"], "rd01");
+    assert_eq!(claim["finding"]["faithful"], true);
+    assert_eq!(claim["finding"]["resolves"], true);
+    assert_eq!(claim["finding"]["leaks"], false);
+    assert!(claim["finding"]["hedges"].is_array());
+}
+
+/// A judge-only repeat over a `seed` survey would make zero judge calls and
+/// still print numbers (the frozen verdicts): refused before anything is asked.
+#[test]
+fn a_judge_repeat_over_a_seed_survey_is_refused_before_the_judge_is_asked() {
+    let home = tempfile::tempdir().unwrap();
+    let r = judge_repeat_over(
+        home.path(),
+        Some(root().join(CASSETTE)),
+        3,
+        false,
+        always_faithful(),
+    );
+    let error = r.run.unwrap_err();
+    assert!(error.contains("live-record"), "{error}");
+    assert_eq!(r.calls, 0);
+}
+
+/// The archived judge output holds exactly the measured judge calls — nothing
+/// a survey replay or a second recorder left behind.
+#[test]
+fn the_judge_output_cassette_holds_exactly_the_measured_judge_calls() {
+    let home = tempfile::tempdir().unwrap();
+    let r = judge_repeat(home.path(), 2, false, always_faithful());
+    let line: Value = serde_json::from_str(&r.run.unwrap().line).unwrap();
+    let measured = line["judge_repeat"]["judge_calls"].as_u64().unwrap() as usize;
+    assert!(measured > 0);
+    assert_eq!(r.calls, measured);
+    let output = read_json(&r.output);
+    let entries = output["entries"].as_array().unwrap();
+    assert_eq!(entries.len(), measured);
+    for entry in entries {
+        assert_eq!(
+            entry["response"]["provider_attribution"]["model_id"],
+            PINNED
+        );
+    }
+}

@@ -440,16 +440,199 @@ fn is_gate_failure(f: &str) -> bool {
     }) || (f.starts_with("negative control ") && f.ends_with(" not detected"))
 }
 
+/// One finding's decisions in a `decisions` entry of a distill line.
+struct FindingDecisions {
+    faithful: bool,
+    resolves: bool,
+    leaks: bool,
+    hedges: Vec<bool>,
+}
+
+/// The claim-level decisions of one distill line (`None` for a line that
+/// predates them): claim id and its finding's decisions, `None` when the
+/// survey carried no finding for the claim.
+type ClaimDecisions = Vec<(String, Option<FindingDecisions>)>;
+
+fn decisions_of(line: &Value) -> Result<Option<ClaimDecisions>, String> {
+    let Some(entries) = line.get("decisions") else {
+        return Ok(None);
+    };
+    let flag = |v: &Value, key: &str| {
+        v.get(key)
+            .and_then(Value::as_bool)
+            .ok_or_else(|| format!("eval-report: a decision's `{key}` is not a boolean"))
+    };
+    let entries = entries
+        .as_array()
+        .ok_or("eval-report: `decisions` is not an array")?;
+    let mut out = Vec::new();
+    for e in entries {
+        let id = format!("{}/{}", text(e, "scenario_id")?, text(e, "claim_id")?);
+        let finding = match field(e, "finding")? {
+            Value::Null => None,
+            f => Some(FindingDecisions {
+                faithful: flag(f, "faithful")?,
+                resolves: flag(f, "resolves")?,
+                leaks: flag(f, "leaks")?,
+                hedges: field(f, "hedges")?
+                    .as_array()
+                    .ok_or("eval-report: a decision's `hedges` is not an array")?
+                    .iter()
+                    .map(|h| {
+                        h.as_bool()
+                            .ok_or("eval-report: a hedge decision is not a boolean".to_owned())
+                    })
+                    .collect::<Result<_, _>>()?,
+            }),
+        };
+        out.push((id, finding));
+    }
+    Ok(Some(out))
+}
+
+/// The five ratios a line's decisions imply, in [`DISTILL`] order; a line
+/// whose `score.metrics` disagree with its own decisions is refused (as the
+/// halt leg refuses a `score` that disagrees with its verdicts).
+fn decided_ratios(claims: &ClaimDecisions) -> [f64; 5] {
+    let found: Vec<&FindingDecisions> = claims.iter().filter_map(|(_, f)| f.as_ref()).collect();
+    let share = |hit: usize, of: usize, empty: f64| {
+        if of == 0 {
+            empty
+        } else {
+            hit as f64 / of as f64
+        }
+    };
+    let hedge_total: usize = found.iter().map(|f| f.hedges.len()).sum();
+    let hedge_kept: usize = found
+        .iter()
+        .map(|f| f.hedges.iter().filter(|k| **k).count())
+        .sum();
+    [
+        share(found.len(), claims.len(), 1.0),
+        share(
+            found.iter().filter(|f| f.faithful).count(),
+            found.len(),
+            1.0,
+        ),
+        share(hedge_kept, hedge_total, 1.0),
+        share(
+            found.iter().filter(|f| f.resolves).count(),
+            found.len(),
+            1.0,
+        ),
+        share(found.iter().filter(|f| f.leaks).count(), found.len(), 0.0),
+    ]
+}
+
+/// More than half of the repeats that carry a finding said true (a tie is false).
+fn majority_of(yes: usize, present: usize) -> bool {
+    yes * 2 > present
+}
+
+/// The per-claim majority over the k repeats, as `(successes, n)` per metric in
+/// [`DISTILL`] order: recall over the claims, the finding metrics over the
+/// claims the majority found, hedge preservation over their hedges. Every
+/// repeat must decide the same claims (and hedges).
+fn majority_counts(runs: &[ClaimDecisions]) -> Result<[(usize, usize); 5], String> {
+    let ids: Vec<&String> = runs[0].iter().map(|(id, _)| id).collect();
+    if runs
+        .iter()
+        .any(|r| r.iter().map(|(id, _)| id).ne(ids.iter().copied()))
+    {
+        return Err("eval-report: the repeats decided different claims".into());
+    }
+    let mut counts = [(0usize, 0usize); 5];
+    counts[0].1 = ids.len();
+    for c in 0..ids.len() {
+        let present: Vec<&FindingDecisions> = runs.iter().filter_map(|r| r[c].1.as_ref()).collect();
+        if !majority_of(present.len(), runs.len()) {
+            continue;
+        }
+        counts[0].0 += 1;
+        let n = present.len();
+        let vote = |pick: &dyn Fn(&FindingDecisions) -> bool| {
+            majority_of(present.iter().filter(|f| pick(f)).count(), n)
+        };
+        for (slot, pick) in [
+            (
+                1,
+                &(|f: &FindingDecisions| f.faithful) as &dyn Fn(&FindingDecisions) -> bool,
+            ),
+            (3, &|f| f.resolves),
+            (4, &|f| f.leaks),
+        ] {
+            counts[slot].1 += 1;
+            counts[slot].0 += usize::from(vote(pick));
+        }
+        let width = present[0].hedges.len();
+        if present.iter().any(|f| f.hedges.len() != width) {
+            return Err("eval-report: the repeats decided different hedges of one claim".into());
+        }
+        for h in 0..width {
+            counts[2].1 += 1;
+            counts[2].0 += usize::from(majority_of(
+                present.iter().filter(|f| f.hedges[h]).count(),
+                n,
+            ));
+        }
+    }
+    Ok(counts)
+}
+
 /// `maos eval distill` lines carry the five metric values, the control
-/// detections and the run's failures, no per-row decisions: mean/min/max
-/// against the NFR-Aud-7 constants, no interval, no confusion matrix. The
-/// denominators come from the corpus: the clean rows' claims (recall; the
-/// findings are one per claim, so also faithfulness, traceability and secret
-/// leakage) and their hedges (hedge preservation). A numeric miss may average
-/// out over the repeats; a structural failure of any repeat (a stale judge
-/// prompt, a changed frozen survey, a writer/cite disagreement) or an
-/// undetected control never does.
+/// detections, the run's failures and (Story 28-3) the claim-level
+/// `decisions` behind the metrics. With decisions on every line the Wilson 95 %
+/// interval is taken over the per-claim majority of the repeats (claims for
+/// recall, faithfulness, traceability and leakage; hedges for preservation),
+/// the denominators are the majority's, and a line whose metrics disagree with
+/// its own decisions is refused. A line without decisions (archived before
+/// 28-3) has no interval: its denominators come from the corpus, the clean
+/// rows' claims (the findings are one per claim) and their hedges. A numeric
+/// miss may average out over the repeats; a structural failure of any repeat
+/// (a stale judge prompt, a changed frozen survey, a writer/cite disagreement)
+/// or an undetected control never does.
 fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
+    let decided = lines
+        .iter()
+        .map(decisions_of)
+        .collect::<Result<Vec<_>, _>>()?;
+    let majority = match decided.iter().flatten().count() {
+        0 => None,
+        n if n == lines.len() => {
+            let runs: Vec<ClaimDecisions> = decided.into_iter().flatten().collect();
+            let clean: Vec<String> = corpus
+                .iter()
+                .filter(|r| r["control"].is_null())
+                .flat_map(|r| {
+                    let scenario = r["scenario_id"].as_str().unwrap_or_default().to_owned();
+                    r["claims"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(move |c| {
+                            format!("{scenario}/{}", c["claim_id"].as_str().unwrap_or_default())
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            if runs[0].iter().map(|(id, _)| id.clone()).ne(clean) {
+                return Err("eval-report: `decisions` are not the corpus' clean claims".into());
+            }
+            for (i, (run, line)) in runs.iter().zip(lines).enumerate() {
+                let metrics = field(field(line, "score")?, "metrics")?;
+                for ((name, ..), want) in DISTILL.iter().zip(decided_ratios(run)) {
+                    if (num(metrics, name)? - want).abs() > 1e-9 {
+                        return Err(format!(
+                            "eval-report: run {}: score.metrics.{name} disagrees with its decisions",
+                            i + 1
+                        ));
+                    }
+                }
+            }
+            Some(majority_counts(&runs)?)
+        }
+        _ => return Err("eval-report: only some result lines carry `decisions`".into()),
+    };
     let claims: Vec<&Value> = corpus
         .iter()
         .filter(|r| r["control"].is_null())
@@ -461,17 +644,17 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
         .sum();
     let mut metrics = Map::new();
     let mut failures = Vec::new();
-    for (name, bound, ceiling) in DISTILL {
+    for (i, (name, bound, ceiling)) in DISTILL.into_iter().enumerate() {
         let values = lines
             .iter()
             .map(|l| num(field(field(l, "score")?, "metrics")?, name))
             .collect::<Result<Vec<_>, String>>()?;
-        let n = if name == "hedge_preservation" {
-            hedges
-        } else {
-            claims.len()
+        let (n, successes) = match majority {
+            Some(counts) => (counts[i].1, Some(counts[i].0)),
+            None if name == "hedge_preservation" => (hedges, None),
+            None => (claims.len(), None),
         };
-        let m = metric(&values, bound, ceiling, n, None);
+        let m = metric(&values, bound, ceiling, n, successes);
         if m["pass"] == false {
             failures.push(format!(
                 "{name} mean {:.3} misses its bound {bound}",
@@ -519,9 +702,9 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
     })
 }
 
-/// The cassette of `line`, refused unless its bytes are the line's `cassette_sha256`.
-fn cassette(line: &Value, args: &Args) -> Result<Value, String> {
-    let rel = text(line, "cassette")?;
+/// A recorded cassette named by `rel`, refused unless its bytes are `want` (the
+/// result line's `key`).
+fn artifact(rel: &str, want: &str, key: &str, args: &Args) -> Result<Value, String> {
     let path = match &args.cassettes {
         Some(dir) => dir.join(
             Path::new(rel)
@@ -531,13 +714,33 @@ fn cassette(line: &Value, args: &Args) -> Result<Value, String> {
         None => args.root.join(rel),
     };
     let bytes = read(&path)?;
-    if hex(&bytes) != text(line, "cassette_sha256")? {
+    if hex(&bytes) != want {
         return Err(format!(
-            "eval-report: {} is not the cassette its result line names (cassette_sha256)",
+            "eval-report: {} is not the cassette its result line names ({key})",
             path.display()
         ));
     }
     serde_json::from_slice(&bytes).map_err(|e| format!("eval-report: {}: {e}", path.display()))
+}
+
+/// The cassette of `line`, refused unless its bytes are the line's `cassette_sha256`.
+/// A judge-only repeat line's `cassette` is the judge replies it recorded; the
+/// survey it replayed is its `judge_repeat.survey_cassette`, digest-checked too.
+fn cassette(line: &Value, args: &Args) -> Result<Value, String> {
+    if let Some(repeat) = line.get("judge_repeat").filter(|v| !v.is_null()) {
+        artifact(
+            text(repeat, "survey_cassette")?,
+            text(repeat, "survey_cassette_sha256")?,
+            "judge_repeat.survey_cassette_sha256",
+            args,
+        )?;
+    }
+    artifact(
+        text(line, "cassette")?,
+        text(line, "cassette_sha256")?,
+        "cassette_sha256",
+        args,
+    )
 }
 
 /// Input/output tokens per (provider, model) over every cassette entry, priced
@@ -689,10 +892,23 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
         .iter()
         .enumerate()
         .map(|(i, l)| {
-            json!({
+            let mut run = json!({
                 "run": i + 1, "cassette": l["cassette"], "cassette_sha256": l["cassette_sha256"],
                 "provenance": l["provenance"], "workflow_run_id": args.run_id,
-            })
+            });
+            // A judge-only repeat reports its survey input beside its judge output.
+            if let Some(repeat) = l.get("judge_repeat").filter(|v| !v.is_null()) {
+                run["survey_cassette"] = repeat["survey_cassette"].clone();
+                run["survey_cassette_sha256"] = repeat["survey_cassette_sha256"].clone();
+                run["judge_repeat"] = json!({
+                    "k": repeat["k"], "gate_basis": repeat["gate_basis"],
+                    "agreement_rate": repeat["agreement_rate"],
+                    "faithfulness_per_pass": repeat["faithfulness_per_pass"],
+                    "faithfulness_mean": repeat["faithfulness_mean"],
+                    "faithfulness_worst_pass": repeat["faithfulness_worst_pass"],
+                });
+            }
+            run
         })
         .collect();
     let report = json!({

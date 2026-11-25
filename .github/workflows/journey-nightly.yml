@@ -217,6 +217,7 @@ jobs:
       # sidecar's verdicts into the corpus rows (`provenance: live-record`) in a PR
       # (owner `ops-nightly-cassette-rerecord`).
       - name: Re-record the Researcher five-metric cassette and judge (live)
+        id: researcher-record
         if: ${{ !cancelled() && inputs.include_researcher == true }}
         env:
           MAOS_INFERENCE_MODE: record
@@ -246,6 +247,36 @@ jobs:
             --results "$results/researcher.results.jsonl" \
             --repeats "$REPEATS" --run-id "$RUN_ID" \
             --out "$results/researcher.report.json"
+
+      # Story 28-3 AC5 / D-28-3-03 A — judge variance is measured on ONE fixed
+      # captured survey (full repeat 1, never a best-scoring pick), not on another
+      # full repeat: the pinned live judge is called k times per finding over that
+      # survey (`--judge-repeat`), recording its replies to a DISTINCT sibling
+      # cassette (the CLI and the evaluator refuse the survey's own path). The one
+      # stdout line (agreement, per-pass faithfulness mean and worst pass, both
+      # artifacts with their digests) is archived separately from the full-repeat
+      # results, so `eval-report` never counts it as a repeat. A measured floor
+      # miss (exit 1) is kept; a structural refusal (exit 1, no line) is not.
+      - name: Measure Researcher judge agreement (fixed survey, k repeats)
+        if: ${{ !cancelled() && inputs.include_researcher == true && steps.researcher-record.outcome == 'success' }}
+        env:
+          MAOS_INFERENCE_MODE: record
+          MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
+          REPEATS: ${{ inputs.repeats }}
+          MAOS_REPLAY_CASSETTE: crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.judge-only.live.json
+        run: |
+          results=crates/maos-journey-test/cassettes/eval-results
+          rc=0
+          target/debug/maos eval distill --class researcher \
+            --cassette crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.1.json \
+            --judge-repeat "$REPEATS" > "$results/researcher.judge-only.json" || rc=$?
+          if [ "$rc" -gt 1 ]; then
+            exit "$rc"
+          fi
+          if [ ! -s "$results/researcher.judge-only.json" ]; then
+            echo "::error::Researcher judge-only evaluation produced no result (exit $rc)"
+            exit 2
+          fi
 
       # The cassettes directory carries every `.live.<i>.json`, the Researcher judge
       # sidecars `j-researcher/distill-corpus-v0.live.<i>.verdicts.json` and

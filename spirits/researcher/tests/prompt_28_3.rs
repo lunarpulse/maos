@@ -130,6 +130,74 @@ fn every_example_of_the_prompt_is_a_train_example_row_verbatim() {
     }
 }
 
+/// Review finding 9: the four train examples are the ONLY examples, and
+/// nothing of the held-out test split (claim statements, their frozen
+/// findings) occurs anywhere in the template. `rd05-c1` ("seem to" ->
+/// "appear to", the miss the prompt was written to fix) is taught by the
+/// prompt's example 2 as a PATTERN, never by its own row: a pass on it is a
+/// tuned regression case, not independent evidence of generalisation.
+#[test]
+fn the_prompt_holds_exactly_the_four_train_examples_and_no_held_out_text() {
+    let text = SYNTHESIS_PROMPT_TEMPLATE;
+    let examples = &text[text.find("## EXAMPLES").unwrap()..text.find("## INPUT").unwrap()];
+    let marked: Vec<String> = train_rows()
+        .iter()
+        .filter(|row| row["example"].as_bool().unwrap_or(false))
+        .map(|row| row["statement"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(marked.len(), 4);
+    let in_prompt: Vec<&str> = examples
+        .lines()
+        .filter_map(|line| line.strip_prefix("Claim: "))
+        .collect();
+    assert_eq!(
+        in_prompt, marked,
+        "the EXAMPLES claims are the marked train rows, in order, and no others"
+    );
+    assert_eq!(examples.matches("hedges: ").count(), 4);
+    assert_eq!(examples.matches("{\"finding\": ").count(), 4);
+    assert_eq!(examples.matches("\nExample ").count(), 4);
+
+    // Unmarked train rows are not examples either.
+    for row in train_rows()
+        .iter()
+        .filter(|row| !row["example"].as_bool().unwrap_or(false))
+    {
+        let statement = row["statement"].as_str().unwrap();
+        assert!(!text.contains(statement), "{statement}");
+    }
+
+    // Nothing held out leaks in: derive every held-out text from the test split.
+    let mut held_out: Vec<String> = Vec::new();
+    for row in common::test_rows() {
+        for claim in row["claims"].as_array().into_iter().flatten() {
+            held_out.extend(claim["statement"].as_str().map(str::to_owned));
+        }
+        for finding in row["survey"]["findings"].as_array().into_iter().flatten() {
+            held_out.extend(finding["statement"].as_str().map(str::to_owned));
+        }
+    }
+    assert!(
+        held_out.len() >= 32,
+        "{} held-out texts derived",
+        held_out.len()
+    );
+    for statement in &held_out {
+        assert!(
+            !text.contains(statement.as_str()),
+            "held-out text appears in the prompt: {statement}"
+        );
+    }
+    // The tuned regression case is held out of the prompt verbatim.
+    let rd05_c1 = common::test_rows()
+        .into_iter()
+        .flat_map(|row| row["claims"].as_array().cloned().unwrap_or_default())
+        .find(|claim| claim["claim_id"] == "rd05-c1")
+        .expect("rd05-c1 is in the test split");
+    assert_eq!(rd05_c1["hedges"], serde_json::json!(["seem to"]));
+    assert!(!text.contains(rd05_c1["statement"].as_str().unwrap()));
+}
+
 /// Regenerate the seed cassette's per-entry prompt pins over the CURRENT
 /// `synthesis_prompt`. The entries map to the corpus claims in row order,
 /// skipping exactly each row's `withheld` claim ids (the DroppedClaim
@@ -200,6 +268,7 @@ fn generate_survey_distill() {
         let prompt = synthesis_prompt(&claim.statement, &claim.hedges);
         entry["prompt_sha256"] = Value::String(sha256(&prompt));
         entry["prompt_len"] = Value::from(prompt.len());
+        as_v1_finding(entry);
     }
     let path = common::root().join(CASSETTE_SD);
     std::fs::write(&path, serde_json::to_vec_pretty(&cassette).unwrap()).expect("rewrite cassette");
@@ -281,6 +350,7 @@ fn rewrite_seed_cassette(rel: &str) {
         mapping.insert(old.clone(), new.clone());
         entry["prompt_sha256"] = Value::String(new);
         entry["prompt_len"] = Value::from(prompt.len());
+        as_v1_finding(entry);
         rewritten += 1;
     }
     assert!(
@@ -293,6 +363,24 @@ fn rewrite_seed_cassette(rel: &str) {
         println!("{rel}: {old} -> {new}");
     }
     println!("rewrote {rewritten} survey entries of {rel}");
+}
+
+/// Review finding 6: the Spirit reads a completion with the strict `{"finding":
+/// string}` decoder and persists the SOURCE summary for anything else, so a
+/// seed cassette's survey completions are v1 JSON whose finding is the old
+/// free text (every downstream digest, authoring prompt and frozen value is
+/// byte-identical). Idempotent; only survey entries call this.
+fn as_v1_finding(entry: &mut Value) {
+    if let Some(text) = entry["response"]["text"].as_str() {
+        if researcher_strict_finding(text).is_none() {
+            let wrapped = serde_json::json!({ "finding": text }).to_string();
+            entry["response"]["text"] = Value::String(wrapped);
+        }
+    }
+}
+
+fn researcher_strict_finding(text: &str) -> Option<String> {
+    maos_domain::distillation::parse_finding_completion(text).map(|f| f.into_owned())
 }
 
 /// One corpus row's surveyed claims as `(statement, hedges)` pairs, skipping

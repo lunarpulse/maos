@@ -743,3 +743,268 @@ fn a_distill_candidate_is_compared_by_one_decision_and_by_its_mandatory_failures
         stderr(&out)
     );
 }
+
+// ---------------------------------------------------------------------------
+// Story 28-3 review (findings 2 and 4) — the claim-level decisions a distill
+// line carries and the interval the report takes over them; a judge-only
+// repeat line's two artifacts.
+// ---------------------------------------------------------------------------
+
+/// The frozen corpus' clean claims: (scenario, claim, hedge count), corpus order.
+fn clean_claims() -> Vec<(String, String, usize)> {
+    let corpus = std::fs::read_to_string(
+        root().join("spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl"),
+    )
+    .unwrap();
+    corpus
+        .lines()
+        .map(|l| serde_json::from_str::<Value>(l).unwrap())
+        .filter(|row| row["control"].is_null())
+        .flat_map(|row| {
+            let scenario = row["scenario_id"].as_str().unwrap().to_owned();
+            row["claims"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| {
+                    (
+                        scenario.clone(),
+                        c["claim_id"].as_str().unwrap().to_owned(),
+                        c["hedges"].as_array().unwrap().len(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// The metrics `decisions` imply (independent of the xtask's own arithmetic).
+fn implied(decisions: &[Value]) -> [f64; 5] {
+    let found: Vec<&Value> = decisions
+        .iter()
+        .map(|d| &d["finding"])
+        .filter(|f| !f.is_null())
+        .collect();
+    let count = |key: &str| found.iter().filter(|f| f[key] == true).count() as f64;
+    let hedges: Vec<bool> = found
+        .iter()
+        .flat_map(|f| f["hedges"].as_array().unwrap().iter().map(|h| h == true))
+        .collect();
+    let n = found.len() as f64;
+    [
+        n / decisions.len() as f64,
+        count("faithful") / n,
+        hedges.iter().filter(|h| **h).count() as f64 / hedges.len() as f64,
+        count("resolves") / n,
+        count("leaks") / n,
+    ]
+}
+
+/// A distill line whose decisions are all-true except `flips` (claim index,
+/// key) set false (`"found"` drops the claim's finding); its metrics follow.
+fn decided_line(flips: &[(usize, &str)]) -> Value {
+    let decisions: Vec<Value> = clean_claims()
+        .iter()
+        .enumerate()
+        .map(|(i, (scenario, claim, hedges))| {
+            let flipped = |key: &str| flips.contains(&(i, key));
+            let finding = if flipped("found") {
+                Value::Null
+            } else {
+                json!({
+                    "faithful": !flipped("faithful"),
+                    "resolves": !flipped("resolves"),
+                    "leaks": flipped("leaks"),
+                    "hedges": vec![!flipped("hedge"); *hedges],
+                })
+            };
+            json!({"scenario_id": scenario, "claim_id": claim, "finding": finding})
+        })
+        .collect();
+    let [recall, faithfulness, hedge, traceability, leakage] = implied(&decisions);
+    distill_line(|l| {
+        l["score"]["metrics"] = json!({
+            "recall": recall, "faithfulness": faithfulness, "hedge_preservation": hedge,
+            "traceability": traceability, "secret_leakage": leakage,
+        });
+        l["decisions"] = json!(decisions);
+    })
+}
+
+fn lower(v: &Value) -> f64 {
+    v["wilson95"][0].as_f64().expect("a Wilson interval")
+}
+
+/// Before 28-3 a distill line carried only aggregates, so `wilson95` was null
+/// for every distill metric and `--calibrate` refused them. With decisions the
+/// interval is over the per-claim majority of the k repeats: one flipped
+/// repeat of three leaves the majority (25 of 25); two flip it (24 of 25).
+#[test]
+fn decisions_give_the_distill_metrics_a_wilson_interval_over_the_per_claim_majority() {
+    let dir = tempfile::tempdir().unwrap();
+    let clean = decided_line(&[]);
+    let one = write_lines(
+        dir.path(),
+        "one.jsonl",
+        &[
+            clean.clone(),
+            decided_line(&[(3, "faithful")]),
+            clean.clone(),
+        ],
+    );
+    let r = json_of(&aggregate(&one, &fixtures(), &[]));
+    let faith = &r["metrics"]["faithfulness"];
+    assert_eq!(
+        (faith["n"].as_u64(), faith["majority"].as_f64()),
+        (Some(25), Some(1.0))
+    );
+    assert!((lower(faith) - 0.8668).abs() < 1e-3, "{faith}");
+    assert!((faith["mean"].as_f64().unwrap() - (1.0 + 0.96 + 1.0) / 3.0).abs() < 1e-12);
+    // 18 hedges in the clean rows; every one kept by the majority.
+    let hedge = &r["metrics"]["hedge_preservation"];
+    assert_eq!(
+        (hedge["n"].as_u64(), hedge["majority"].as_f64()),
+        (Some(18), Some(1.0))
+    );
+    assert!(r["metrics"]["secret_leakage"]["wilson95"].is_array());
+    assert_eq!(r["pass"], true, "{}", r["failures"]);
+
+    let two = write_lines(
+        dir.path(),
+        "two.jsonl",
+        &[
+            decided_line(&[(3, "faithful")]),
+            decided_line(&[(3, "faithful")]),
+            clean.clone(),
+        ],
+    );
+    let r = json_of(&aggregate(&two, &fixtures(), &[]));
+    let faith = &r["metrics"]["faithfulness"];
+    assert_eq!(faith["majority"].as_f64(), Some(0.96));
+    assert!((lower(faith) - 0.8046).abs() < 1e-3, "{faith}");
+
+    // A claim the majority did not find leaves every finding denominator.
+    let missing = decided_line(&[(0, "found")]);
+    let three = write_lines(
+        dir.path(),
+        "three.jsonl",
+        &[missing.clone(), missing, clean],
+    );
+    let r = json_of(&aggregate(&three, &fixtures(), &[]));
+    assert_eq!(r["metrics"]["recall"]["majority"].as_f64(), Some(0.96));
+    assert_eq!(r["metrics"]["faithfulness"]["n"], 24);
+
+    // The calibration path now has an interval to take its lower bound from.
+    let live = dir.path().join("decided.live.json");
+    aggregate(&one, &fixtures(), &["--out", s(&live)]);
+    let out = xtask(&[
+        "eval-report",
+        "--calibrate",
+        "--spec",
+        "0.98",
+        "--metric",
+        "faithfulness",
+        "--result",
+        s(&live),
+    ]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let c = json_of(&out);
+    assert!((c["wilson95"][0].as_f64().unwrap() - 0.8668).abs() < 1e-3);
+    assert_eq!(c["floor"], 0.98, "the spec minimum is the larger");
+}
+
+#[test]
+fn a_line_whose_metrics_disagree_with_its_decisions_or_that_half_carries_them_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut lying = decided_line(&[]);
+    lying["score"]["metrics"]["faithfulness"] = json!(0.5);
+    let results = write_lines(dir.path(), "lying.jsonl", &[lying]);
+    let out = aggregate(&results, &fixtures(), &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("score.metrics.faithfulness disagrees with its decisions"),
+        "{}",
+        stderr(&out)
+    );
+
+    let mut wrong_claims = decided_line(&[]);
+    wrong_claims["decisions"].as_array_mut().unwrap().pop();
+    let results = write_lines(dir.path(), "short.jsonl", &[wrong_claims]);
+    let out = aggregate(&results, &fixtures(), &[]);
+    assert!(
+        stderr(&out).contains("not the corpus' clean claims"),
+        "{}",
+        stderr(&out)
+    );
+
+    let mut bare = decided_line(&[]);
+    bare.as_object_mut().unwrap().remove("decisions");
+    let results = write_lines(dir.path(), "half.jsonl", &[decided_line(&[]), bare]);
+    let out = aggregate(&results, &fixtures(), &[]);
+    assert!(
+        stderr(&out).contains("only some result lines carry `decisions`"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+/// Finding 2 — a judge-only repeat line's `cassette` is the judge OUTPUT and
+/// its digest is that file's; the survey it replayed is its own artifact with
+/// its own digest, reported and re-hashed.
+#[test]
+fn a_judge_repeat_line_is_checked_against_both_of_its_artifacts() {
+    let dir = tempfile::tempdir().unwrap();
+    let cassettes = dir.path().join("cassettes");
+    std::fs::create_dir(&cassettes).unwrap();
+    let output = std::fs::read(fixtures().join("distill-corpus-v0.live.json")).unwrap();
+    std::fs::write(cassettes.join("distill-corpus-v0.live.json"), &output).unwrap();
+    let survey = b"{\"entries\": [], \"provenance\": \"live-record\"}\n";
+    std::fs::write(cassettes.join("survey.json"), survey).unwrap();
+    let digest = |bytes: &[u8]| format!("{:x}", Sha256::digest(bytes));
+
+    let repeat_line = |survey_sha: String| {
+        let mut line = decided_line(&[]);
+        line["judge_repeat"] = json!({
+            "k": 3, "gate_basis": "first-verdict",
+            "survey_cassette": "elsewhere/survey.json", "survey_cassette_sha256": survey_sha,
+            "agreement_rate": 1.0, "faithfulness_per_pass": [1.0, 1.0, 1.0],
+            "faithfulness_mean": 1.0, "faithfulness_worst_pass": 1.0,
+        });
+        line
+    };
+    let good = write_lines(dir.path(), "good.jsonl", &[repeat_line(digest(survey))]);
+    let out = aggregate(&good, &cassettes, &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let run = &json_of(&out)["runs"][0];
+    assert_eq!(run["cassette_sha256"], digest(&output).as_str());
+    assert_eq!(run["survey_cassette"], "elsewhere/survey.json");
+    assert_eq!(run["survey_cassette_sha256"], digest(survey).as_str());
+    assert_eq!(run["judge_repeat"]["faithfulness_worst_pass"], 1.0);
+
+    // Each artifact is checked on its own digest.
+    let bad_survey = write_lines(
+        dir.path(),
+        "bad-survey.jsonl",
+        &[repeat_line("00".repeat(32))],
+    );
+    let out = aggregate(&bad_survey, &cassettes, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("judge_repeat.survey_cassette_sha256"),
+        "{}",
+        stderr(&out)
+    );
+
+    // The pre-fix line: `cassette_sha256` over the SURVEY input while
+    // `cassette` names the judge output is rejected.
+    let mut aliased = repeat_line(digest(survey));
+    aliased["cassette_sha256"] = json!(digest(survey));
+    let results = write_lines(dir.path(), "aliased.jsonl", &[aliased]);
+    let out = aggregate(&results, &cassettes, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("(cassette_sha256)"),
+        "{}",
+        stderr(&out)
+    );
+}

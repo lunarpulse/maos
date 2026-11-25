@@ -88,7 +88,7 @@ fn live_path_uses_inference_port_text_with_token_and_pid() {
         "the original source statement",
     )];
     let port = Arc::new(StubInferencePort::new(
-        "LIVE digest sentence from the model.",
+        r#"{"finding":"LIVE digest sentence from the model."}"#,
     ));
 
     let researcher = Researcher::with_frames(frames.clone()).with_inference_port(
@@ -143,7 +143,7 @@ fn deterministic_path_is_byte_identical_to_v05_survey() {
 
     let live = Researcher::with_frames(frames.clone()).with_inference_port(
         Arc::new(StubInferencePort::new(
-            "a completely different model sentence",
+            r#"{"finding":"a completely different model sentence"}"#,
         )) as Arc<dyn InferencePort + Send + Sync>,
         "anthropic",
         token(7),
