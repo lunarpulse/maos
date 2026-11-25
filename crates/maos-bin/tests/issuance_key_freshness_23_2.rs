@@ -32,9 +32,10 @@ use maos_bin::worker_spawn::{
 };
 use maos_domain::invariants::i1::{IntentClass, Scope};
 use maos_domain::invariants::i9::SandboxTier;
+use maos_domain::ports::identity_assertion::KeyFreshnessIssuer;
 use maos_domain::ports::{
-    IdentityAssertionPort, PolicyDecisionError, PolicyDecisionPort, PolicyDecisionRequest,
-    PolicyVerdict,
+    AuthenticatedPrincipal, IdentityAssertionPort, IdentityError, PolicyDecisionError,
+    PolicyDecisionPort, PolicyDecisionRequest, PolicyVerdict,
 };
 use maos_kernel_core::capability::{
     cap_audit,
@@ -398,5 +399,40 @@ fn a_key_set_that_expired_between_verification_and_mint_is_refused_and_issues_no
         // The recheck nudged the refresher (no wait): once it republished, the retry mints.
         idp.await_refreshes(2);
         idp.assert_budget_untouched(wait);
+    }
+}
+
+/// A static key set (a port that never issues a proof) and a runtime with no port at all cannot
+/// validate a supplied proof: it is a bug, and the runtime refuses it (the generic denial)
+/// instead of the old default `true`/`Ok(())`.
+#[test]
+fn a_supplied_proof_is_refused_where_nothing_can_validate_it() {
+    struct StaticKeys;
+    impl IdentityAssertionPort for StaticKeys {
+        fn verify(&self, _assertion: &str) -> Result<AuthenticatedPrincipal, IdentityError> {
+            Err(IdentityError::SignatureInvalid)
+        }
+        fn is_healthy(&self) -> bool {
+            true
+        }
+    }
+    let proof = KeyFreshnessIssuer::new().issue("key-a", 1, 3_600_000);
+    let ports: [Option<Arc<dyn IdentityAssertionPort>>; 2] = [Some(Arc::new(StaticKeys)), None];
+    for port in ports {
+        let runtime = EnterpriseRuntime::from_ports(
+            EnterpriseConfig::empty().with_sso_available(),
+            port,
+            None,
+            None,
+            None,
+            None,
+            None,
+            7,
+        );
+        assert_generic_denial(
+            runtime
+                .ensure_key_fresh(PID, &proof)
+                .map_err(|e| GovernedMintError::SsoAssertionMissing(e.to_string())),
+        );
     }
 }

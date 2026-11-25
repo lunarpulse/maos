@@ -521,10 +521,16 @@ fn issue_governed_capability(
         }
     }
 
-    // Story 23-2 (round 4): the discovered key the verification used must still be published and
+    // Story 23-2 (round 5): the discovered key the verification used must still be published and
     // unexpired AT the authorization point, after PDP and immediately before the mint. Never
     // waits for discovery and holds no discovery lock across PDP, sealing or audit; both the
     // bounded-wait callers and the no-wait caller (the digest admission guard) pass through here.
+    // Residual (operator accept I): the token is inserted inside the kernel capability registry,
+    // so a key retired after this check and before the insert is not detected. That window is
+    // the duration of `issue_with_mediation` (policy, context, quota-shard wait, store), not a
+    // fixed small time; it is small against the revocation semantics (a withdrawn key verifies
+    // until the next successful refresh, up to the TTL) and the token's own lifetime does not
+    // depend on the key's later retirement.
     if let (Some(runtime), Some(proof)) = (enterprise_runtime, freshness.as_ref()) {
         runtime
             .ensure_key_fresh(spirit_pid, proof)

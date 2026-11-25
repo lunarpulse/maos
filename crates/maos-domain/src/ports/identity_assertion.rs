@@ -17,15 +17,80 @@ pub struct AuthenticatedPrincipal {
     pub attributes: HashMap<String, String>,
 }
 
-/// Story 23-2 (round 4) — what a verification relied on, so the issuance point can ask whether
+/// Story 23-2 (round 5) — what a verification relied on, so the issuance point can ask whether
 /// it still holds: the `kid` of the key that verified, the publication stamp of the key set that
 /// held it, and the clock reading (milliseconds, the verifier's clock) at which that set's hard
-/// TTL ends. Opaque to everyone but the verifier that made it.
+/// TTL ends, bound to the verifier that made it. Opaque: no field is public and the only way to
+/// make one is [`KeyFreshnessIssuer::issue`], so a proof cannot be assembled from a tuple; a
+/// verifier accepts only a proof its own issuer made ([`KeyFreshnessIssuer::issued`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KeyFreshness {
-    pub kid: String,
-    pub key_set: u64,
-    pub expires_at_ms: u64,
+    verifier: u64,
+    kid: String,
+    key_set: u64,
+    expires_at_ms: u64,
+}
+
+impl KeyFreshness {
+    /// The `kid` of the key that verified.
+    #[must_use]
+    pub fn kid(&self) -> &str {
+        &self.kid
+    }
+
+    /// The publication stamp of the key set that held the key.
+    #[must_use]
+    pub fn key_set(&self) -> u64 {
+        self.key_set
+    }
+
+    /// The verifier-clock reading (milliseconds) at which that key set's hard TTL ends.
+    #[must_use]
+    pub fn expires_at_ms(&self) -> u64 {
+        self.expires_at_ms
+    }
+}
+
+/// Story 23-2 (round 5) — the identity of one verifier, held privately by it. Every issuer has a
+/// process-unique id, so a proof made by one verifier is never `issued` by another, even for the
+/// same `kid` and publication stamp. Deliberately not `Clone`.
+#[derive(Debug)]
+pub struct KeyFreshnessIssuer {
+    id: u64,
+}
+
+impl Default for KeyFreshnessIssuer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KeyFreshnessIssuer {
+    /// A new issuer with a process-unique id.
+    #[must_use]
+    pub fn new() -> Self {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        Self {
+            id: NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        }
+    }
+
+    /// A proof bound to this issuer.
+    #[must_use]
+    pub fn issue(&self, kid: &str, key_set: u64, expires_at_ms: u64) -> KeyFreshness {
+        KeyFreshness {
+            verifier: self.id,
+            kid: kid.to_owned(),
+            key_set,
+            expires_at_ms,
+        }
+    }
+
+    /// Whether `proof` was made by this issuer.
+    #[must_use]
+    pub fn issued(&self, proof: &KeyFreshness) -> bool {
+        proof.verifier == self.id
+    }
 }
 
 /// Fail-closed identity verification errors.
@@ -97,12 +162,11 @@ pub trait IdentityAssertionPort: Send + Sync {
         Ok((principal, None))
     }
 
-    /// Class: supervision
-    ///
     /// Whether the key a [`KeyFreshness`] names is still the published, unexpired key. MUST NOT
-    /// wait on discovery or hold a lock past its own answer; the default (no rotation) is `true`.
+    /// wait on discovery or hold a lock past its own answer. The default REFUSES: a port that
+    /// never issues a proof cannot validate one, so a supplied proof is a bug and fails closed.
     fn key_still_fresh(&self, _proof: &KeyFreshness) -> bool {
-        true
+        false
     }
 }
 

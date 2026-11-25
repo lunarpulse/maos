@@ -439,21 +439,26 @@ impl EnterpriseRuntime {
         self.verify_principal(spirit_pid, assertion, wait)
     }
 
-    /// Story 23-2 (round 4) — the issuance-point recheck: the key a verification used must still
+    /// Story 23-2 (round 5) — the issuance-point recheck: the key a verification used must still
     /// be published and unexpired. Never waits and holds no discovery lock afterwards; a key set
     /// that expired, or a `kid` retired or replaced since, is a denial with the same generic
-    /// text as an unavailable identity provider.
+    /// text as an unavailable identity provider. A proof the runtime's port cannot validate (no
+    /// port, or a port that never issued one such as a static key set) is a bug and is refused
+    /// too: a supplied proof fails closed. Residual (operator accept I): a key retired after
+    /// this check and before the token is inserted in the kernel registry is not detected; that
+    /// window is the duration of `issue_with_mediation`, not a fixed small time.
     ///
     /// # Errors
-    /// [`EnterpriseFailure::SsoIssuanceDenied`] when the proof no longer holds.
+    /// [`EnterpriseFailure::SsoIssuanceDenied`] when the proof no longer holds or cannot be
+    /// validated.
     pub fn ensure_key_fresh(
         &self,
         spirit_pid: u32,
         proof: &KeyFreshness,
     ) -> Result<(), EnterpriseFailure> {
         match &self.identity_port {
-            Some(port) if !port.key_still_fresh(proof) => Err(self.idp_unavailable(spirit_pid)),
-            _ => Ok(()),
+            Some(port) if port.key_still_fresh(proof) => Ok(()),
+            _ => Err(self.idp_unavailable(spirit_pid)),
         }
     }
 

@@ -1,0 +1,9 @@
+Round 5, R5-2 (Rev232G4 P2): an epoch-only supersession of a healthy set must not nudge a refresh.
+Marker: E232-PLANT-r5-2a (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, DiscoveringVerifier::key_still_fresh, the `Some(epoch)` arm:
+  `Some(epoch) => epoch == proof.key_set(),`  ->  an arm that calls `nudge_refresh_locked` when `epoch != proof.key_set()` (the round-4 behaviour).
+Command: cargo test -p maos-sso --features discovery --test key_freshness_23_2 (CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232r)
+Observed: 8 passed, 1 FAILED:
+  an_epoch_only_refusal_schedules_no_refresh_but_a_retired_kid_does  panicked at crates/maos-sso/tests/key_freshness_23_2.rs:272:5
+  (left == right: an epoch-only refusal asks for no refresh; left: 2, right: 1)
+Note: the oracle is the deterministic `DiscoveringVerifier::refresh_nudges()` counter (nudges accepted by the limiter), read synchronously after the refusal; the limiter is open (clock 62 s, last attempt 31 s, minimum 30 s), proven by the positive control in the same test.

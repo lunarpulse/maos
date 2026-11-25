@@ -1,0 +1,9 @@
+Round 5, R5-1 (Rev232G4 P2): freshness proof bound to its originating verifier.
+Marker: E232-PLANT-r5-1a (removed; grep-verified empty).
+Plant: crates/maos-sso/src/discovery.rs, DiscoveringVerifier::key_still_fresh:
+  `if !self.shared.proofs.issued(proof) {`  ->  `if false && !self.shared.proofs.issued(proof) {`  (any verifier accepts any proof whose tuple matches).
+Command: cargo test -p maos-sso --features discovery --test key_freshness_23_2 (CARGO_TARGET_DIR=/mnt/build/cargo-maos-e232r)
+Observed: 6 passed, 3 FAILED:
+  a_genuine_proof_from_another_verifier_is_refused  panicked at crates/maos-sso/tests/key_freshness_23_2.rs:233:5 (B refuses A's proof)
+  a_counterfeit_proof_matching_every_observable_is_refused  panicked at :252:5 (assertion failed: !verifier.key_still_fresh(&counterfeit))
+  a_proof_cannot_be_assembled_from_its_claims  panicked at :198:5 (same claims, other issuer)

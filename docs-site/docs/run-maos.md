@@ -162,12 +162,20 @@ malformed (as opposed to validly empty) keeps the old keys. A fetch that does no
 within 30 s is abandoned; an issuer that never answers at all leaves discovery down until
 it does. A cohort digest read is verified inside the cohort lock without ever waiting for
 the identity provider, so the first digest request after an IdP key rotation is refused.
-A retry recovers only after the refresh limiter has reopened (a new key id that arrives
-within the minimum refresh interval of the previous refresh is refused without scheduling a
-refresh) and a refresh has started and published, so repeated refusals are possible, and
-every retry is made by the caller; the daemon does not retry. If the issuer reuses a key id
-with new key material, recovery waits for the half-TTL idle refresh (about half
-`MAOS_SSO_JWKS_TTL_SECS` plus the idle tick). A `MAOS_SSO_*`
+A retry usually recovers only after the refresh limiter has reopened (a new key id that
+arrives within the minimum refresh interval of the previous refresh is refused without
+scheduling a refresh) and a refresh has started and published, so repeated refusals are
+possible, and every retry is made by the caller; the daemon does not retry. The sequence
+can end sooner: if an already-running refresh publishes the new key before the limiter
+reopens, a retry can succeed while the limiter is still closed, and if the idle refresh
+published it before the first request, the first request can succeed. If the issuer reuses
+a key id with new key material, the refusal does not itself ask for a refresh: recovery is
+on the next successful publication, normally the half-TTL idle refresh (about half
+`MAOS_SSO_JWKS_TTL_SECS` plus the idle tick, a scheduling target gated by the limiter, not
+a completion bound). A token's key is rechecked just before it is minted; a key withdrawn
+by a publication after that check and before the token is stored (the duration of the
+mint, with no fixed bound) is not detected, which is small against the TTL-long
+revocation window above and is an operator-accepted residual. A `MAOS_SSO_*`
 variable that is not valid UTF-8 leaves SSO configured-down
 (`sso_env_not_unicode: <NAME>`). The principal is asserted, not authenticated, at the
 door.

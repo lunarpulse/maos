@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use maos_domain::ports::identity_assertion::KeyFreshness;
+use maos_domain::ports::identity_assertion::{KeyFreshness, KeyFreshnessIssuer};
 use maos_domain::ports::IdentityAssertionPort;
 use maos_sso::discovery::{Clock, DiscoveringVerifier, DiscoveryConfig, FetchError, Fetcher};
 use maos_sso::OidcAlgorithm;
@@ -47,6 +47,7 @@ impl Clock for ManualClock {
 #[derive(Default)]
 struct Script {
     routes: Mutex<HashMap<String, Vec<u8>>>,
+    gets: AtomicU64,
 }
 
 impl Script {
@@ -56,10 +57,16 @@ impl Script {
             .unwrap()
             .insert(url.to_owned(), body.as_bytes().to_vec());
     }
+
+    /// Requests the fetcher has answered or refused so far.
+    fn gets(&self) -> u64 {
+        self.gets.load(Ordering::SeqCst)
+    }
 }
 
 impl Fetcher for Script {
     fn get(&self, url: &str) -> Result<Vec<u8>, FetchError> {
+        self.gets.fetch_add(1, Ordering::SeqCst);
         self.routes
             .lock()
             .unwrap()
@@ -121,8 +128,8 @@ fn proof(verifier: &DiscoveringVerifier) -> KeyFreshness {
 fn a_verification_carries_the_key_the_set_and_the_expiry() {
     let (verifier, clock, _script) = started();
     let cached = proof(&verifier);
-    assert_eq!(cached.kid, "key-a");
-    assert_eq!(cached.expires_at_ms, TTL_MS, "fetched at 0, default TTL");
+    assert_eq!(cached.kid(), "key-a");
+    assert_eq!(cached.expires_at_ms(), TTL_MS, "fetched at 0, default TTL");
     let waiting = verifier
         .verify_with_freshness(fixtures::TOKEN_GOOD_RS256, true)
         .unwrap()
@@ -174,46 +181,30 @@ fn a_proof_does_not_hold_once_another_key_set_was_published() {
         "the same kid in a newer set is a different publication"
     );
     let fresh = proof(&verifier);
-    assert_ne!(fresh.key_set, old.key_set);
+    assert_ne!(fresh.key_set(), old.key_set());
     assert!(verifier.key_still_fresh(&fresh), "a new proof holds");
 }
 
-/// The recheck trusts the verifier's own state, not the proof's claims: a `kid` the current set
-/// lacks, a wrong stamp, an expiry later than the set's own, or an earlier one all refuse.
+/// The recheck trusts the verifier's own identity and state, not claims: the type is opaque, so
+/// the same claims (or a later expiry) made by another issuer are refused, and the real proof
+/// does not outlive its set's TTL.
 #[test]
-fn a_forged_proof_is_refused() {
+fn a_proof_cannot_be_assembled_from_its_claims() {
     let (verifier, clock, _script) = started();
     let real = proof(&verifier);
-    let forged_kid = KeyFreshness {
-        kid: "key-unknown".to_owned(),
-        ..real.clone()
-    };
+    // Every claim the real proof carries, minted by another issuer: refused at every clock.
+    let other = KeyFreshnessIssuer::new();
+    let same = other.issue(real.kid(), real.key_set(), real.expires_at_ms());
     assert!(
-        !verifier.key_still_fresh(&forged_kid),
-        "a kid the set lacks"
+        !verifier.key_still_fresh(&same),
+        "same claims, other issuer"
     );
-    let forged_stamp = KeyFreshness {
-        key_set: real.key_set + 1,
-        ..real.clone()
-    };
-    assert!(!verifier.key_still_fresh(&forged_stamp), "another stamp");
-    let forged_early = KeyFreshness {
-        expires_at_ms: 1_000,
-        ..real.clone()
-    };
-    clock.set_millis(1_000);
-    assert!(
-        !verifier.key_still_fresh(&forged_early),
-        "a proof whose own expiry has passed"
-    );
+    let later = other.issue(real.kid(), real.key_set(), u64::MAX);
     clock.set_millis(TTL_MS);
-    let forged_late = KeyFreshness {
-        expires_at_ms: u64::MAX,
-        ..real
-    };
+    assert!(!verifier.key_still_fresh(&later), "a later expiry");
     assert!(
-        !verifier.key_still_fresh(&forged_late),
-        "a later expiry than the set's own does not extend it"
+        !verifier.key_still_fresh(&real),
+        "and the real one has expired"
     );
 }
 
@@ -230,4 +221,80 @@ fn a_refused_recheck_nudges_the_refresher_and_never_waits() {
     await_refreshes(&verifier, before + 1);
     assert!(verifier.is_healthy(), "the nudged refresh republished");
     assert_eq!(verifier.refresh_waits(), waits, "the recheck never waited");
+}
+
+/// Round 5 (P2-1): a proof is bound to the verifier that made it. Two verifiers with the same
+/// `kid` and each at its first publication stamp: B refuses A's genuine proof (and A refuses
+/// B's), while each accepts its own.
+#[test]
+fn a_genuine_proof_from_another_verifier_is_refused() {
+    let (a, _clock_a, _script_a) = started();
+    let (b, _clock_b, _script_b) = started();
+    let from_a = proof(&a);
+    let from_b = proof(&b);
+    assert_eq!(from_a.kid(), from_b.kid(), "the same kid");
+    assert_eq!(from_a.key_set(), from_b.key_set(), "the same first stamp");
+    assert_eq!(from_a.expires_at_ms(), from_b.expires_at_ms());
+    assert!(a.key_still_fresh(&from_a) && b.key_still_fresh(&from_b));
+    assert!(!b.key_still_fresh(&from_a), "B refuses A's proof");
+    assert!(!a.key_still_fresh(&from_b), "A refuses B's proof");
+}
+
+/// Round 5 (P2-1): the type is opaque (no field is public), so a tuple that matches every
+/// observable of the real proof can only come from another issuer, and is refused. The same
+/// goes for a proof whose tuple the verifier's own set would otherwise accept.
+#[test]
+fn a_counterfeit_proof_matching_every_observable_is_refused() {
+    let (verifier, _clock, _script) = started();
+    let real = proof(&verifier);
+    let counterfeit =
+        KeyFreshnessIssuer::new().issue(real.kid(), real.key_set(), real.expires_at_ms());
+    assert_eq!(counterfeit.kid(), real.kid());
+    assert_eq!(counterfeit.key_set(), real.key_set());
+    assert_eq!(counterfeit.expires_at_ms(), real.expires_at_ms());
+    assert!(!verifier.key_still_fresh(&counterfeit));
+    assert!(
+        verifier.key_still_fresh(&real),
+        "the real proof still holds"
+    );
+}
+
+/// Round 5 (P2-2): a refusal that is ONLY an epoch supersession of a healthy set (the `kid` is
+/// still published, the set unexpired) schedules no refresh, even with the limiter open: the
+/// caller re-verifies against the already-published set. A retired `kid` still nudges (the
+/// positive control also proves the limiter was open for the first refusal).
+#[test]
+fn an_epoch_only_refusal_schedules_no_refresh_but_a_retired_kid_does() {
+    let (verifier, clock, script) = started();
+    let old = proof(&verifier);
+    clock.set_millis(31_000);
+    verifier.request_refresh();
+    await_refreshes(&verifier, 2);
+    // The limiter (30 s) has reopened: a nudge now WOULD be accepted.
+    clock.set_millis(62_000);
+    let nudges = verifier.refresh_nudges();
+    let fetches = script.gets();
+    assert!(!verifier.key_still_fresh(&old), "a newer set was published");
+    assert_eq!(
+        verifier.refresh_nudges(),
+        nudges,
+        "an epoch-only refusal asks for no refresh"
+    );
+    assert_eq!(script.gets(), fetches, "and fetches nothing");
+    let fresh = proof(&verifier);
+    assert!(verifier.key_still_fresh(&fresh), "re-verified, it holds");
+
+    // Control: the kid is retired by the next publication; the refusal nudges.
+    script.serve(JWKS_URL, &fixtures::JWKS_KEY_A.replace("key-a", "key-z"));
+    verifier.request_refresh();
+    await_refreshes(&verifier, 3);
+    clock.set_millis(93_000);
+    let nudges = verifier.refresh_nudges();
+    assert!(!verifier.key_still_fresh(&fresh));
+    assert_eq!(
+        verifier.refresh_nudges(),
+        nudges + 1,
+        "a retired kid asks for a refresh"
+    );
+    await_refreshes(&verifier, 4);
 }

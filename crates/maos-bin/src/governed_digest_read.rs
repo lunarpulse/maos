@@ -5,23 +5,36 @@
 //! guard; only a new admissible request runs the governance chain (SSO principal, PDP, kernel
 //! mint, audit, seal, SIEM) and publishes the reply obligation. ONE linearization point: the
 //! chain runs inside the state's admission guard, so verification and mint are the same
-//! microsecond window every other governed mint has.
+//! window every other governed mint has (see the last paragraph for its bound).
 //!
 //! Story 23-2: the guard holds the admitted-read and pending-reply mutexes, so nothing inside
 //! it may wait on the network. The governor's SSO step therefore uses the non-waiting
 //! verification (`issue_enterprise_governed_capability_no_wait`): an unknown key id or a stale
 //! key set is refused at once, fail-closed, and nudges the key refresher without waiting.
 //! No thread ever waits for discovery inside the cohort critical section. The cost: a request
-//! whose key the cache lacks is refused, and a retry recovers only once the refresher has
-//! published a set that holds the key (the nudge is dropped while the refresh interval is closed
-//! or a refresh is pending, so repeated refusals are possible and every retry is the caller's);
-//! a reused `kid` with new material finds the cached key, fails the signature, asks for no
-//! refresh, and recovers at the next idle refresh.
+//! whose key the cache lacks is refused. Recovery depends on timing and is not one refusal: the
+//! refusal nudges the refresher only when the limiter is open and no refresh is pending (a
+//! dropped nudge is not queued); if an already-running refresh publishes the key before the
+//! limiter reopens, a retry can succeed while the limiter is still closed; if the idle refresh
+//! published it before the first request, the first request succeeds; otherwise a retry
+//! succeeds once a refresh has started and published a set that holds the key, and every retry
+//! is the caller's. A reused `kid` with new material finds the cached key, fails the signature
+//! and does not itself nudge: recovery is on the next successful publication (half the TTL
+//! plus the idle tick is a scheduling target gated by the limiter, not a completion bound).
 //!
 //! The same no-wait recheck guards the mint itself: the governed mint verifies a freshness proof
 //! (the verifying key's `kid`, its key set's publication stamp and TTL expiry) immediately
 //! before `issue_with_mediation`, so a key set that expired or a `kid` retired between the
 //! signature check and the mint is refused with the same generic denial.
+//!
+//! Residual (operator accept I, RELEASE-HOLDS 23-2.e/23-2.f): the token is published inside the
+//! kernel capability registry (policy, context, quota shard, token store), which this crate
+//! cannot change. A key retired by a publication after the recheck and before the token is
+//! inserted is not detected. That window is the duration of `issue_with_mediation`: it can
+//! exceed a few instructions under quota-shard contention or process suspension, so it is
+//! not bounded by a fixed time. It is small against the documented revocation semantics (a
+//! withdrawn key already verifies until the next successful refresh, up to the TTL), and a
+//! minted token's own lifetime is independent of the key's later retirement.
 
 use std::sync::Arc;
 

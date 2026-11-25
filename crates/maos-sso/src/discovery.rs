@@ -58,7 +58,7 @@ use std::time::{Duration, Instant};
 
 use maos_domain::outbound::OutboundRefusal;
 #[cfg(not(feature = "sso-fault-inject"))]
-use maos_domain::ports::identity_assertion::KeyFreshness;
+use maos_domain::ports::identity_assertion::{KeyFreshness, KeyFreshnessIssuer};
 use maos_domain::ports::io_subsystem::{IoError, IoSubsystemPort};
 use maos_domain::ports::{AuthenticatedPrincipal, IdentityAssertionPort, IdentityError};
 use serde::Deserialize;
@@ -564,6 +564,8 @@ struct State {
     last_wait: Duration,
     /// Clock milliseconds at which the latest refresh attempt was published.
     published_at: u64,
+    /// Non-blocking refreshes scheduled (see `nudge_refresh_locked`).
+    nudges: u64,
 }
 
 struct Shared {
@@ -571,6 +573,9 @@ struct Shared {
     rules: Rules,
     fetcher: Arc<dyn Fetcher>,
     clock: Arc<dyn Clock>,
+    /// The identity of this verifier: the only maker (and checker) of its freshness proofs.
+    #[cfg(not(feature = "sso-fault-inject"))]
+    proofs: KeyFreshnessIssuer,
     state: Mutex<State>,
     wake_refresher: Condvar,
     refresh_done: Condvar,
@@ -895,6 +900,8 @@ impl DiscoveringVerifier {
             rules,
             fetcher,
             clock,
+            #[cfg(not(feature = "sso-fault-inject"))]
+            proofs: KeyFreshnessIssuer::new(),
             state: Mutex::new(State {
                 keys: None,
                 last_attempt: None,
@@ -908,6 +915,7 @@ impl DiscoveringVerifier {
                 abandoned: None,
                 last_wait: Duration::ZERO,
                 published_at: 0,
+                nudges: 0,
             }),
             wake_refresher: Condvar::new(),
             refresh_done: Condvar::new(),
@@ -947,6 +955,13 @@ impl DiscoveringVerifier {
     #[must_use]
     pub fn last_verify_wait(&self) -> Duration {
         self.shared.lock().last_wait
+    }
+
+    /// Non-blocking refreshes scheduled by a refusal or by [`Self::request_refresh`] (a
+    /// diagnostic: a nudge dropped by the limiter or by a pending refresh does not count).
+    #[must_use]
+    pub fn refresh_nudges(&self) -> u64 {
+        self.shared.lock().nudges
     }
 
     /// Abandoned fetch workers that have not returned yet (zero or one).
@@ -1015,26 +1030,34 @@ impl IdentityAssertionPort for DiscoveringVerifier {
             .map(|(principal, proof)| (principal, Some(proof)))
     }
 
-    /// Story 23-2 (round 4) — the issuance-point recheck: never waits, never fetches, holds the
+    /// Story 23-2 (round 5) — the issuance-point recheck: never waits, never fetches, holds the
     /// state mutex only for this comparison (not across PDP, sealing or audit). `true` only
-    /// while the key set the verification used is still the published one, unexpired at the
-    /// verifier's own clock, and still holds the `kid`. A key set published since (even with
-    /// the same `kid`) is refused: the caller re-verifies against it. A refusal nudges the
-    /// refresher without waiting.
+    /// for a proof THIS verifier made, while the key set it used is still the published one,
+    /// unexpired at the verifier's own clock, and still holds the `kid`. A proof from another
+    /// verifier is refused outright (no nudge). A key set published since (even with the same
+    /// `kid`) is refused so the caller re-verifies against it; that refusal alone asks for NO
+    /// refresh (the published set is healthy and holds the `kid`), while a stale or absent set
+    /// or a retired `kid` nudges the refresher without waiting.
     #[cfg(not(feature = "sso-fault-inject"))]
     fn key_still_fresh(&self, proof: &KeyFreshness) -> bool {
+        if !self.shared.proofs.issued(proof) {
+            return false;
+        }
         let mut state = self.shared.lock();
         let now = self.shared.clock.now_millis();
-        let current = state.keys.as_ref().is_some_and(|keys| {
-            keys.epoch == proof.key_set
-                && now < proof.expires_at_ms
-                && self.shared.fresh(keys, now)
-                && keys.keys.contains_key(&proof.kid)
-        });
-        if !current {
-            self.shared.nudge_refresh_locked(&mut state, now);
+        let published = state
+            .keys
+            .as_ref()
+            .filter(|keys| self.shared.fresh(keys, now) && now < proof.expires_at_ms())
+            .filter(|keys| keys.keys.contains_key(proof.kid()))
+            .map(|keys| keys.epoch);
+        match published {
+            Some(epoch) => epoch == proof.key_set(),
+            None => {
+                self.shared.nudge_refresh_locked(&mut state, now);
+                false
+            }
         }
-        current
     }
 }
 
@@ -1045,7 +1068,7 @@ impl Shared {
         let mut state = self.lock();
         let now = self.clock.now_millis();
         // The key is COPIED under the state mutex; the signature check runs after the mutex is
-        // released (a few microseconds of RSA/EC work). The copy carries the proof that the
+        // released (the RSA/EC work). The copy carries the proof that the
         // issuance point rechecks (`key_still_fresh`); the mutex is never held across anything.
         let found = state
             .keys
@@ -1075,6 +1098,7 @@ impl Shared {
     fn nudge_refresh_locked(&self, state: &mut State, now: u64) {
         if !state.pending && !state.shutdown && self.limiter_open(state, now) {
             state.pending = true;
+            state.nudges += 1;
             self.wake_refresher.notify_one();
         }
     }
@@ -1094,11 +1118,11 @@ impl DiscoveringVerifier {
             } else {
                 self.shared.cached_key(kid)
             }?;
-            proof = Some(KeyFreshness {
-                kid: kid.to_owned(),
-                key_set: found.key_set,
-                expires_at_ms: found.expires_at,
-            });
+            proof = Some(
+                self.shared
+                    .proofs
+                    .issue(kid, found.key_set, found.expires_at),
+            );
             Some(found.jwk)
         })?;
         // `Rules::verify` succeeds only after the lookup returned a key.
