@@ -417,18 +417,16 @@ fn s3_diagnostics(run: &TerminalRun, elapsed: Duration, version: &str) -> String
             .map(|(_, _, payload)| payload.to_string())
             .collect::<Vec<_>>()
             .join(" | ");
+        // The cap covers the text AND the marker (total <= EXIT_ROWS_CAP).
+        const MARKER: &str = "…[truncated]";
         if joined.len() <= EXIT_ROWS_CAP {
             joined
         } else {
-            let mut end = EXIT_ROWS_CAP;
+            let mut end = EXIT_ROWS_CAP - MARKER.len();
             while !joined.is_char_boundary(end) {
                 end -= 1;
             }
-            format!(
-                "{}…[truncated {} bytes]",
-                &joined[..end],
-                joined.len() - end
-            )
+            format!("{}{MARKER}", &joined[..end])
         }
     };
     let kernel = Command::new("uname")

@@ -18,7 +18,7 @@ use std::cell::RefCell;
 use std::io::{BufRead, BufReader};
 use std::os::fd::{AsFd, OwnedFd};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc;
+use std::sync::{mpsc, PoisonError};
 
 #[path = "../../../../tests/harness/ci.rs"]
 mod ci;
@@ -39,31 +39,47 @@ impl Gate {
         })
     }
 
-    /// Owner side. The bound only keeps a failed test from leaking a thread.
+    /// Owner side. A missed release is a LOUD failure: the owner thread
+    /// panics (outside the lock, so it poisons nothing; a panic in a spawned
+    /// thread cannot abort other tests, and the test's `join().unwrap()`
+    /// reports it).
     fn hold(&self) {
-        let mut state = self.state.lock().unwrap();
-        state.0 = true;
-        self.changed.notify_all();
-        let _ = self
-            .changed
-            .wait_timeout_while(state, Duration::from_secs(60), |state| !state.1)
-            .unwrap();
+        let released = {
+            let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+            state.0 = true;
+            self.changed.notify_all();
+            let (state, _) = self
+                .changed
+                .wait_timeout_while(state, Duration::from_secs(60), |state| !state.1)
+                .unwrap_or_else(PoisonError::into_inner);
+            state.1
+        };
+        assert!(
+            released,
+            "hang guard (60 s): the test never released the owner"
+        );
     }
 
     fn wait_reached(&self) {
-        let state = self.state.lock().unwrap();
-        let (state, _) = self
-            .changed
-            .wait_timeout_while(state, HANG_GUARD, |state| !state.0)
-            .unwrap();
+        // Copy the flag and drop the lock BEFORE asserting: a panic under the
+        // lock would poison it and abort the process from `ReleaseOnDrop`.
+        let reached = {
+            let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+            let (state, _) = self
+                .changed
+                .wait_timeout_while(state, HANG_GUARD, |state| !state.0)
+                .unwrap_or_else(PoisonError::into_inner);
+            state.0
+        };
         assert!(
-            state.0,
+            reached,
             "hang guard (10 s): the owner never reached the publish hold"
         );
     }
 
+    /// Recovers from poisoning so the owner is always woken.
     fn release(&self) {
-        self.state.lock().unwrap().1 = true;
+        self.state.lock().unwrap_or_else(PoisonError::into_inner).1 = true;
         self.changed.notify_all();
     }
 }
@@ -159,6 +175,7 @@ fn failing_inspect_runtime(dir: &Path) -> ContainerRuntime {
 /// assertion unwinds.
 struct PayloadShell {
     shell: Child,
+    release: Option<std::process::ChildStdin>,
     pidfd: Option<OwnedFd>,
 }
 
@@ -168,24 +185,46 @@ impl Drop for PayloadShell {
             let _ =
                 rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL);
         }
-        let _ = self.shell.kill();
-        let _ = self.shell.wait();
+        // Closing the release pipe lets the shell SIGKILL and reap the payload
+        // itself, so the payload dies even when no pidfd was ever acquired.
+        drop(self.release.take());
+        let until = Instant::now() + HANG_GUARD;
+        while !matches!(self.shell.try_wait(), Ok(Some(_))) {
+            if Instant::now() >= until {
+                let _ = self.shell.kill();
+                let _ = self.shell.wait();
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 }
 
 /// An external payload (a grandchild, never our child) with its pidfd open,
-/// SIGKILLed through that pidfd and reaped by its owner shell. The two pipe
-/// reads are bounded by [`HANG_GUARD`].
+/// SIGKILLed through that pidfd and reaped by its owner shell.
+///
+/// Lifetime handshake: the shell does not `wait` (reap) the payload until the
+/// parent writes to the release pipe, so the payload's PID stays reserved (at
+/// worst a zombie) until the parent has opened and cloned its pidfd; the PID
+/// cannot be reused before `pidfd_open`. The pipe reads are bounded by
+/// [`HANG_GUARD`].
 fn killed_external_payload() -> (PayloadShell, u32, OwnedFd) {
+    use std::io::Write;
     let mut shell = Command::new("sh")
         .arg("-c")
-        .arg("sleep 30 & p=$!; echo $p; wait $p; echo reaped")
+        .arg("sleep 30 & p=$!; echo $p; read _; kill -9 $p 2>/dev/null; wait $p; echo reaped")
+        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
     let stdout = shell.stdout.take().unwrap();
-    let mut guard = PayloadShell { shell, pidfd: None };
+    let release = shell.stdin.take();
+    let mut guard = PayloadShell {
+        shell,
+        release,
+        pidfd: None,
+    };
     let (lines_tx, lines) = mpsc::channel();
     std::thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
@@ -205,6 +244,10 @@ fn killed_external_payload() -> (PayloadShell, u32, OwnedFd) {
     guard.pidfd = Some(pidfd.try_clone().unwrap());
     rustix::process::pidfd_send_signal(pidfd.as_fd(), rustix::process::Signal::KILL)
         .expect("SIGKILL the external payload through its pidfd");
+    // Release the shell only now: it reaps the (already killed) payload.
+    let mut release = guard.release.take().unwrap();
+    release.write_all(b"\n").unwrap();
+    drop(release);
     let ack = lines
         .recv_timeout(HANG_GUARD)
         .expect("hang guard (10 s): the owner shell never acknowledged the reap");
@@ -296,11 +339,14 @@ fn capped_follower_fallback_keeps_the_pidfd_fact_s3() {
     let terminal = Arc::clone(armed.child.terminal());
     let gate = Gate::new();
     let _release = ReleaseOnDrop(Arc::clone(&gate));
-    // A far owner cap: the snapshot deadline is the 10 s SNAPSHOT_BUDGET
-    // ahead, a precondition (never asserted on a clock) that is not reached
-    // while the owner is held.
     let owner = spawn_held_owner(&terminal, Instant::now() + Duration::from_secs(3600), &gate);
     gate.wait_reached();
+    // Controlled shared deadline: `facts_by` clamped the owner's cap to the
+    // 10 s SNAPSHOT_BUDGET when the owner started. Widen it while the owner is
+    // held (the owner does not re-read it), so neither follower call can cross
+    // the deadline however long this thread is descheduled. The rendezvous
+    // guard above is a separate, loud-failure bound.
+    terminal.lock().snapshot_deadline = Some(Instant::now() + Duration::from_secs(86_400));
     assert!(
         terminal.facts_by(Instant::now(), true).is_none(),
         "a capped follower returns None while the owner is in flight"

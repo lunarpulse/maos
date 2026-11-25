@@ -104,3 +104,28 @@ Kernel src 28372 -> 28390 -> 28394 (+22 physical over main, +4 for the test hook
 - The version gate was replaced by a capability probe in the tests only; production `pidfd_exit` already is a
   capability use (an `Err` returns `None`). `exit_row` in the S3 test can still panic before the enriched message on a
   missing, duplicate or malformed row.
+
+## Round 2 (test defects fixed; production unchanged)
+
+- Gate lock: `wait_reached` copies the arrival flag and drops the lock before asserting; `release`/`hold` recover from
+  poisoning (`PoisonError::into_inner`), so `ReleaseOnDrop` can never abort the lib-test process. A missed release makes
+  the OWNER thread panic outside the lock (a panic in a spawned thread cannot abort other tests; the test's
+  `join().unwrap()` reports it). On that failure path the dead owner leaves the snapshot in flight, so the test's
+  `Armed` teardown may wait up to the snapshot deadline before the failure surfaces.
+- Capped test deadline: after the owner is held, the test widens `snapshot_deadline` to now+24 h through the
+  private `terminal.lock()` (the test module is a descendant of `child`, so no production seam). The owner does not
+  re-read it; neither follower call can cross a deadline however long the thread is descheduled. The rendezvous guard
+  (10 s) is separate.
+- Fixture lifetime: the shell reaps the payload only after the parent writes the release pipe (`read _` before
+  `wait`), so the payload's PID stays reserved until the parent has opened and cloned its pidfd. The guard closes
+  the pipe on any exit path; the shell then SIGKILLs and reaps the payload itself (also when pidfd acquisition
+  failed), and the guard kills the shell only after a 10 s bounded wait. Because of that the shell's `kill -9 $p` is a
+  harmless duplicate of the pidfd kill in the normal path. If the shell itself hangs past 10 s the sleeper can outlive
+  the test by up to its 30 s.
+- Diagnostics: the 8 KiB cap now includes the `…[truncated]` marker.
+- Plant evidence with the failing assertion per iteration: `plant-runs.md` (20/20 plain and 20/20 under 16 busy
+  loops, each red is the payload assertion `(Unknown, None)` vs `(Signaled(9), Pidfd)`; fixed code 20/20 green both).
+- Kernel src unchanged at 28394 (no re-pin); `repin.py --check` PINS IN SYNC; tokei 22180.
+- Residual: a non-waiting re-read of the frozen snapshot after teardown and before journaling in the bridge could
+  make the journaled value agree with a snapshot that appeared meanwhile. The reviewer advised against it in this PR;
+  not done.
