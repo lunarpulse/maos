@@ -1,0 +1,68 @@
+#!/bin/bash
+# Loop driver for the s3-pidfd-follower-fix evidence.
+#
+# Usage:   bash plant-loop-driver.txt LABEL FILTER EXPECT_RUN EXPECT [EXPECT_MSG]
+#   LABEL       free text for the output
+#   FILTER      libtest name filter ("follower_pidfd" = both tests, or one test name)
+#   EXPECT_RUN  number of `RUN (kernel ...)` lines one iteration must print
+#               (expired test = 4 instances, capped test = 1; a red iteration stops at its first failing
+#               instance, so a red expired test prints 1; both tests green = 5)
+#   EXPECT      green | red
+#   EXPECT_MSG  required for `red`: a fixed string that must appear in the iteration's own log, the
+#               branch-specific payload assertion message:
+#                 expired test : "follower: the verified pidfd fact survives an unavailable snapshot"
+#                 capped test  : "capped-follower fallback: the verified pidfd fact survives an unavailable snapshot"
+#               (the owner assertion of the capped test says "owner: the verified ..." and is NOT accepted)
+#
+# Prerequisites: Linux with PIDFD_INFO_EXIT (>= 6.15 or a backport), bash, cargo, `timeout`, `seq`; a checkout
+# whose kernel-core lib test binary builds. Paths (override by environment):
+#   S3FIX_ROOT          checkout root; default: three directories above this file
+#   CARGO_TARGET_DIR    build directory; default: $S3FIX_ROOT/target
+#   S3FIX_LOG_DIR       per-iteration logs; default: /tmp/s3fix-driver (a log is never overwritten)
+#
+# Each mode (plain, then busy16 = 16 `while :; do :; done` loops) runs 20 iterations. CI=true is DECLARED, so a
+# capability skip PANICS instead of printing SKIP; an iteration also FAILS if "SKIP" appears or the RUN count is
+# not EXPECT_RUN.
+#   green iteration: exit code 0, `test result: ok`.
+#   red iteration  : exit code 101, the completed libtest summary `test result: FAILED`, the payload assertion
+#                    `left: (Unknown, None)` / `right: (Signaled(9), Pidfd)` and EXPECT_MSG.
+# The script exits 0 only when every iteration of both modes is ok; otherwise it exits 1 (3 = no test binary).
+LABEL=$1; FILTER=$2; EXPECT_RUN=$3; EXPECT=$4; EXPECT_MSG=$5
+[ -n "$EXPECT" ] || { echo "usage: LABEL FILTER EXPECT_RUN green|red [EXPECT_MSG]"; exit 2; }
+[ "$EXPECT" != red ] || [ -n "$EXPECT_MSG" ] || { echo "red needs EXPECT_MSG"; exit 2; }
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+S3FIX_ROOT=${S3FIX_ROOT:-$(cd "$HERE/../../.." && pwd)}
+LOG_DIR=${S3FIX_LOG_DIR:-/tmp/s3fix-driver}
+unset GITHUB_ACTIONS MAOS_17_2_CGROUP_MODE
+export CI=true CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-$S3FIX_ROOT/target}
+cd "$S3FIX_ROOT" || exit 3
+BIN=$(cargo test --locked -p maos-kernel-core --lib --no-run 2>&1 | grep -o "$CARGO_TARGET_DIR[^)]*maos_kernel_core-[0-9a-f]*" | tail -1)
+[ -x "$BIN" ] || { echo "no test binary"; exit 3; }
+mkdir -p "$LOG_DIR"
+total_bad=0
+run20() {
+  mode=$1; ok=0; bad=0
+  for i in $(seq 20); do
+    log=$LOG_DIR/$LABEL-$mode-$i.log
+    timeout 120 "$BIN" $FILTER --nocapture >"$log" 2>&1; rc=$?
+    runs=$(grep -c 'RUN (kernel' "$log"); skips=$(grep -c 'SKIP' "$log")
+    loc=$(grep -m1 -o 'child_follower_pidfd.rs:[0-9]*:[0-9]*' "$log")
+    left=$(grep -m1 'left:' "$log" | sed 's/^ *//'); right=$(grep -m1 'right:' "$log" | sed 's/^ *//')
+    verdict=BAD
+    if [ "$skips" = 0 ] && [ "$runs" = "$EXPECT_RUN" ]; then
+      if [ "$EXPECT" = green ] && [ $rc = 0 ] && grep -q 'test result: ok' "$log"; then verdict=ok; fi
+      if [ "$EXPECT" = red ] && [ $rc = 101 ] && grep -q 'test result: FAILED' "$log" \
+         && [ "$left" = 'left: (Unknown, None)' ] && [ "$right" = 'right: (Signaled(9), Pidfd)' ] \
+         && grep -qF -- "$EXPECT_MSG" "$log"; then verdict=ok; fi
+    fi
+    if [ $verdict = ok ]; then ok=$((ok+1)); else bad=$((bad+1)); fi
+    echo "$LABEL $mode iter $i: rc=$rc RUN=$runs SKIP=$skips ${loc:+at $loc }${left:+| $left | $right }=> $verdict"
+  done
+  echo "== $LABEL $mode expect=$EXPECT: ok=$ok bad=$bad"
+  total_bad=$((total_bad+bad))
+}
+run20 plain
+pids=""; for i in $(seq 16); do (while :; do :; done) & pids="$pids $!"; done
+run20 busy16
+kill $pids 2>/dev/null
+[ $total_bad = 0 ]

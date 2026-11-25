@@ -208,6 +208,20 @@ impl ContainerTerminal {
         ContainerTerminalFacts::new(state, self.pidfd_exit(by))
     }
 
+    /// Typed "runtime snapshot unavailable" facts for a follower that cannot
+    /// wait for the owner. The verified payload pidfd needs no runtime lock,
+    /// so one non-blocking probe (`by = now`: a single ioctl, never `pause`)
+    /// keeps a proven `signaled(9)` instead of discarding it.
+    ///
+    /// Lock order: callers may hold `progress`; this takes `identity` only
+    /// (progress -> identity). Nothing takes identity -> progress.
+    pub(crate) fn unavailable_facts(&self) -> ContainerTerminalFacts {
+        ContainerTerminalFacts::new(
+            Err(TerminalUnavailable::DeadlineExpired),
+            self.pidfd_exit(Instant::now()),
+        )
+    }
+
     /// The one immutable terminal snapshot. The first caller owns
     /// initialization under one absolute deadline; followers wait on that
     /// deadline, and expiry freezes typed unavailable evidence. A
@@ -234,6 +248,10 @@ impl ContainerTerminal {
             progress.snapshot_inflight = true;
             drop(progress);
             let observed = Arc::new(self.observe(deadline));
+            // Test seam: holds the owner after its observation and before it
+            // publishes, so a test can force the follower branches.
+            #[cfg(all(test, target_os = "linux"))]
+            follower_pidfd_tests::hold_owner_before_publish();
             let mut progress = self.lock();
             progress.snapshot_inflight = false;
             let facts = Arc::clone(progress.facts.get_or_insert(observed));
@@ -249,9 +267,8 @@ impl ContainerTerminal {
                 return None;
             }
             if now >= deadline {
-                let expired =
-                    ContainerTerminalFacts::new(Err(TerminalUnavailable::DeadlineExpired), None);
-                let facts = Arc::clone(progress.facts.get_or_insert(Arc::new(expired)));
+                let expired = Arc::new(self.unavailable_facts());
+                let facts = Arc::clone(progress.facts.get_or_insert(expired));
                 self.changed.notify_all();
                 return Some(facts);
             }
@@ -266,6 +283,14 @@ impl ContainerTerminal {
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .0;
         }
+    }
+
+    /// The bridge's capped read: the shared snapshot when it is (or becomes)
+    /// available within `cap`, otherwise a LOCAL (unfrozen) unavailable
+    /// record that still carries the non-blocking pidfd fact.
+    pub(crate) fn facts_capped(&self, cap: Instant) -> Arc<ContainerTerminalFacts> {
+        self.facts_by(cap, true)
+            .unwrap_or_else(|| Arc::new(self.unavailable_facts()))
     }
 
     /// One bounded CID kill. A failed outcome remains diagnostic even if
@@ -874,3 +899,7 @@ impl Drop for SandboxedContainerChild {
         let _ = self.teardown(deadline);
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "../../../../tests/unit/child_follower_pidfd.rs"]
+mod follower_pidfd_tests;
