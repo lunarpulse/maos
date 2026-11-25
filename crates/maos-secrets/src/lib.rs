@@ -324,6 +324,16 @@ impl EncryptedFileSecretStore {
         let path = self.path(key);
         let sealed = seal_at_rest(self.kms.as_ref(), self.crypto.as_ref(), value.as_bytes())
             .map_err(|error| SecretStoreError::Access(error.to_string()))?;
+        // Unwrap-before-commit (KMS-2): an endpoint can return a `wrapped` it
+        // cannot unwrap. Prove the envelope opens to this value before any
+        // temporary file exists; a failure leaves the old `.sealed` untouched.
+        let verified = open_at_rest(self.kms.as_ref(), &sealed)
+            .map_err(|error| SecretStoreError::Access(error.to_string()))?;
+        if verified != value.as_bytes() {
+            return Err(SecretStoreError::Access(
+                "sealed credential did not open to the stored value".to_string(),
+            ));
+        }
         let mut temporary = tempfile::Builder::new()
             .prefix(".maos-secret-")
             .tempfile_in(&self.root)
