@@ -5965,14 +5965,13 @@ mod tests {
     /// A FIFO at `dir/name`.
     fn fifo(dir: &std::path::Path, name: &str) -> std::path::PathBuf {
         let path = dir.join(name);
-        rustix::fs::mknodat(
-            rustix::fs::CWD,
-            &path,
-            rustix::fs::FileType::Fifo,
-            rustix::fs::Mode::RUSR | rustix::fs::Mode::WUSR,
-            0,
-        )
-        .unwrap();
+        // `mkfifo(1)` exists on every Unix this crate builds on; `rustix::fs::mknodat` does not
+        // exist on macOS.
+        let status = std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .expect("run mkfifo");
+        assert!(status.success(), "mkfifo failed: {status}");
         path
     }
 
