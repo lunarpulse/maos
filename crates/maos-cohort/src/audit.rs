@@ -144,6 +144,9 @@ pub enum CohortAuditEvent {
         outcome: SelfLeafOutcome,
         on_disk: String,
         declared: String,
+        /// The peers that had not confirmed the declaring manifest version (comma separated; empty
+        /// for outcomes that do not concern peers).
+        detail: String,
         version: u64,
     },
 }
@@ -160,12 +163,25 @@ pub enum SelfLeafOutcome {
     RefusedUndeclared,
     /// The files could not be read, parsed, or (under `peer_san = "required"`) lacked the SAN.
     RefusedUnusable,
+    /// Story 23-7 review B5 — the declared leaf is on disk and validated, but the peers in
+    /// `unconfirmed_peers` have not told this host they hold the declaring manifest version, so
+    /// the retiring leaf stays served (a peer that has not applied the reissue would refuse the
+    /// new leaf in both directions). One row per standing condition; the swap runs the moment the
+    /// last peer confirms, or when the manifest's stale lease has elapsed since this host applied
+    /// it.
+    SwapHeldForPeers,
+    /// Story 23-7 review B5 — as [`Self::Swapped`], but the stale-lease bound elapsed before every
+    /// peer confirmed: `unconfirmed_peers` names the peers that may refuse this host until they
+    /// apply the reissue (they are stale by the manifest's own lease).
+    SwappedUnconfirmed,
 }
 
 impl SelfLeafOutcome {
     fn event_name(self) -> &'static str {
         match self {
             SelfLeafOutcome::Swapped => "self_leaf_swapped",
+            SelfLeafOutcome::SwappedUnconfirmed => "self_leaf_swapped_unconfirmed",
+            SelfLeafOutcome::SwapHeldForPeers => "self_leaf_swap_held",
             SelfLeafOutcome::SwapPending => "self_leaf_swap_pending",
             SelfLeafOutcome::RefusedUndeclared => "self_leaf_refused_undeclared",
             SelfLeafOutcome::RefusedUnusable => "self_leaf_refused_unusable",
@@ -347,10 +363,11 @@ impl CohortAuditSink for CohortTransparencyLogSink {
                 on_disk,
                 declared,
                 version,
+                detail,
             } => (
                 CERT_ROTATION_INTENT,
                 format!(
-                    "{{\"event\":\"{}\",\"host\":{host:?},\"on_disk_short\":{:?},\"declared_short\":{:?},\"version\":{version}}}",
+                    "{{\"event\":\"{}\",\"host\":{host:?},\"on_disk_short\":{:?},\"declared_short\":{:?},\"version\":{version},\"unconfirmed_peers\":{detail:?}}}",
                     outcome.event_name(),
                     fingerprint_short(on_disk),
                     fingerprint_short(declared)

@@ -153,6 +153,21 @@ pub fn mk_self_signed(clock: &Clock, before_off: i64, after_off: i64) -> Leaf {
     finish_leaf(cert, key)
 }
 
+/// Story 23-7 (review A3) — a SELF-SIGNED leaf (the `ca_roots = None` corpus) carrying exactly
+/// the given URI SANs: anyone can mint one naming any peer.
+pub fn mk_self_signed_san(clock: &Clock, uris: &[String]) -> Leaf {
+    let (mut params, key) = leaf_params(clock, -HOUR, HOUR);
+    for uri in uris {
+        params.subject_alt_names.push(rcgen::SanType::URI(
+            uri.clone()
+                .try_into()
+                .expect("an IA5 string for the URI SAN"),
+        ));
+    }
+    let cert = params.self_signed(&key).expect("self-signed san leaf");
+    finish_leaf(cert, key)
+}
+
 /// Story 23-7 — a valid leaf issued by `ca` carrying exactly the given URI SANs (plus the
 /// loopback IP SAN every leaf here has).
 pub fn mk_san_leaf(ca: &Ca, clock: &Clock, uris: &[String]) -> Leaf {
@@ -167,6 +182,33 @@ pub fn mk_san_leaf(ca: &Ca, clock: &Clock, uris: &[String]) -> Leaf {
     let cert = params
         .signed_by(&key, &ca.cert, &ca.key)
         .expect("san leaf signed_by ca");
+    finish_leaf(cert, key)
+}
+
+/// Story 23-7 review B3 — an INTERMEDIATE CA issued by `root` (a leaf chained through it needs the
+/// intermediate presented alongside, or it does not verify against `root`).
+pub fn mk_intermediate(root: &Ca, clock: &Clock, common_name: &str) -> Ca {
+    let key = KeyPair::generate().expect("intermediate keypair");
+    let mut params =
+        CertificateParams::new(vec![common_name.to_string()]).expect("intermediate params");
+    params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+    params.not_before = clock.offset(-10 * HOUR);
+    params.not_after = clock.offset(10 * HOUR);
+    let cert = params
+        .signed_by(&key, &root.cert, &root.key)
+        .expect("intermediate signed_by root");
+    let der = cert.der().clone();
+    Ca { cert, key, der }
+}
+
+/// Story 23-7 review B3 — a valid leaf issued by `ca` carrying exactly the given extended key
+/// usages (a leaf with only `serverAuth` cannot be presented as a client).
+pub fn mk_leaf_eku(ca: &Ca, clock: &Clock, usages: Vec<rcgen::ExtendedKeyUsagePurpose>) -> Leaf {
+    let (mut params, key) = leaf_params(clock, -HOUR, HOUR);
+    params.extended_key_usages = usages;
+    let cert = params
+        .signed_by(&key, &ca.cert, &ca.key)
+        .expect("eku leaf signed_by ca");
     finish_leaf(cert, key)
 }
 

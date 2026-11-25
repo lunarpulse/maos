@@ -24,10 +24,10 @@
 //! branches the WebPKI step runs FIRST and the pin runs ONLY on its success —
 //! `None` is NOT a `danger_accept_any` noop (AC-A3 HARD CONDITION 1).
 
-use crate::error::TcpTransportError;
+use crate::error::{TcpTransportError, RETIRED_KEY_CANDIDATE};
 use crate::san;
 use maos_a2a_core::identity::{PeerCertFingerprint, PeerId};
-use maos_a2a_core::InMemoryTofuPinStore;
+use maos_a2a_core::{EPinMismatch, InMemoryTofuPinStore};
 use rustls::crypto::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
 use rustls::pki_types::{CertificateDer, ServerName, TrustAnchor, UnixTime};
 use rustls::{DigitallySignedStruct, Error as RustlsError, SignatureScheme};
@@ -138,42 +138,14 @@ impl TofuPinningVerifier {
         usage: KeyUsage,
     ) -> Result<(), RustlsError> {
         // ---- Step 1: WebPKI (validity/structure [+ chain in Some mode]) ----
-        let ee = EndEntityCert::try_from(end_entity)
-            .map_err(|e| reject("BAD_CERTIFICATE", format!("malformed leaf: {e:?}")))?;
-
-        // Build the trust anchors for this posture. `LeafSelfAnchor` (None mode)
-        // anchors the leaf to ITSELF — webpki then checks the self-signature,
-        // structure, and validity window (notBefore/notAfter) against `now`,
-        // with no chain. NOT a noop: an expired/malformed leaf is rejected here.
-        let anchors: Vec<TrustAnchor<'_>> = match &self.posture {
-            TrustPosture::ChainToRoots(roots) => roots
-                .iter()
-                .filter_map(|der| anchor_from_trusted_cert(der).ok())
-                .collect(),
-            TrustPosture::LeafSelfAnchor => {
-                let anchor = anchor_from_trusted_cert(end_entity).map_err(|e| {
-                    reject("BAD_CERTIFICATE", format!("leaf not a valid anchor: {e:?}"))
-                })?;
-                vec![anchor]
-            }
-        };
-        if anchors.is_empty() {
-            return Err(reject(
-                "UNTRUSTED_ISSUER",
-                "no trust anchors configured for chain validation".into(),
-            ));
-        }
-
-        ee.verify_for_usage(
-            self.sig_algs.all,
-            &anchors,
+        webpki_prelude(
+            &self.posture,
+            &self.sig_algs,
+            end_entity,
             intermediates,
             now,
             usage,
-            None,
-            None,
-        )
-        .map_err(map_webpki_error)?;
+        )?;
 
         // ---- Step 2: TOFU pin (runs ONLY on WebPKI success) ----
         let observed = PeerCertFingerprint::from_cert_der(end_entity.as_ref());
@@ -184,7 +156,7 @@ impl TofuPinningVerifier {
             Some(peer) => self
                 .pins
                 .verify_pinned_sync(peer, &observed)
-                .map_err(|e| reject_with(Some(peer.clone()), "PIN_MISMATCH", e.to_string())),
+                .map_err(|e| self.pin_refusal(peer, &e)),
             // Listen side, `peer_san = "off"`: peer identity is learned from the cert —
             // accept any active pin (TOFU first-contact). The receiver-side allowlist/consent
             // checks in `handle_intake` bind the wire identity downstream.
@@ -208,13 +180,107 @@ impl TofuPinningVerifier {
                         })?;
                     self.pins
                         .verify_pinned_sync(&subject, &observed)
-                        .map_err(|e| {
-                            reject_with(Some(subject.clone()), "PIN_MISMATCH", e.to_string())
-                        })
+                        .map_err(|e| self.pin_refusal(&subject, &e))
                 }
             },
         }
     }
+
+    /// The refusal for a failed pin check against `subject`. Story 23-7 (review A3): it carries
+    /// [`RETIRED_KEY_CANDIDATE`] only when ONE read of the pin state shows a plain fingerprint
+    /// `Mismatch` on a promoted subject AND the leaf chained to the configured roots. An
+    /// invalidated pin (`Invalidated`: a restart awaiting re-pin approval, where the peer may be
+    /// presenting its current leaf) and every `ca_roots`-unset handshake (the leaf is its own
+    /// anchor, so anyone can present one whose SAN names the subject) stay untyped.
+    fn pin_refusal(&self, subject: &PeerId, error: &EPinMismatch) -> RustlsError {
+        let retired_key_candidate = matches!(error, EPinMismatch::Mismatch { .. })
+            && matches!(self.posture, TrustPosture::ChainToRoots(_))
+            && self.pins.is_promoted(subject);
+        let detail = if retired_key_candidate {
+            format!("{error} [{RETIRED_KEY_CANDIDATE}]")
+        } else {
+            error.to_string()
+        };
+        reject_with(Some(subject.clone()), "PIN_MISMATCH", detail)
+    }
+}
+
+/// Step 1 of every handshake verification, as a function of the posture alone: validity,
+/// structure, `usage` (EKU) and — under `ChainToRoots` — the chain to a configured root, using
+/// `intermediates` as the presented chain. `LeafSelfAnchor` anchors the leaf to itself, so the
+/// leaf's signature, structure, validity and EKU are judged and no chain exists to judge.
+fn webpki_prelude(
+    posture: &TrustPosture,
+    sig_algs: &WebPkiSupportedAlgorithms,
+    end_entity: &CertificateDer<'_>,
+    intermediates: &[CertificateDer<'_>],
+    now: UnixTime,
+    usage: KeyUsage,
+) -> Result<(), RustlsError> {
+    let ee = EndEntityCert::try_from(end_entity)
+        .map_err(|e| reject("BAD_CERTIFICATE", format!("malformed leaf: {e:?}")))?;
+
+    // `LeafSelfAnchor` (None mode) anchors the leaf to ITSELF — webpki then checks the
+    // self-signature, structure, and validity window (notBefore/notAfter) against `now`, with no
+    // chain. NOT a noop: an expired/malformed leaf is rejected here.
+    let anchors: Vec<TrustAnchor<'_>> = match posture {
+        TrustPosture::ChainToRoots(roots) => roots
+            .iter()
+            .filter_map(|der| anchor_from_trusted_cert(der).ok())
+            .collect(),
+        TrustPosture::LeafSelfAnchor => {
+            let anchor = anchor_from_trusted_cert(end_entity).map_err(|e| {
+                reject("BAD_CERTIFICATE", format!("leaf not a valid anchor: {e:?}"))
+            })?;
+            vec![anchor]
+        }
+    };
+    if anchors.is_empty() {
+        return Err(reject(
+            "UNTRUSTED_ISSUER",
+            "no trust anchors configured for chain validation".into(),
+        ));
+    }
+
+    ee.verify_for_usage(
+        sig_algs.all,
+        &anchors,
+        intermediates,
+        now,
+        usage,
+        None,
+        None,
+    )
+    .map(|_| ())
+    .map_err(map_webpki_error)
+}
+
+/// Story 23-7 review B3 — judge this host's OWN `chain` exactly as a peer's verifier will judge
+/// it when it is presented: for BOTH usages (`serverAuth` when a peer dials us, `clientAuth` when
+/// we dial a peer), with `chain[1..]` as the presented intermediates, against the same posture.
+/// A leaf whose intermediate has not been written yet fails here, not in every peer's handshake.
+pub(crate) fn check_own_chain(
+    posture: &TrustPosture,
+    chain: &[CertificateDer<'_>],
+    now: UnixTime,
+) -> Result<(), TcpTransportError> {
+    let sig_algs = rustls::crypto::ring::default_provider().signature_verification_algorithms;
+    let (Some(leaf), intermediates) = (chain.first(), chain.get(1..).unwrap_or_default()) else {
+        return Err(TcpTransportError::OwnIdentityRefused(
+            "the chain holds no certificate".into(),
+        ));
+    };
+    for (name, usage) in [
+        ("serverAuth", KeyUsage::server_auth()),
+        ("clientAuth", KeyUsage::client_auth()),
+    ] {
+        webpki_prelude(posture, &sig_algs, leaf, intermediates, now, usage).map_err(|error| {
+            TcpTransportError::OwnIdentityRefused(format!(
+                "the own chain does not verify for {name}: {error}"
+            ))
+        })?;
+    }
+    Ok(())
 }
 
 /// Story 23-7 / D-23-7-07 A — the typed carrier a handshake refusal travels in: the classified

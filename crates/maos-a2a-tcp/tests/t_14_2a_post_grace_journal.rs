@@ -238,10 +238,25 @@ async fn t_14_2a_a_current_generation_handshake_journals_no_post_grace_row() {
 // durable promotion. Never-promoted peers, unknown leaves and SAN-less listen-side clients stay
 // `PeerIdentityUnverified`.
 
-/// Every rupture row's first rejected reason, in order.
-#[derive(Default)]
+/// Every rupture row's first rejected reason, in order. Each frame ALSO goes through the real
+/// production `CohortRuptureLogSink` into an in-memory Transparency Log (review A1), so
+/// [`Self::rows`] is what the daemon would have persisted; a recording sink alone skips the
+/// envelope attribution that sink demands.
 struct ReasonSink {
     frames: Mutex<Vec<IacFrame>>,
+    log: Arc<maos_iac::TransparencyLogAdapter>,
+    real: maos_cohort::CohortRuptureLogSink,
+}
+
+impl Default for ReasonSink {
+    fn default() -> Self {
+        let log = Arc::new(maos_iac::TransparencyLogAdapter::open_in_memory(2_314));
+        Self {
+            frames: Mutex::default(),
+            real: maos_cohort::CohortRuptureLogSink::new(log.clone()),
+            log,
+        }
+    }
 }
 
 impl ReasonSink {
@@ -257,12 +272,32 @@ impl ReasonSink {
             })
             .collect()
     }
+
+    /// The kind-22 rows the real sink persisted: `(to_spirit_id, intent, reason)`.
+    fn rows(&self) -> Vec<(String, String, RuptureReason)> {
+        self.log
+            .query_frames(maos_iac::adapter::transparency_log::FrameFilter {
+                kind: Some(maos_iac::adapter::transparency_log::FrameKind::ConsentRupture),
+                ..Default::default()
+            })
+            .expect("query rupture rows")
+            .into_iter()
+            .map(|row| {
+                let payload: FramePayload =
+                    serde_json::from_slice(&row.payload_redacted).expect("row payload");
+                let FramePayload::ConsentRupture(rupture) = payload else {
+                    panic!("a rupture row carries a rupture payload");
+                };
+                (row.to_spirit_id, row.intent, rupture.rejected[0].reason)
+            })
+            .collect()
+    }
 }
 
 impl ConsentRuptureSink for ReasonSink {
     fn append(&self, frame: &IacFrame) -> Result<(), String> {
         self.frames.lock().push(frame.clone());
-        Ok(())
+        self.real.append(frame)
     }
 }
 
@@ -349,6 +384,16 @@ async fn t_23_7_a_dial_to_a_promoted_peer_presenting_its_retired_leaf_is_cert_po
         "the retired leaf is refused after promotion"
     );
     assert_eq!(journal.reasons(), vec![RuptureReason::CertPostGraceReject]);
+    // Through the REAL sink: exactly one durable kind-22 row, attributed to the transport event
+    // (no fabricated consent intent) and carrying the dial target.
+    assert_eq!(
+        journal.rows(),
+        vec![(
+            "dial@host_b".to_string(),
+            maos_cohort::PEER_IDENTITY_REFUSAL_INTENT.to_string(),
+            RuptureReason::CertPostGraceReject
+        )]
+    );
 }
 
 #[tokio::test]
@@ -504,6 +549,15 @@ async fn t_23_7_under_required_a_listen_side_client_with_a_promoted_peers_san_an
         "the listen-side refusal is journaled"
     );
     assert_eq!(journal.reasons(), vec![RuptureReason::CertPostGraceReject]);
+    // The listen-side row keeps the SAN-named subject, not the socket address (review A3).
+    assert_eq!(
+        journal.rows(),
+        vec![(
+            "listen@host_a".to_string(),
+            maos_cohort::PEER_IDENTITY_REFUSAL_INTENT.to_string(),
+            RuptureReason::CertPostGraceReject
+        )]
+    );
 
     // A never-promoted peer's SAN with an unknown leaf: the untyped reason.
     assert!(dial(c_unknown, "host_c").await.is_err());
@@ -521,4 +575,167 @@ async fn t_23_7_under_required_a_listen_side_client_with_a_promoted_peers_san_an
     );
     // The current generation is still accepted.
     assert!(dial(a_new, "host_a").await.is_ok());
+}
+
+// Review A3 (a) — a promoted peer that RESTARTED presents its CURRENT leaf; its pin here is
+// invalidated pending re-pin approval (`promoted` stays set). That refusal is not a retired-key
+// signal. (The dial side never reaches TLS for an invalidated pin: the router refuses first.)
+#[tokio::test]
+async fn t_23_7_a_restarted_promoted_peer_with_its_current_leaf_is_not_a_retired_key_signal() {
+    use maos_a2a_core::TofuPinStore as _;
+    use maos_a2a_tcp::PeerSanMode;
+    const DOMAIN: &str = "corp.example";
+    let spiffe = |peer: &str| format!("spiffe://{DOMAIN}/maos/peer/{peer}");
+    let clock = Clock::capture();
+    let ca = mk_ca(&clock, "ca-23-7-restart");
+    let nash_leaf = mk_san_leaf(&ca, &clock, &[spiffe("host_b")]);
+    let a_old = mk_san_leaf(&ca, &clock, &[spiffe("host_a")]);
+    let a_new = mk_san_leaf(&ca, &clock, &[spiffe("host_a")]);
+
+    let pems = write_pem(&nash_leaf, Some(&ca));
+    let mut cfg = tcp_config(
+        &pems,
+        vec![pin("host_a", &a_old.fingerprint, MIRA_NONCE)],
+        Duration::from_secs(30),
+    );
+    cfg.peer_san = PeerSanMode::Required;
+    cfg.peer_trust_domain = Some(DOMAIN.to_string());
+    let nash = maos_a2a_tcp::TcpA2ATransport::bind(
+        cfg,
+        vec![peer_cfg(
+            "host_a",
+            "tls://127.0.0.1:0",
+            &a_old.fingerprint,
+            &[],
+            &["readonly"],
+        )],
+        NASH_NONCE,
+        maos_a2a_tcp::TcpTimeouts::test_profile(),
+        no_retry(),
+        Some(clock.unix()),
+        None,
+    )
+    .await
+    .expect("nash binds");
+    let journal = Arc::new(ReasonSink::default());
+    nash.core().install_rupture_sink(journal.clone()).await;
+    promote(&nash, "host_a", &a_new.fingerprint);
+    // host_a restarts: nash invalidates its pin, but it is still the promoted peer.
+    let peer = maos_a2a_core::identity::PeerId::new("host_a");
+    nash.pins()
+        .invalidate_for_restart(&peer, MIRA_NONCE)
+        .await
+        .unwrap();
+    assert!(nash.pins().is_promoted(&peer));
+
+    let client = bind_endpoint(
+        &a_new,
+        Some(&ca),
+        MIRA_NONCE + 1,
+        vec![pin("host_b", &nash_leaf.fingerprint, NASH_NONCE)],
+        vec![peer_cfg(
+            "host_b",
+            &format!("tls://{}", nash.local_addr().unwrap()),
+            &nash_leaf.fingerprint,
+            &["readonly"],
+            &[],
+        )],
+        &clock,
+        no_retry(),
+    )
+    .await;
+    assert!(client
+        .route_outbound(
+            make_frame("host_a", "host_b", IntentClass::Readonly, 1),
+            &HostId("host_b".into()),
+        )
+        .await
+        .is_err());
+    assert!(
+        wait_until(|| !journal.reasons().is_empty(), Duration::from_secs(3)).await,
+        "the refusal is journaled"
+    );
+    assert_eq!(
+        journal.reasons(),
+        vec![RuptureReason::PeerIdentityUnverified],
+        "a restart awaiting re-pin approval is not a retired-key presentation"
+    );
+    assert_eq!(journal.rows()[0].2, RuptureReason::PeerIdentityUnverified);
+}
+
+// Review A3 (b) — under `required` with `ca_roots` unset anyone can mint a self-signed leaf whose
+// SAN names a promoted peer; the refusal must not be filed as that peer's retired-key signal.
+#[tokio::test]
+async fn t_23_7_a_forged_self_signed_leaf_naming_a_promoted_peer_is_not_a_retired_key_signal() {
+    use maos_a2a_tcp::PeerSanMode;
+    const DOMAIN: &str = "corp.example";
+    let spiffe = |peer: &str| format!("spiffe://{DOMAIN}/maos/peer/{peer}");
+    let clock = Clock::capture();
+    let nash_leaf = mk_self_signed_san(&clock, &[spiffe("host_b")]);
+    let a_pinned = mk_self_signed_san(&clock, &[spiffe("host_a")]);
+    let a_new = mk_self_signed_san(&clock, &[spiffe("host_a")]);
+    let forged = mk_self_signed_san(&clock, &[spiffe("host_a")]);
+
+    let pems = write_pem(&nash_leaf, None);
+    let mut cfg = tcp_config(
+        &pems,
+        vec![pin("host_a", &a_pinned.fingerprint, MIRA_NONCE)],
+        Duration::from_secs(30),
+    );
+    cfg.peer_san = PeerSanMode::Required;
+    cfg.peer_trust_domain = Some(DOMAIN.to_string());
+    let nash = maos_a2a_tcp::TcpA2ATransport::bind(
+        cfg,
+        vec![peer_cfg(
+            "host_a",
+            "tls://127.0.0.1:0",
+            &a_pinned.fingerprint,
+            &[],
+            &["readonly"],
+        )],
+        NASH_NONCE,
+        maos_a2a_tcp::TcpTimeouts::test_profile(),
+        no_retry(),
+        Some(clock.unix()),
+        None,
+    )
+    .await
+    .expect("nash binds");
+    let journal = Arc::new(ReasonSink::default());
+    nash.core().install_rupture_sink(journal.clone()).await;
+    promote(&nash, "host_a", &a_new.fingerprint);
+
+    let client = bind_endpoint(
+        &forged,
+        None,
+        MIRA_NONCE,
+        vec![pin("host_b", &nash_leaf.fingerprint, NASH_NONCE)],
+        vec![peer_cfg(
+            "host_b",
+            &format!("tls://{}", nash.local_addr().unwrap()),
+            &nash_leaf.fingerprint,
+            &["readonly"],
+            &[],
+        )],
+        &clock,
+        no_retry(),
+    )
+    .await;
+    assert!(client
+        .route_outbound(
+            make_frame("host_a", "host_b", IntentClass::Readonly, 1),
+            &HostId("host_b".into()),
+        )
+        .await
+        .is_err());
+    assert!(
+        wait_until(|| !journal.reasons().is_empty(), Duration::from_secs(3)).await,
+        "the refusal is journaled"
+    );
+    assert_eq!(
+        journal.reasons(),
+        vec![RuptureReason::PeerIdentityUnverified],
+        "a leaf nothing chains for is no proof the promoted peer's old key was used"
+    );
+    assert_eq!(journal.rows()[0].0, "listen@host_a");
 }

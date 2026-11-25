@@ -23,8 +23,9 @@ use maos_a2a_core::{
 use maos_cohort::rotation::{RotationGraceTimer, RotationWindow};
 use maos_cohort::{
     CohortAuditEvent, CohortAuthority, CohortManifest, CohortManifestState, CohortMember,
-    ConsentMatrix, ConsentTuple, InMemoryCohortAuditSink, ManifestSignature, PinnedAuthorityKeys,
-    ReissueOutcome, COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT, RESERVED_INTENT_REISSUE,
+    ConsentMatrix, ConsentTuple, InMemoryCohortAuditSink, ManifestSignature, OwnLeafCommit,
+    PinnedAuthorityKeys, ReissueOutcome, COHORT_SCHEMA_V1, RESERVED_INTENT_HALT_RECEIPT,
+    RESERVED_INTENT_REISSUE,
 };
 use maos_spirit_abi::identity::HostId;
 
@@ -104,6 +105,15 @@ fn fingerprint(seed: u8) -> PeerCertFingerprint {
 }
 
 fn signed_manifest(version: u64, signer: &SigningKey, members: &[(String, String)]) -> String {
+    signed_manifest_leased(version, signer, members, 30)
+}
+
+fn signed_manifest_leased(
+    version: u64,
+    signer: &SigningKey,
+    members: &[(String, String)],
+    t_stale: u64,
+) -> String {
     let manifest = CohortManifest {
         schema_version: COHORT_SCHEMA_V1,
         cohort_id: "story-14-2a-rotation".into(),
@@ -143,7 +153,7 @@ fn signed_manifest(version: u64, signer: &SigningKey, members: &[(String, String
             RESERVED_INTENT_REISSUE.into(),
             RESERVED_INTENT_HALT_RECEIPT.into(),
         ],
-        t_stale_secs: 30,
+        t_stale_secs: t_stale,
         teams: None,
         signature: ManifestSignature { sig: String::new() },
         cross_team_consent: Vec::new(),
@@ -203,6 +213,37 @@ impl Mesh {
     /// and plane B pinned to the SAME fingerprints — exactly the state
     /// `reconcile_transport_identity_with_manifest` guarantees at boot.
     fn boot(local: &str, peers: &[(&str, PeerCertFingerprint)]) -> Self {
+        Self::boot_full(local, peers, InMemoryTofuPinStore::new(), 30, None)
+    }
+
+    fn boot_leased(local: &str, peers: &[(&str, PeerCertFingerprint)], lease: u64) -> Self {
+        Self::boot_full(local, peers, InMemoryTofuPinStore::new(), lease, None)
+    }
+
+    fn boot_with(
+        local: &str,
+        peers: &[(&str, PeerCertFingerprint)],
+        store: InMemoryTofuPinStore,
+    ) -> Self {
+        Self::boot_full(local, peers, store, 30, None)
+    }
+
+    /// Boot with an injected cohort clock (the hold/fallback bound is judged against it).
+    fn boot_clocked(
+        local: &str,
+        peers: &[(&str, PeerCertFingerprint)],
+        clock: Arc<dyn maos_cohort::CohortClock>,
+    ) -> Self {
+        Self::boot_full(local, peers, InMemoryTofuPinStore::new(), 30, Some(clock))
+    }
+
+    fn boot_full(
+        local: &str,
+        peers: &[(&str, PeerCertFingerprint)],
+        store: InMemoryTofuPinStore,
+        lease: u64,
+        clock: Option<Arc<dyn maos_cohort::CohortClock>>,
+    ) -> Self {
         let signer = SigningKey::from_bytes(&[7_u8; 32]);
         let mut members: Vec<(String, String)> =
             vec![(local.to_string(), fingerprint(0xf0).wire())];
@@ -211,20 +252,29 @@ impl Mesh {
                 .iter()
                 .map(|(peer, fp)| ((*peer).to_string(), fp.wire())),
         );
-        let manifest = signed_manifest(1, &signer, &members);
+        let manifest = signed_manifest_leased(1, &signer, &members, lease);
         let audit = Arc::new(InMemoryCohortAuditSink::default());
         let pinned = PinnedAuthorityKeys::from_keys(vec![signer.verifying_key()])
             .expect("one pinned authority key");
         let state = Arc::new(
-            CohortManifestState::load(
-                HostId(local.to_string()),
-                &manifest,
-                pinned,
-                Arc::clone(&audit) as Arc<dyn maos_cohort::CohortAuditSink>,
-            )
+            match clock {
+                Some(clock) => CohortManifestState::load_with_clock(
+                    HostId(local.to_string()),
+                    &manifest,
+                    pinned,
+                    Arc::clone(&audit) as Arc<dyn maos_cohort::CohortAuditSink>,
+                    clock,
+                ),
+                None => CohortManifestState::load(
+                    HostId(local.to_string()),
+                    &manifest,
+                    pinned,
+                    Arc::clone(&audit) as Arc<dyn maos_cohort::CohortAuditSink>,
+                ),
+            }
             .expect("signed manifest loads"),
         );
-        let pins = Arc::new(InMemoryTofuPinStore::new());
+        let pins = Arc::new(store);
         let tofu: Arc<dyn TofuPinStore> = pins.clone();
         let core = Arc::new(
             A2ARouterCore::try_new(
@@ -353,11 +403,14 @@ fn a_signed_reissue_that_rotates_a_member_opens_a_window_moves_both_planes_and_p
             instance: windows[0].instance,
         }
     );
-    // D-23-7-03 A: the window lasts G = the §7.2.1.a base + one confirmation interval of the
-    // manifest being applied — derived, never a literal.
+    // D-23-7-03 A + review B5/B6: the window lasts G = the §7.2.1.a base + TWO confirmation
+    // intervals (apply spread + own-leaf swap confirmation lag) — derived, never a literal.
     assert_eq!(
         mesh.timer.armed_windows(),
-        vec![maos_cohort::cold_deployment_t_grace() + mesh.state.confirmation_interval().unwrap()],
+        vec![
+            maos_cohort::cold_deployment_t_grace()
+                + 2 * mesh.state.confirmation_interval().unwrap()
+        ],
         "a REAL deadline is armed — the window does not wait for the next frame"
     );
     assert!(matches!(
@@ -742,7 +795,8 @@ fn t_grace_matches_the_shipped_formula_on_the_cold_deployment_branch() {
         "§7.2.1.a floors T_grace at 5 s on either branch"
     );
 
-    // Story 23-7 / D-23-7-03 A, as an equality on G (a pull lag longer than the base is covered).
+    // Story 23-7 / D-23-7-03 A + review B5, as an equality on G (a pull lag longer than the base is
+    // covered, twice: apply spread and the swap gate's confirmation lag).
     let mesh = Mesh::boot("host_a", &[("host_b", fingerprint(0x11))]);
     let interval = mesh.state.confirmation_interval().unwrap();
     mesh.reissue(
@@ -752,11 +806,12 @@ fn t_grace_matches_the_shipped_formula_on_the_cold_deployment_branch() {
             ("host_b", &fingerprint(0x22)),
         ]),
     );
-    let g = maos_cohort::cold_deployment_t_grace() + interval;
+    let g = maos_cohort::cold_deployment_t_grace() + 2 * interval;
     assert_eq!(mesh.timer.armed_windows(), vec![g]);
     assert!(
-        g > maos_cohort::cold_deployment_t_grace(),
-        "G exceeds the bare base by one pull interval"
+        g > maos_cohort::cold_deployment_t_grace() + interval,
+        "G exceeds the bare base by TWO pull intervals: one for the spread of applies, one for the \
+         own-leaf swap gate's confirmation lag"
     );
 }
 
@@ -1819,4 +1874,378 @@ fn a_reissue_below_the_durable_floor_is_refused_with_a_named_reason() {
         "no window opened"
     );
     assert!(mesh.open_windows().is_empty());
+}
+
+type FloorProbe = Box<dyn Fn(u64) + Send>;
+
+/// A durability port that reports every write's floor to a probe, under the store's window lock —
+/// the only seam that observes "what is visible at the instant the floor becomes durable".
+struct FloorProbePort {
+    probe: Mutex<Option<FloorProbe>>,
+}
+
+impl maos_a2a_core::tofu::PinPersistence for FloorProbePort {
+    fn load(&self) -> Vec<maos_a2a_core::tofu::PinRecord> {
+        Vec::new()
+    }
+
+    fn store(&self, _records: &[maos_a2a_core::tofu::PinRecord], floor: u64) -> Result<(), String> {
+        if let Some(probe) = self.probe.lock().expect("probe lock").as_ref() {
+            probe(floor);
+        }
+        Ok(())
+    }
+
+    fn fence(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/// Story 23-7 review B1 — the durable floor is written BEFORE the signed artifact, the trust
+/// windows or the audit row are visible: a crash at (or after) the floor write finds the floor
+/// raised and nothing published, and a crash before it finds nothing at all. Planted red: raising
+/// the floor after the commit (the previous order) makes the probe see the open window.
+#[test]
+fn the_durable_floor_is_written_before_the_reissue_becomes_visible() {
+    let old = fingerprint(0x11);
+    let port = Arc::new(FloorProbePort {
+        probe: Mutex::new(None),
+    });
+    let store = InMemoryTofuPinStore::new()
+        .with_persistence(Arc::clone(&port) as Arc<dyn maos_a2a_core::tofu::PinPersistence>);
+    let mesh = Mesh::boot_with("host_a", &[("host_b", old.clone())], store);
+    let seen: Arc<Mutex<Vec<(bool, bool)>>> = Arc::new(Mutex::new(Vec::new()));
+    {
+        let seen = Arc::clone(&seen);
+        let pins = Arc::clone(&mesh.pins);
+        let audit = Arc::clone(&mesh.audit);
+        *port.probe.lock().unwrap() = Some(Box::new(move |floor| {
+            if floor == 2 {
+                let window_open = pins.rotation_next(&PeerId::new("host_b")).is_some();
+                let row_visible = audit.events().iter().any(|event| {
+                    matches!(
+                        event,
+                        CohortAuditEvent::MemberReissueAccepted { version: 2, .. }
+                    )
+                });
+                seen.lock().unwrap().push((window_open, row_visible));
+            }
+        }));
+    }
+    mesh.reissue(
+        2,
+        &members(&[
+            ("host_a", &fingerprint(0xf0)),
+            ("host_b", &fingerprint(0x22)),
+        ]),
+    );
+    let seen = seen.lock().unwrap().clone();
+    assert_eq!(
+        seen.first(),
+        Some(&(false, false)),
+        "the FIRST write carrying floor 2 saw no open window and no accepted row"
+    );
+    assert_eq!(mesh.pins.manifest_floor(), 2);
+    assert_eq!(
+        mesh.open_windows().len(),
+        1,
+        "the reissue did apply after the floor"
+    );
+}
+
+/// Story 23-7 review B1 — a floor loaded at boot is enforced BEFORE the rotation control is
+/// installed (the listener and pull service are live first): a superseded reissue is refused and
+/// opens no window once the control installs. Planted red: dropping `install_manifest_floor`
+/// makes the state accept the v2 manifest below the floor of 3.
+#[test]
+fn a_floor_loaded_before_the_rotation_install_refuses_a_superseded_reissue() {
+    let signer = SigningKey::from_bytes(&[7_u8; 32]);
+    let local = fingerprint(0xf0);
+    let old = fingerprint(0x11);
+    let audit = Arc::new(InMemoryCohortAuditSink::default());
+    let state = CohortManifestState::load(
+        HostId("host_a".into()),
+        &signed_manifest(
+            1,
+            &signer,
+            &members(&[("host_a", &local), ("host_b", &old)]),
+        ),
+        PinnedAuthorityKeys::from_keys(vec![signer.verifying_key()]).expect("one authority key"),
+        Arc::clone(&audit) as Arc<dyn maos_cohort::CohortAuditSink>,
+    )
+    .expect("signed manifest loads");
+    state.install_manifest_floor(3);
+    let error = state
+        .apply_reissue(&signed_manifest(
+            2,
+            &signer,
+            &members(&[("host_a", &local), ("host_b", &fingerprint(0x22))]),
+        ))
+        .expect_err("v2 is below the loaded floor of 3, and no rotation control is installed yet");
+    assert!(matches!(
+        error,
+        maos_cohort::CohortError::ECohortManifestFork {
+            reason: maos_cohort::CohortManifestForkReason::VersionBelowDurableFloor,
+            ..
+        }
+    ));
+    assert_eq!(state.manifest().unwrap().version, 1, "nothing was cached");
+}
+
+/// Story 23-7 review B6 — `G` is sized from the LARGER of the manifest being applied and the one in
+/// force: the pull cadence that delivers a reissue is the one already in force. Booted at a 120 s
+/// lease (60 s interval), a reissue that LOWERS the lease to the 30 s floor (15 s interval) must
+/// still arm `base + 2 × 60 s`, not `base + 2 × 15 s`; the reverse (a raise) takes the new one.
+#[test]
+fn g_uses_the_larger_of_the_two_pull_intervals() {
+    let members_v = members(&[
+        ("host_a", &fingerprint(0xf0)),
+        ("host_b", &fingerprint(0x22)),
+    ]);
+    let base = maos_cohort::cold_deployment_t_grace();
+
+    let lowered = Mesh::boot_leased("host_a", &[("host_b", fingerprint(0x11))], 120);
+    assert_eq!(
+        lowered.state.confirmation_interval().unwrap(),
+        Duration::from_secs(60)
+    );
+    lowered
+        .state
+        .apply_reissue(&signed_manifest_leased(2, &lowered.signer, &members_v, 30))
+        .unwrap();
+    assert_eq!(
+        lowered.timer.armed_windows(),
+        vec![base + Duration::from_secs(2 * 60)],
+        "a lowered lease must not shrink the cover below the pull lag in force"
+    );
+
+    let raised = Mesh::boot_leased("host_a", &[("host_b", fingerprint(0x11))], 30);
+    raised
+        .state
+        .apply_reissue(&signed_manifest_leased(2, &raised.signer, &members_v, 120))
+        .unwrap();
+    assert_eq!(
+        raised.timer.armed_windows(),
+        vec![base + Duration::from_secs(2 * 60)],
+        "a raised lease is covered by the new interval"
+    );
+}
+
+// ───────────────── Story 23-7 review B2 + B5: the own-leaf commit gate ─────────────────
+
+struct TestClock(std::sync::atomic::AtomicU64);
+
+impl maos_cohort::CohortClock for TestClock {
+    fn now_secs(&self) -> u64 {
+        self.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+/// The exact `Pull` frame `CohortDistributor::pull_from` sends (same payload builder), from
+/// `from` to `to`, declaring `known_version` / `known_hash`.
+fn pull_frame(
+    from: &str,
+    to: &str,
+    known_version: u64,
+    known_hash: String,
+) -> maos_domain::frame::IacFrame {
+    use maos_domain::frame::{
+        ConsentEnvelope, FrameAddress, FramePayload, IacFrame, TelemetryEventPayload,
+    };
+    use maos_domain::invariants::i1::IntentClass;
+    use maos_domain::invariants::i13::IntentLineage;
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_domain::invariants::i8::A2AIntent;
+    use maos_spirit_abi::identity::{FrameKind, SpiritId};
+    let payload = maos_cohort::CohortManifestControl::Pull {
+        known_version,
+        known_hash,
+    }
+    .telemetry_payload()
+    .expect("pull payload");
+    let address = |host: &str| FrameAddress {
+        spirit_id: SpiritId::from("cohort-control"),
+        host_id: Some(HostId(host.to_string())),
+        role: None,
+    };
+    IacFrame {
+        frame_id: [7; 16],
+        timestamp_ns: 0,
+        logical_clock: 0,
+        from: address(from),
+        to: std::iter::once(address(to)).collect(),
+        kind: FrameKind::TelemetryEvent,
+        intent: IntentClass::Readonly,
+        payload: FramePayload::TelemetryEvent(TelemetryEventPayload {
+            event_type: payload.event_type,
+            data: payload.data,
+        }),
+        auto_marker: FrameOrigin::SpiritAuto,
+        consent_envelope: Some(ConsentEnvelope::with_fine_grained_intent(
+            address(from),
+            A2AIntent::new(RESERVED_INTENT_REISSUE),
+        )),
+        intent_lineage: IntentLineage::default(),
+    }
+}
+
+/// `peer` pulls from `mesh`'s host declaring the version `mesh` holds now (`behind`: one lower).
+fn peer_pulls(mesh: &Mesh, peer: &str, behind: bool) {
+    let version = mesh.state.version().unwrap() - u64::from(behind);
+    let hash = hex::encode(mesh.state.canonical_hash().unwrap());
+    let frame = pull_frame(peer, "host_a", version, hash);
+    let disposition = maos_a2a_core::CohortManifestGate::apply_reissue(
+        &*mesh.state,
+        &HostId(peer.to_string()),
+        11,
+        &frame,
+    )
+    .expect("a verified pull is accepted");
+    assert!(matches!(
+        disposition,
+        maos_a2a_core::CohortReissueDisposition::PullRequested
+    ));
+}
+
+/// Review B5 — X holds its old leaf while any peer has not confirmed the version in force, swaps
+/// the instant the last one has, and a stale or lower claim does not count. The reconciler is woken
+/// by each peer's pull while the swap is pending. Planted red: ignoring the unconfirmed set commits
+/// at the first call (the first `Held` assertion fails).
+#[test]
+fn the_own_leaf_swap_waits_for_every_peer_to_confirm_the_version() {
+    let clock = Arc::new(TestClock(std::sync::atomic::AtomicU64::new(100)));
+    let old = fingerprint(0xf0);
+    let new = fingerprint(0xf1);
+    let mesh = Mesh::boot_clocked(
+        "host_a",
+        &[("host_b", fingerprint(0x11)), ("host_c", fingerprint(0x12))],
+        clock.clone(),
+    );
+    mesh.core.set_local_leaf_fingerprint(old.clone());
+    let wakes = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = Arc::clone(&wakes);
+    assert!(mesh.state.install_local_leaf_observer(Arc::new(move || {
+        counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    })));
+    mesh.reissue(
+        2,
+        &members(&[
+            ("host_a", &new),
+            ("host_b", &fingerprint(0x11)),
+            ("host_c", &fingerprint(0x12)),
+        ]),
+    );
+    let committed = |expected: &'static str| move || expected.to_string();
+    // The reissue itself already woke the reconciler once (the declaration diverged from the leaf).
+    let base_wakes = wakes.load(std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(base_wakes, 1);
+
+    // Nobody has confirmed v2 yet.
+    let held = mesh
+        .state
+        .commit_own_leaf(&new, committed("swapped"))
+        .unwrap();
+    assert!(
+        matches!(&held, OwnLeafCommit::Held { unconfirmed } if unconfirmed == &["host_b", "host_c"]),
+        "{held:?}"
+    );
+
+    // host_b is still on v1 (a LOWER claim) → does not count; each pull wakes the reconciler.
+    peer_pulls(&mesh, "host_b", true);
+    assert_eq!(
+        wakes.load(std::sync::atomic::Ordering::SeqCst),
+        base_wakes + 1
+    );
+    assert!(matches!(
+        mesh.state.commit_own_leaf(&new, committed("swapped")).unwrap(),
+        OwnLeafCommit::Held { unconfirmed } if unconfirmed == ["host_b", "host_c"]
+    ));
+    // host_b applies v2 and pulls again; host_c is the last one.
+    peer_pulls(&mesh, "host_b", false);
+    assert!(matches!(
+        mesh.state.commit_own_leaf(&new, committed("swapped")).unwrap(),
+        OwnLeafCommit::Held { unconfirmed } if unconfirmed == ["host_c"]
+    ));
+    peer_pulls(&mesh, "host_c", false);
+    assert_eq!(
+        wakes.load(std::sync::atomic::Ordering::SeqCst),
+        base_wakes + 3
+    );
+    assert_eq!(
+        mesh.state
+            .commit_own_leaf(&new, committed("swapped"))
+            .unwrap(),
+        OwnLeafCommit::Committed {
+            result: "swapped".to_string(),
+            unconfirmed: vec![]
+        }
+    );
+}
+
+/// Review B5 — a silent peer cannot hold the rotation forever: once the manifest's own stale lease
+/// has elapsed since X applied it, the commit runs and names the peers that never confirmed.
+#[test]
+fn a_silent_peer_holds_the_swap_for_at_most_one_stale_lease() {
+    let clock = Arc::new(TestClock(std::sync::atomic::AtomicU64::new(100)));
+    let new = fingerprint(0xf1);
+    let mesh = Mesh::boot_clocked("host_a", &[("host_b", fingerprint(0x11))], clock.clone());
+    mesh.core.set_local_leaf_fingerprint(fingerprint(0xf0));
+    mesh.reissue(
+        2,
+        &members(&[("host_a", &new), ("host_b", &fingerprint(0x11))]),
+    );
+    let lease = mesh.state.manifest().unwrap().t_stale_secs;
+    clock
+        .0
+        .store(100 + lease - 1, std::sync::atomic::Ordering::SeqCst);
+    assert!(matches!(
+        mesh.state.commit_own_leaf(&new, || ()).unwrap(),
+        OwnLeafCommit::Held { .. }
+    ));
+    clock
+        .0
+        .store(100 + lease, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(
+        mesh.state.commit_own_leaf(&new, || ()).unwrap(),
+        OwnLeafCommit::Committed {
+            result: (),
+            unconfirmed: vec!["host_b".to_string()]
+        },
+        "the lease bound elapsed: the swap runs and reports who never confirmed"
+    );
+}
+
+/// Review B2 — the declaration is re-checked at the commit, under the manifest lock: a leaf prepared
+/// for v2's declaration is NOT committed after v3 superseded it, whether v3 declares a third leaf or
+/// restores the leaf currently served (the case that raises no divergence and so no wake-up).
+/// Planted red: dropping the re-check commits the stale leaf (the closure panics).
+#[test]
+fn a_declaration_replaced_between_prepare_and_commit_is_never_committed() {
+    let old = fingerprint(0xf0);
+    let v2_leaf = fingerprint(0xf1);
+    for (what, v3_leaf) in [
+        ("a third leaf", fingerprint(0xf2)),
+        ("the served leaf again", old.clone()),
+    ] {
+        let mesh = Mesh::boot("host_a", &[("host_b", fingerprint(0x11))]);
+        mesh.core.set_local_leaf_fingerprint(old.clone());
+        mesh.reissue(
+            2,
+            &members(&[("host_a", &v2_leaf), ("host_b", &fingerprint(0x11))]),
+        );
+        // The reconciler has read and validated v2's leaf ... and v3 lands before the commit.
+        mesh.reissue(
+            3,
+            &members(&[("host_a", &v3_leaf), ("host_b", &fingerprint(0x11))]),
+        );
+        assert_eq!(
+            mesh.state
+                .commit_own_leaf(&v2_leaf, || panic!(
+                    "{what}: the superseded leaf was committed"
+                ))
+                .unwrap(),
+            OwnLeafCommit::<()>::Superseded,
+            "{what}"
+        );
+    }
 }

@@ -501,9 +501,12 @@ impl A2ARouterCore {
     /// strong — the listen side accepts ANY active pin, while per-peer scoping
     /// exists only on the dial side.
     ///
-    /// `reason` is `PeerIdentityUnverified` unless the caller holds the Story 23-7 durable join
-    /// (the subject peer's pin record carries a promotion), in which case it is
-    /// `CertPostGraceReject`; the router does not decide it.
+    /// `reason` is `PeerIdentityUnverified` unless the verifier typed the refusal a retired-key
+    /// candidate (Story 23-7, review A3), in which case it is `CertPostGraceReject`; the router
+    /// does not decide it. The frame carries NO consent envelope (none exists at this layer and
+    /// none is fabricated); the production `CohortRuptureLogSink` attributes it to
+    /// `PEER_IDENTITY_REFUSAL_INTENT` and keeps `<direction>@<peer_hint>` in the row, where
+    /// `peer_hint` is the SAN-named peer id when the listen side had one, else the socket address.
     ///
     /// Returns `Err` when no sink is installed, so a deployment that expects
     /// journaling and has none fails loudly rather than silently.

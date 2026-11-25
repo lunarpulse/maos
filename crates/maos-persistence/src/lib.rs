@@ -459,7 +459,7 @@ impl FilePinStore {
         };
         match write_atomic(&self.path, &body, rename, sync_dir) {
             // The file is now complete and durable: any earlier fence is obsolete.
-            Ok(()) => self.lock.set_len(0).map_err(io),
+            Ok(()) => self.lift_fence(|lock| lock.sync_all()).map_err(io),
             Err(WriteError::NotPublished(source)) => {
                 Err(format!("{}{}", io(source), fence_note(&pre_fence)))
             }
@@ -479,6 +479,18 @@ impl FilePinStore {
                 ))
             }
         }
+    }
+
+    /// Lift the fence (after a durable write) and make the lift itself durable: an unsynced
+    /// `set_len(0)` can vanish on a crash right after a successful write and leave the boot
+    /// refusing a file that was fine. A refused sync reports the write as not clean, so the
+    /// caller degrades and re-fences, which is the conservative answer.
+    fn lift_fence(
+        &self,
+        sync: impl FnOnce(&std::fs::File) -> std::io::Result<()>,
+    ) -> std::io::Result<()> {
+        self.lock.set_len(0)?;
+        sync(&self.lock)
     }
 }
 
@@ -714,5 +726,42 @@ mod tests {
             parse(&path, br#"{"version":3,"pins":[]}"#).unwrap_err(),
             PinFileError::Version { found: 3, .. }
         ));
+    }
+
+    // Review A4 — the fence lift is synced, and a refused sync is reported (the caller then
+    // degrades and re-fences). Planted red: dropping the `sync(..)` call in `lift_fence` leaves
+    // the flag unset and the refused sync unreported.
+    #[test]
+    fn the_fence_lift_is_synced_and_a_refused_sync_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(PIN_FILE_NAME);
+        let lock_path = dir.path().join(format!("{PIN_FILE_NAME}.lock"));
+        let store = FilePinStore::open(&path).unwrap();
+        store.fence().unwrap();
+        assert!(std::fs::metadata(&lock_path).unwrap().len() > 0);
+
+        let mut synced = false;
+        store
+            .lift_fence(|file| {
+                synced = true;
+                assert_eq!(
+                    file.metadata()?.len(),
+                    0,
+                    "the sync covers the emptied fence"
+                );
+                Ok(())
+            })
+            .unwrap();
+        assert!(synced, "the lift must be synced");
+
+        let error = store
+            .lift_fence(|_| Err(std::io::Error::other("sync injected")))
+            .unwrap_err();
+        assert!(error.to_string().contains("sync injected"), "{error}");
+
+        // A successful narrowing write through the real path lifts the fence it set.
+        store.store_narrowing(&[rec("peer-a", 1)], 2).unwrap();
+        drop(store);
+        assert!(FilePinStore::open(&path).is_ok(), "no fence left behind");
     }
 }

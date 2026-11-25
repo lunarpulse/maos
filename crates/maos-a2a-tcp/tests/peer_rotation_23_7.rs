@@ -26,6 +26,7 @@ use maos_a2a_core::{
 };
 use maos_a2a_tcp::{OwnLeafReload, TcpA2AConfig, TcpA2ATransport, TcpTimeouts, TcpTransportError};
 use maos_cohort::rotation::RotationGraceTimer;
+use maos_cohort::OwnLeafCommit;
 use maos_cohort::{
     CohortAuditEvent, CohortAuthority, CohortError, CohortManifest, CohortManifestForkReason,
     CohortManifestState, CohortMember, ConsentMatrix, ConsentTuple, InMemoryCohortAuditSink,
@@ -377,6 +378,38 @@ async fn a_swap_moves_plane_c_so_the_send_seam_stamps_the_declaration() {
     );
 }
 
+/// Delivers a peer's `Pull` frame (built by the production `CohortDistributor::pull_from`) to the
+/// target host's manifest gate, as the router would after the TLS peer binding.
+struct PullDelivery {
+    target: Arc<CohortManifestState>,
+    from: String,
+}
+
+#[async_trait::async_trait]
+impl A2APeerRouter for PullDelivery {
+    async fn route_outbound(
+        &self,
+        frame: IacFrame,
+        _peer: &HostId,
+    ) -> Result<(), maos_a2a_core::A2AError> {
+        CohortManifestGate::apply_reissue(
+            &*self.target,
+            &HostId(self.from.clone()),
+            BOOT_NONCE,
+            &frame,
+        )
+        .map(|_| ())
+        .map_err(|rejection| maos_a2a_core::A2AError::TransportFailed(rejection.reason))
+    }
+
+    async fn handle_intake(
+        &self,
+        _request: maos_a2a_core::A2AJsonRpcRequest,
+    ) -> maos_a2a_core::A2AJsonRpcResponse {
+        unreachable!("the pull-delivery double only carries outbound pulls")
+    }
+}
+
 // ───────────────────────────── AC3: G covers one pull lag ─────────────────────────────
 
 #[tokio::test]
@@ -452,8 +485,44 @@ async fn g_covers_one_pull_lag_and_the_old_leaf_is_refused_only_after_it() {
     }
     let interval = states[0].confirmation_interval().unwrap();
     assert_eq!(interval, secs((T_STALE + 1) / 2));
-    // D-23-7-03 A, as an equality and never a literal: G = the §7.2.1.a base + one pull interval.
-    let g = base + interval;
+    // D-23-7-03 A + review B5, as an equality and never a literal: G = the §7.2.1.a base + TWO pull
+    // intervals — one for the spread of applies, one for the confirmation lag of X's own-leaf swap.
+    let g = base + 2 * interval;
+
+    // X's own state: the gate that decides WHEN its own-leaf swap may commit.
+    let (x_state, _x_audit) = state_for("x", &v1, &signer);
+    x_state
+        .install_cert_rotation(x.pins(), x.core(), timer.clone(), base)
+        .expect("X's rotation installs");
+    // Each peer's production `pull_from`, delivered to X's gate (the frame is the shipped one; the
+    // handshakes asserted below are the real ones).
+    let courier = |peer: &str, state: &Arc<CohortManifestState>| {
+        maos_cohort::CohortDistributor::new(
+            Arc::clone(state),
+            Arc::new(PullDelivery {
+                target: Arc::clone(&x_state),
+                from: peer.to_string(),
+            }),
+            maos_domain::frame::FrameAddress {
+                spirit_id: maos_spirit_abi::identity::SpiritId::from("cohort-control"),
+                host_id: Some(HostId(peer.to_string())),
+                role: None,
+            },
+        )
+    };
+    let p1_courier = courier("p1", &states[0]);
+    let p2_courier = courier("p2", &states[1]);
+    // One reconcile attempt of X: read and validate the files off the lock, commit under the gate.
+    let try_swap = || {
+        let maos_a2a_tcp::OwnLeafPrepare::Ready(prepared) =
+            x.prepare_own_identity(&x_new.fingerprint).unwrap()
+        else {
+            panic!("the PKI wrote the declared leaf");
+        };
+        x_state
+            .commit_own_leaf(&x_new.fingerprint, || x.commit_own_identity(prepared))
+            .unwrap()
+    };
 
     // Baseline: the old generation everywhere, all four directions.
     assert!(send(&x, "x", "p1", 1).await && send(&p1, "p1", "x", 2).await);
@@ -470,38 +539,71 @@ async fn g_covers_one_pull_lag_and_the_old_leaf_is_refused_only_after_it() {
         "the window P1 opened lasts G, not the bare base"
     );
 
-    // One pull lag passes (less one second): X has not applied yet and still serves the old leaf.
-    // P1's window must still be open, so X↔P1 works in both directions.
+    // One pull lag passes (less one second): X applies the reissue (its signed declaration names
+    // x_new) and its PKI already wrote the files. X's swap DECISION POINT: no peer has confirmed v2
+    // to X, so X holds its old leaf ...
     timer.advance_to(interval - secs(1));
-    assert!(
-        send(&x, "x", "p1", 5).await && send(&p1, "p1", "x", 6).await,
-        "P1 must still accept the retiring leaf one pull lag after it applied the reissue"
+    assert_eq!(
+        x_state.apply_reissue(&v2).unwrap(),
+        ReissueOutcome::Applied { version: 2 }
     );
-
-    // X applies it (the signed declaration names x_new) and its PKI already wrote the files.
     std::fs::write(&x_pems.cert_chain, &x_new.cert_pem).unwrap();
     std::fs::write(&x_pems.private_key, &x_new.key_pem).unwrap();
-    assert!(matches!(
-        x.reload_own_identity(&x_new.fingerprint).unwrap(),
-        OwnLeafReload::Swapped { .. }
-    ));
-    assert!(send(&x, "x", "p1", 7).await && send(&p1, "p1", "x", 8).await);
+    let decision = try_swap();
+    // ... so a handshake attempted AFTER that decision and BEFORE P2 applies the reissue is
+    // accepted in both directions (P2 still pins only the retiring leaf and X still serves it),
+    // and so is P1's, whose window is open. (Asserted BEFORE the decision itself, so that a
+    // gate-less X, which swapped here, fails at the P2 handshake assertion first.)
+    assert!(
+        send(&x, "x", "p2", 5).await && send(&p2, "p2", "x", 6).await,
+        "X<->P2 between X's swap decision and P2's apply: accepted both ways"
+    );
+    assert!(
+        send(&x, "x", "p1", 7).await && send(&p1, "p1", "x", 8).await,
+        "P1 must still accept the retiring leaf one pull lag after it applied the reissue"
+    );
+    assert!(
+        matches!(decision, OwnLeafCommit::Held { unconfirmed } if unconfirmed == ["p1", "p2"]),
+        "X must wait for the peers to confirm the reissue"
+    );
+    assert_eq!(
+        x.core().local_leaf_fingerprint(),
+        Some(x_old.fingerprint.clone())
+    );
 
-    // t = interval: P2 applies it. Nothing has been refused in either direction, before any fire.
+    // P1 confirms (its pull is the shipped frame, over to X's gate): X still waits for P2.
+    p1_courier.pull_from(&HostId("x".into())).await.unwrap();
+    assert!(matches!(
+        try_swap(),
+        OwnLeafCommit::Held { unconfirmed } if unconfirmed == ["p2"]
+    ));
+    assert!(send(&x, "x", "p2", 9).await && send(&p2, "p2", "x", 10).await);
+
+    // t = interval: P2 applies it and confirms; X's gate opens and X swaps.
     timer.advance_to(interval);
     assert_eq!(
         states[1].apply_reissue(&v2).unwrap(),
         ReissueOutcome::Applied { version: 2 }
     );
-    assert!(send(&x, "x", "p1", 9).await && send(&p1, "p1", "x", 10).await);
+    p2_courier.pull_from(&HostId("x".into())).await.unwrap();
+    assert!(matches!(
+        try_swap(),
+        OwnLeafCommit::Committed { unconfirmed, .. } if unconfirmed.is_empty()
+    ));
+    assert_eq!(
+        x.core().local_leaf_fingerprint(),
+        Some(x_new.fingerprint.clone())
+    );
+    // Nothing has been refused in either direction, before any fire.
+    assert!(send(&x, "x", "p1", 11).await && send(&p1, "p1", "x", 12).await);
     assert!(
-        send(&x, "x", "p2", 11).await && send(&p2, "p2", "x", 12).await,
+        send(&x, "x", "p2", 13).await && send(&p2, "p2", "x", 14).await,
         "P2, a pull later than P1, accepts the new leaf both ways"
     );
 
     // P1's G elapses: it promotes. X (new) is still fine everywhere.
     timer.advance_to(g);
-    assert!(send(&x, "x", "p1", 13).await && send(&x, "x", "p2", 14).await);
+    assert!(send(&x, "x", "p1", 15).await && send(&x, "x", "p2", 16).await);
 
     // The ghost still serves and presents the RETIRED leaf. Before P2's G elapses P2 still takes it.
     let ghost_pems = write_pem(&x_old, Some(&ca));

@@ -236,17 +236,21 @@ impl CohortSelfIdentitySource for CohortSelfIdentity {
     }
 }
 
-/// Story 23-7 / D-23-7-02 C — the production caller of `TcpA2ATransport::swap_serving_cert`.
+/// Story 23-7 / D-23-7-02 C — the production caller of the own-leaf swap
+/// ([`TcpA2ATransport::prepare_own_identity`] / [`TcpA2ATransport::commit_own_identity`]).
 ///
 /// The signed cohort manifest is the ONLY authority for replacing this host's serving leaf
 /// (ADR-062 keeps serving-leaf replacement off the operator POST surface). So the trigger is not
 /// a verb: this reconciler wakes when a reissue moved this host's declaration off the served leaf
 /// ([`CohortManifestState::install_local_leaf_observer`], delivered after the `cached` lock is
-/// released) and on every confirmation tick, and ONLY while the declaration and the served leaf
-/// differ it re-reads the configured PEM paths and swaps if the leaf there IS the declared one
-/// ([`TcpA2ATransport::reload_own_identity`]). A leaf the manifest does not declare is never
-/// served; a declared leaf that is not on disk yet leaves the host partitioned from every peer
-/// that already promoted (fail-closed), and a later tick heals it with no restart.
+/// released), when a peer's `Pull` arrives while the swap is pending, and on every confirmation
+/// tick, and ONLY while the declaration and the served leaf differ it re-reads the configured PEM
+/// paths, validates the identity (exact host SAN, chain, both TLS usages) and commits it inside
+/// [`CohortManifestState::commit_own_leaf`] if the leaf there IS the declared one, the declaration
+/// is still current at the commit, and every peer confirmed the manifest version (or the stale
+/// lease elapsed). A leaf the manifest does not declare is never served; a declared leaf that is
+/// not on disk yet leaves the host partitioned from every peer that already promoted
+/// (fail-closed), and a later tick heals it with no restart.
 ///
 /// It runs on its own task: never inside a `RotationGraceTimer` callback, never under `cached`.
 pub struct OwnLeafReconciler {
@@ -270,10 +274,16 @@ impl OwnLeafReconciler {
     }
 
     /// One pass. Returns the outcome it journaled, or `None` when the served leaf already is the
-    /// declared one (no file is read) or the row was already written for this exact condition.
+    /// declared one (no file is read), the row was already written for this exact condition, or a
+    /// newer reissue replaced the declaration before the commit (that reissue wakes the next pass).
+    ///
+    /// The files are read and validated OFF every lock ([`maos_a2a_tcp::TcpA2ATransport::prepare_own_identity`]);
+    /// the commit then runs inside [`CohortManifestState::commit_own_leaf`], which re-checks the
+    /// declaration and the peers' confirmation under the manifest lock, so a reissue cannot slip
+    /// between the check and the swap (review B2) and the swap waits for the peers (review B5).
     pub fn reconcile(&self) -> Option<maos_cohort::SelfLeafOutcome> {
-        use maos_a2a_tcp::OwnLeafReload;
-        use maos_cohort::SelfLeafOutcome;
+        use maos_a2a_tcp::OwnLeafPrepare;
+        use maos_cohort::{OwnLeafCommit, SelfLeafOutcome};
 
         let (declared, version) = self.state.local_declaration().ok().flatten()?;
         if self.state.local_leaf_fingerprint().as_ref() == Some(&declared) {
@@ -284,23 +294,61 @@ impl OwnLeafReconciler {
                 .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
             return None;
         }
-        let (outcome, on_disk) = match self.transport.reload_own_identity(&declared) {
-            Ok(OwnLeafReload::Current) => return None,
-            Ok(OwnLeafReload::Swapped { serving, .. }) => {
-                (SelfLeafOutcome::Swapped, serving.wire())
+        let unusable = |error: &dyn std::fmt::Display| {
+            eprintln!("cohort own-leaf reconcile: the configured identity is unusable: {error}");
+            (
+                SelfLeafOutcome::RefusedUnusable,
+                "unusable".to_string(),
+                String::new(),
+            )
+        };
+        let (outcome, on_disk, detail) = match self.transport.prepare_own_identity(&declared) {
+            Ok(OwnLeafPrepare::Current) => return None,
+            Ok(OwnLeafPrepare::Pending { on_disk }) => {
+                (SelfLeafOutcome::SwapPending, on_disk.wire(), String::new())
             }
-            Ok(OwnLeafReload::Pending { on_disk }) => {
-                (SelfLeafOutcome::SwapPending, on_disk.wire())
+            Ok(OwnLeafPrepare::Undeclared { on_disk }) => (
+                SelfLeafOutcome::RefusedUndeclared,
+                on_disk.wire(),
+                String::new(),
+            ),
+            Ok(OwnLeafPrepare::Ready(prepared)) => {
+                let on_disk = prepared.fingerprint().wire();
+                let transport = &self.transport;
+                match self
+                    .state
+                    .commit_own_leaf(&declared, || transport.commit_own_identity(prepared))
+                {
+                    Ok(OwnLeafCommit::Superseded) => return None,
+                    Ok(OwnLeafCommit::Held { unconfirmed }) => (
+                        SelfLeafOutcome::SwapHeldForPeers,
+                        on_disk,
+                        unconfirmed.join(","),
+                    ),
+                    Ok(OwnLeafCommit::Committed {
+                        result: Ok((_retired, serving)),
+                        unconfirmed,
+                    }) => (
+                        if unconfirmed.is_empty() {
+                            SelfLeafOutcome::Swapped
+                        } else {
+                            SelfLeafOutcome::SwappedUnconfirmed
+                        },
+                        serving.wire(),
+                        unconfirmed.join(","),
+                    ),
+                    Ok(OwnLeafCommit::Committed {
+                        result: Err(error), ..
+                    }) => unusable(&error),
+                    Err(error) => {
+                        eprintln!(
+                            "cohort own-leaf reconcile: the manifest state is unavailable: {error}"
+                        );
+                        return None;
+                    }
+                }
             }
-            Ok(OwnLeafReload::Undeclared { on_disk }) => {
-                (SelfLeafOutcome::RefusedUndeclared, on_disk.wire())
-            }
-            Err(error) => {
-                eprintln!(
-                    "cohort own-leaf reconcile: the configured identity is unusable: {error}"
-                );
-                (SelfLeafOutcome::RefusedUnusable, "unusable".to_string())
-            }
+            Err(error) => unusable(&error),
         };
         let key = (outcome, on_disk.clone(), declared.wire());
         let mut last = self
@@ -312,7 +360,7 @@ impl OwnLeafReconciler {
         }
         match self
             .state
-            .journal_self_leaf(outcome, &on_disk, &declared.wire(), version)
+            .journal_self_leaf(outcome, &on_disk, &declared.wire(), version, &detail)
         {
             Ok(()) => {
                 *last = Some(key);

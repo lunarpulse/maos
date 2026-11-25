@@ -332,10 +332,10 @@ pub struct PeerCertRotation {
     core: Arc<A2ARouterCore>,
     audit: Arc<dyn CohortAuditSink>,
     timer: Arc<dyn RotationGraceTimer>,
-    /// Story 23-7 / D-23-7-03 A — the §7.2.1.a base ([`cold_deployment_t_grace`]); each window
-    /// opened by `reload` closes after this PLUS the confirmation interval of the manifest being
-    /// applied, so a peer that applies the reissue one pull later than another still sees the
-    /// incoming leaf accepted by every peer that already did.
+    /// Story 23-7 / D-23-7-03 A + review B5/B6 — the §7.2.1.a base ([`cold_deployment_t_grace`]);
+    /// each window opened by `reload` closes after this PLUS the `window_lag` the caller passes
+    /// (two pull intervals: the spread between members applying one reissue, and the lag of the
+    /// own-leaf swap behind the last peer's confirmation).
     grace: Duration,
     /// Serializes every plane/ledger transition with grace closers. Readers do
     /// not take the store's writer lock, so ordering still preserves their
@@ -525,9 +525,9 @@ impl PeerCertRotation {
         now_secs: u64,
         commit_event: Option<&CohortAuditEvent>,
         local_leaf_event: Option<&CohortAuditEvent>,
-        confirmation_interval: Duration,
+        window_lag: Duration,
     ) -> Result<RotationOutcome, CohortError> {
-        let grace = self.grace + confirmation_interval;
+        let grace = self.grace + window_lag;
         let _transition = match self.transition_lock.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),

@@ -53,7 +53,7 @@ pub use audit::{
 pub use control::{CohortManifestControl, CONTROL_EVENT_TYPE};
 pub use digest::{
     journal_rupture_frame, CohortDigestDistributor, CohortRuptureLogSink, DigestReadControl,
-    DigestSummary, DIGEST_DAILY_SCOPE, DIGEST_READ_EVENT_TYPE,
+    DigestSummary, DIGEST_DAILY_SCOPE, DIGEST_READ_EVENT_TYPE, PEER_IDENTITY_REFUSAL_INTENT,
 };
 pub use distribution::CohortDistributor;
 pub use error::{CohortError, CohortManifestForkReason, MigrationChainNotLinearReason};
@@ -77,6 +77,6 @@ pub use rotation::{
     RotationRefusal, RotationWindow, COLD_DEPLOYMENT_DAYS_OF_HISTORY, COLD_DEPLOYMENT_HANDSHAKE_MS,
 };
 pub use state::{
-    CohortClock, CohortManifestState, PeerConvergence, ReissueOutcome, CONVERGENCE_OBSERVED,
-    CONVERGENCE_RESTARTED, CONVERGENCE_STALE,
+    CohortClock, CohortManifestState, OwnLeafCommit, PeerConvergence, ReissueOutcome,
+    CONVERGENCE_OBSERVED, CONVERGENCE_RESTARTED, CONVERGENCE_STALE,
 };

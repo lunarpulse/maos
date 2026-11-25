@@ -574,11 +574,19 @@ impl InMemoryTofuPinStore {
     /// degraded (D-21-3-04 A) and FENCES the durable file, so a restart refuses
     /// to revive the older, wider snapshot the failed write left behind.
     fn persist_narrowed(&self) {
+        self.persist_narrowed_after(false);
+    }
+
+    /// [`Self::persist_narrowed`] where the caller already made a fence durable for this very
+    /// transition: a refused write then needs no second fence.
+    fn persist_narrowed_after(&self, fenced: bool) {
         if let Err(detail) = self.persist_with(None, true) {
             self.degraded.store(true, Ordering::Release);
             tracing::error!(%detail, "TOFU pin file not written; pins degraded");
-            if let Some(Err(fence)) = self.persistence.as_ref().map(|port| port.fence()) {
-                tracing::error!(%fence, "TOFU pin file not fenced; a restart may revive retired pins");
+            if !fenced {
+                if let Some(Err(fence)) = self.persistence.as_ref().map(|port| port.fence()) {
+                    tracing::error!(%fence, "TOFU pin file not fenced; a restart may revive retired pins");
+                }
             }
         }
     }
@@ -596,12 +604,32 @@ impl InMemoryTofuPinStore {
 
     /// A promotion changed `peer`'s fingerprint: bump its durable generation and mark the
     /// current pin as promoted (the durable join behind `CertPostGraceReject`).
-    fn persist_promotion(&self, peer: &PeerId) {
+    fn persist_promotion(&self, peer: &PeerId, fenced: bool) {
         if let Some(mut meta) = self.meta.get_mut(peer.as_str()) {
             meta.generation += 1;
             meta.promoted = true;
         }
-        self.persist_narrowed();
+        self.persist_narrowed_after(fenced);
+    }
+
+    /// Story 23-7 / D-23-7-08 A (review A2) — make the fence durable BEFORE a promotion's
+    /// retirement becomes observable to the lock-free verifiers. `persist_promotion` fences too,
+    /// but only after the pin map already moved: a crash between a verifier observing the
+    /// retirement and that fence would reopen the older, unfenced pin file. Caller holds
+    /// `window_lock`. A refused fence is logged; the retirement itself still applies (narrower
+    /// is the fail-closed answer) exactly like a refused fence after a failed write.
+    fn fence_before_retirement(&self, peer: &PeerId) -> bool {
+        if !self.pins.contains_key(peer.as_str()) {
+            return false;
+        }
+        match self.persistence.as_ref().map(|port| port.fence()) {
+            Some(Err(fence)) => {
+                tracing::error!(%fence, "TOFU pin file not fenced before a retirement; a restart may revive the retired pin");
+                false
+            }
+            Some(Ok(())) => true,
+            None => false,
+        }
     }
 
     /// Story 19-7 / D-19-7-03 A — record the operator verdict on `peer`'s
@@ -801,6 +829,7 @@ impl InMemoryTofuPinStore {
         // generation throughout close. A recovered poisoned lock cleared all
         // transient windows, so `None` is fail-closed rather than stale trust.
         let next = self.rotation_next.get(peer.as_str())?.value().clone();
+        let fenced = self.fence_before_retirement(peer);
         let retired = self.pins.get_mut(peer.as_str()).map(|mut entry| {
             let retired = entry.fingerprint.clone();
             entry.fingerprint = next;
@@ -814,7 +843,7 @@ impl InMemoryTofuPinStore {
         // fail-closed answer when the promotion target is gone.
         self.rotation_next.remove(peer.as_str());
         if retired.is_some() {
-            self.persist_promotion(peer);
+            self.persist_promotion(peer, fenced);
         }
         retired
     }
@@ -878,6 +907,7 @@ impl InMemoryTofuPinStore {
         // has vanished — the same fail-closed clear as close_rotation_window.
         // An early `?` here would ORPHAN a widened trust set no later close
         // could reach; narrower is the only fail-closed answer.
+        let fenced = self.fence_before_retirement(peer);
         let retired = self.pins.get_mut(peer.as_str()).map(|mut entry| {
             let retired = entry.fingerprint.clone();
             entry.fingerprint = next;
@@ -886,7 +916,7 @@ impl InMemoryTofuPinStore {
         });
         self.rotation_next.remove(peer.as_str());
         if retired.is_some() {
-            self.persist_promotion(peer);
+            self.persist_promotion(peer, fenced);
         }
         retired
     }

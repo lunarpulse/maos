@@ -8,6 +8,10 @@ use crate::san::SanRefusal;
 use maos_a2a_core::A2AError;
 use std::fmt;
 
+/// Story 23-7 (review A3) — the token the verifier appends to a pin refusal that is a retired-key
+/// candidate (see [`TcpTransportError::is_retired_key_candidate`]).
+pub const RETIRED_KEY_CANDIDATE: &str = "RETIRED_KEY_CANDIDATE";
+
 /// Classified transport-layer failure. The variants are the oracle classes the
 /// security tests read; `classify` recovers them from a dial error.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,12 +61,28 @@ pub enum TcpTransportError {
         refusal: SanRefusal,
         trust_domain: String,
     },
+    /// Story 23-7 review B3 — the own leaf's SPIFFE SAN names another host than this one.
+    OwnLeafSanNamesOtherHost { named: String, expected: String },
+    /// Story 23-7 review B3 — the own identity material (leaf, intermediates, key) is not usable as
+    /// committed: the chain does not verify for BOTH TLS usages against this host's own trust
+    /// posture, or `peer_san = "required"` is set but the own peer id was never bound.
+    OwnIdentityRefused(String),
 }
 
 impl TcpTransportError {
     /// Is this a TOFU pin mismatch (the security model's primary negative)?
     pub fn is_tofu_mismatch(&self) -> bool {
         matches!(self, TcpTransportError::TofuPinMismatch(_))
+    }
+
+    /// Story 23-7 (review A3) — the pin refusal the verifier itself judged a possible retired-key
+    /// presentation: a leaf that chained to the configured `ca_roots` and failed a plain
+    /// fingerprint comparison (`EPinMismatch::Mismatch`) against a subject whose pin carries a
+    /// promotion, all read in the same verifier decision. An invalidated pin (a restart awaiting
+    /// re-pin approval), an unknown or non-chaining leaf, and any `ca_roots`-unset handshake
+    /// (where anyone can mint a leaf naming the subject) never carry it.
+    pub fn is_retired_key_candidate(&self) -> bool {
+        matches!(self, TcpTransportError::TofuPinMismatch(m) if m.contains(RETIRED_KEY_CANDIDATE))
     }
 
     /// Is this a chain/issuer/structure rejection (NOT a pin mismatch)?
@@ -126,9 +146,9 @@ impl TcpTransportError {
             TcpTransportError::Config(m) => A2AError::ConfigInvalid(m.clone()),
             TcpTransportError::Protocol(m) => A2AError::TransportFailed(m.clone()),
             TcpTransportError::PinPromotionNotCarried { .. }
-            | TcpTransportError::OwnLeafSanRefused { .. } => {
-                A2AError::ConfigInvalid(self.to_string())
-            }
+            | TcpTransportError::OwnLeafSanRefused { .. }
+            | TcpTransportError::OwnLeafSanNamesOtherHost { .. }
+            | TcpTransportError::OwnIdentityRefused(_) => A2AError::ConfigInvalid(self.to_string()),
         }
     }
 
@@ -187,8 +207,9 @@ impl fmt::Display for TcpTransportError {
                 f,
                 "pin store refuses to boot: peer {peer} was promoted at runtime from \
                  {configured} (still named by `[[tcp.peer_pins]]`) to {promoted}; carry {promoted} \
-                 into `[[tcp.peer_pins]]` and the signed cohort manifest and restart, or delete \
-                 a2a-pins.json to boot from the configured pin"
+                 into `[[tcp.peer_pins]]` and the signed cohort manifest and restart (deleting \
+                 a2a-pins.json would boot from the configured pin but also resets the durable \
+                 manifest-version floor to 0 and clears every promoted marker)"
             ),
             TcpTransportError::OwnLeafSanRefused {
                 refusal,
@@ -198,6 +219,14 @@ impl fmt::Display for TcpTransportError {
                 "peer_san = \"required\": this host's own leaf is refused ({refusal}); it must \
                  carry exactly one URI SAN `spiffe://{trust_domain}/maos/peer/<peer_id>`"
             ),
+            TcpTransportError::OwnLeafSanNamesOtherHost { named, expected } => write!(
+                f,
+                "peer_san = \"required\": this host's own leaf names {named} but this host is \
+                 {expected}; every `required` peer would scope our handshake to {named}"
+            ),
+            TcpTransportError::OwnIdentityRefused(detail) => {
+                write!(f, "own identity refused: {detail}")
+            }
         }
     }
 }

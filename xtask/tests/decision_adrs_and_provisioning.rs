@@ -614,7 +614,21 @@ fn validate_anchors(root: &Path, number: &str, body: &str, findings: &mut Vec<St
                     "None, // listen side: peer_san off = flat TOFU lookup",
                     findings,
                 );
+                // Review A5: the SAN scoping itself — deleting the wiring leaves the comment
+                // above green while `required` silently becomes a flat lookup.
+                require_contains(
+                    number,
+                    context,
+                    "build_server_config",
+                    "crates/maos-a2a-tcp/src/transport.rs",
+                    &transport,
+                    ".with_peer_san(san_trust_domain)",
+                    findings,
+                );
             }
+            // The ADR's own body carries the amendment (outside `## Context`), like 061/062.
+            let adr_rel = "docs/adr/ADR-063-two-axis-revocation-and-post-grace-identity.md";
+            require_body_contains(number, body, adr_rel, "## Amendment — Story 23-7", findings);
         }
         "064" => {
             if let Some(inference_mode) = anchor_source(
@@ -1031,6 +1045,7 @@ impl Fixture {
             let amendment = match number {
                 61 => "\n## Amendment — Story 17-1\n\nThe bearer is daemon-minted; the Worker reaches `/proxy/egress.sock` only.\n",
                 62 => "\n## Amendment — Story 16-1\n\n`control.json` keeps one writer and `cohort-a2a-daemon` is a door root.\n\n## Amendment — Story 19-7\n\nA nonce-only re-pin route keeps the pinned fingerprint.\n",
+                63 => "\n## Amendment — Story 23-7\n\nThe SAN scoping and the typed post-grace reason are recorded here.\n",
                 _ => "",
             };
             let adr = format!(
@@ -1092,7 +1107,7 @@ impl Fixture {
         write_file(
             root,
             "crates/maos-a2a-tcp/src/transport.rs",
-            "pub fn build_server_config_with_san() { None, // listen side: peer_san off = flat TOFU lookup, required = SAN-scoped\n}\n",
+            "pub fn build_server_config_with_san() { None, // listen side: peer_san off = flat TOFU lookup, required = SAN-scoped\n    verifier.with_peer_san(san_trust_domain)\n}\n",
         );
         write_file(
             root,
@@ -1280,6 +1295,19 @@ fn every_clause_and_denominator_has_a_planted_red() {
         body.replace("## Amendment — Story 19-7", "")
     });
     assert_red_contains(&fx, "must contain `## Amendment — Story 19-7`");
+
+    // ADR-063 loses its Story 23-7 amendment, or the transport loses the SAN-scoping wiring
+    // while its comment stays: both must red (review A5).
+    let fx = Fixture::complete();
+    fx.rewrite("docs/adr/ADR-063-fixture-decision.md", |body| {
+        body.replace("## Amendment — Story 23-7", "")
+    });
+    assert_red_contains(&fx, "must contain `## Amendment — Story 23-7`");
+    let fx = Fixture::complete();
+    fx.rewrite("crates/maos-a2a-tcp/src/transport.rs", |body| {
+        body.replace(".with_peer_san(san_trust_domain)", "")
+    });
+    assert_red_contains(&fx, "no longer contains `.with_peer_san(san_trust_domain)`");
 
     // ADR-060's documented field name may remain in comments, but deleting
     // its executable rust-inproc refusal must still red.

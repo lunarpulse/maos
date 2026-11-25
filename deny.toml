@@ -96,6 +96,12 @@ skip = [
     { name = "rand" },
     { name = "rand_core" },
     { name = "fallible-iterator" },
+    # Story 23-7 — `x509-cert` 0.2.5 (SPIFFE URI SAN parsing in `maos-a2a-tcp`) sits on RustCrypto
+    # `der` 0.7.10, which uses `const-oid` 0.9.6; the digest 0.11 cluster above uses `const-oid`
+    # 0.10.2. Both versions were already in `Cargo.lock` before this story (der 0.7 via rcgen);
+    # the story makes 0.9.6 a normal edge. Not a vulnerability; trips only `multiple-versions`.
+    # Drop with the digest 0.11 / der 0.8 convergence. FLAG-Winston/John: ratify.
+    { name = "const-oid" },
     # Story 11.4a enterprise PDP — the Cedar reference engine (cedar-policy,
     # in `maos-pdp`, user-space only; quarantined from kernel/domain by
     # check-dependency-closure) brings a parser/graph/serde cluster that

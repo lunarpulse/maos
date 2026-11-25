@@ -69,13 +69,13 @@ pub fn mint_identity(dir: &Path, tag: &str) -> Identity {
     }
 }
 
-/// Story 23-7 / D-23-7-03 A — the signed lease of the fixture manifests: the minimum (30), so the
-/// rotation grace `G = cold_deployment_t_grace() + (t_stale + 1) / 2` is 20 s, not 65 s.
+/// Story 23-7 / D-23-7-03 A + review B5 — the signed lease of the fixture manifests: the minimum
+/// (30), so the rotation grace `G = cold_deployment_t_grace() + 2 × ((t_stale + 1) / 2)` is 35 s.
 pub const FIXTURE_T_STALE_SECS: u64 = 30;
 
 /// `G` for the fixture manifests, derived from the shipped formula.
 pub fn fixture_grace() -> Duration {
-    maos_cohort::cold_deployment_t_grace() + Duration::from_secs((FIXTURE_T_STALE_SECS + 1) / 2)
+    maos_cohort::cold_deployment_t_grace() + 2 * Duration::from_secs((FIXTURE_T_STALE_SECS + 1) / 2)
 }
 
 pub fn signed_manifest(

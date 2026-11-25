@@ -27,6 +27,6 @@ pub use error::TcpTransportError;
 pub use san::{PeerSanMode, SanRefusal};
 pub use transport::{
     build_client_config, build_server_config, build_server_config_with_san, length_delimited_codec,
-    OwnLeafReload, TcpA2ATransport, TcpTimeouts, MAX_FRAME_LEN,
+    OwnLeafPrepare, OwnLeafReload, PreparedOwnLeaf, TcpA2ATransport, TcpTimeouts, MAX_FRAME_LEN,
 };
 pub use verifier::{TofuPinningVerifier, TrustPosture, VerifyDirection};

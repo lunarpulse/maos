@@ -214,3 +214,71 @@ fn without_a_port_the_floor_is_still_enforced_in_memory() {
     store.raise_manifest_floor(3);
     assert_eq!(store.manifest_floor(), 3);
 }
+
+/// A port that records, in one ordered log, every fence and write together with the pin a
+/// lock-free verifier could read at that instant.
+#[derive(Default)]
+struct OrderPort {
+    store: std::sync::OnceLock<Arc<InMemoryTofuPinStore>>,
+    events: Mutex<Vec<String>>,
+}
+
+impl OrderPort {
+    fn observed(&self) -> String {
+        self.store
+            .get()
+            .and_then(|store| store.get_pin_sync(&peer()))
+            .map_or_else(|| "none".into(), |pin| pin.fingerprint.wire())
+    }
+}
+
+impl PinPersistence for OrderPort {
+    fn load(&self) -> Vec<PinRecord> {
+        Vec::new()
+    }
+    fn store(&self, _: &[PinRecord], _: u64) -> Result<(), String> {
+        Ok(())
+    }
+    fn store_narrowing(&self, _: &[PinRecord], _: u64) -> Result<(), String> {
+        let seen = self.observed();
+        self.events.lock().unwrap().push(format!("write:{seen}"));
+        Ok(())
+    }
+    fn fence(&self) -> Result<(), String> {
+        let seen = self.observed();
+        self.events.lock().unwrap().push(format!("fence:{seen}"));
+        Ok(())
+    }
+}
+
+// Review A2 — the fence is durable BEFORE the retirement is observable: at the instant of the
+// fence a verifier still reads the OLD pin, so no crash can follow an observable retirement
+// without the fence in place. Planted red: dropping `fence_before_retirement` leaves only the
+// write (which a verifier already sees as retired).
+#[tokio::test]
+async fn both_promotion_closes_fence_before_the_retirement_is_observable() {
+    let port = Arc::new(OrderPort::default());
+    let store = Arc::new(InMemoryTofuPinStore::new().with_persistence(port.clone()));
+    assert!(port.store.set(store.clone()).is_ok());
+    store
+        .pin_first_contact(&peer(), &fp(1), &fp(1), 7)
+        .await
+        .unwrap();
+    let (old, newer, newest) = (fp(1).wire(), fp(2).wire(), fp(3).wire());
+
+    store.open_rotation_window(&peer(), &fp(2)).unwrap();
+    port.events.lock().unwrap().clear();
+    store.close_rotation_window_if(&peer(), &fp(2)).unwrap();
+    assert_eq!(
+        *port.events.lock().unwrap(),
+        vec![format!("fence:{old}"), format!("write:{newer}")]
+    );
+
+    store.open_rotation_window(&peer(), &fp(3)).unwrap();
+    port.events.lock().unwrap().clear();
+    store.close_rotation_window(&peer()).unwrap();
+    assert_eq!(
+        *port.events.lock().unwrap(),
+        vec![format!("fence:{newer}"), format!("write:{newest}")]
+    );
+}

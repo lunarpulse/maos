@@ -189,10 +189,24 @@ async fn a_reissue_before_the_files_leaves_the_host_diverged_and_the_files_then_
             && !seen.contains(r#""verdict":"diverged""#)
     })
     .await;
-    wait_for("self_leaf_swapped row", || {
-        rows(&fixture, "self_leaf_swapped") >= 1
+    // The fixture's only peer (host-b) is a one-shot courier: it never `Pull`s the daemon, so it
+    // never confirms v2 (review B5). The daemon therefore holds the swap until the manifest's own
+    // stale lease has elapsed since it applied v2, then swaps and says who never confirmed. A hold
+    // row may or may not be written first (it depends on where the tick falls inside the lease),
+    // so only the terminal outcome is asserted.
+    wait_for("self_leaf_swapped_unconfirmed row", || {
+        rows(&fixture, "self_leaf_swapped_unconfirmed") >= 1
     })
     .await;
+    assert_eq!(
+        rows(&fixture, "self_leaf_swapped"),
+        0,
+        "host-b never confirmed v2, so the swap is the lease-bounded one"
+    );
+    assert!(
+        rows(&fixture, "self_leaf_swap_held") <= 1,
+        "a standing hold is ONE row, not one per tick"
+    );
     assert_eq!(
         rows(&fixture, "self_leaf_swap_pending"),
         1,

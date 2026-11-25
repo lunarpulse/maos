@@ -109,7 +109,7 @@ leaf must be reissued carrying its declared `PeerId`. The reissue rides Story
 21-3 AC2's own rotation path — `swap_serving_cert` gains its first production
 caller, driven by the signed manifest reissue — so the story that needs the
 migration builds its vehicle. The binding budget is
-`G = cold_deployment_t_grace() + confirmation_interval() ≈ 65 s`, recorded as
+`G = cold_deployment_t_grace() + 2 × confirmation_interval() ≈ 125 s` (amended by Story 23-7), recorded as
 **ratified but unbuilt** (`14-2d-self-identity-rotation.md:141-142`) and owned
 by 21-3. Assigning the durable join and its typed reason to 21-3 also closes
 14-2b's dangling post-grace ownership note
@@ -171,22 +171,49 @@ Story 23-7 built; the decision above is unchanged.
   `required`. Until a deployment reissues its leaves with the SAN and sets `required`, the
   listen side stays unscoped and row 12 clause (iii) stays open for it.
 - **`G` is built.** A window opened by a reissue closes after
-  `G = cold_deployment_t_grace() + confirmation_interval()` of the manifest being applied
-  (65 s at the default `t_stale_secs = 120`), because members apply one reissue up to one pull
-  interval apart. It is derived, never an operator knob.
+  `G = cold_deployment_t_grace() + 2 × confirmation_interval()`, the interval being the larger
+  of the manifest being applied and the one in force (125 s at the default `t_stale_secs =
+  120`): members apply one reissue up to one pull interval apart, and the own-leaf swap trails
+  the last peer's apply by up to one more. It is derived, never an operator knob.
 - **The join source.** The durable join is a `promoted` marker on the peer's pin record (pin
   file schema 2): true once a rotation promotion closed on the current fingerprint, false after
-  a re-pair or re-seed. `CertPostGraceReject` is journaled exactly when the refusal's subject
-  (the dial target, or the SAN-named listen peer) has `promoted = true`; an unknown leaf, a
-  never-promoted peer and every `off`-mode listen refusal stay `PeerIdentityUnverified`. No
-  retired fingerprint is stored. The tracing token `cert_post_grace_reject` is unchanged. A WASM
-  guest sees `PeerIdentityUnverified` (the WIT enum has no post-grace variant).
+  a re-pair or re-seed. `CertPostGraceReject` is a *candidate* signal, not proof: the verifier
+  types a refusal with it only when, in one read of the pin state, the leaf chained to the
+  configured `ca_roots`, failed a plain fingerprint comparison against the subject
+  (`EPinMismatch::Mismatch`; the dial target, or the SAN-named listen peer) and the subject has
+  `promoted = true`. A leaf that chains to the CA, names the subject and is not its pin reads the
+  same whether it is the retired key or another leaf issued for that SAN; no retired fingerprint
+  is stored. Everything else stays `PeerIdentityUnverified`: an invalidated pin (a promoted peer
+  that restarted and presents its current leaf keeps `promoted` until re-pin approval), a
+  never-promoted peer, an unknown or non-chaining leaf, every `off`-mode listen refusal, and
+  every handshake with `ca_roots` unset (the leaf is its own anchor, so anyone can present one
+  whose SAN names a promoted peer; there the retired-key signal is not made at all). The row is
+  attributed to the transport event (`a2a:peer-identity-refusal`, no fabricated consent
+  envelope) and its `to_spirit_id` is `<direction>@<peer>`, where `<peer>` is the dial target,
+  the SAN-named listen peer when the verifier had one, else the socket address. Before this
+  amendment's review fixes the listen-side row held only the socket address, so the rotation-close
+  ⋈ refusal join could not be made from durable rows for a SAN-less or SAN-unparsed refusal; it
+  can for a refusal whose subject the verifier knew. The tracing token `cert_post_grace_reject`
+  is unchanged. A WASM guest sees `PeerIdentityUnverified` (the WIT enum has no post-grace
+  variant).
 - **Own-leaf trigger.** The signed manifest stays the only authority for replacing the serving
   leaf (ADR-062 is not amended): when a reissue moves this host's declaration off the served
-  leaf, and on every confirmation tick while they differ, the daemon re-reads the configured
-  PEM paths and swaps only if the leaf there equals the declaration.
+  leaf, on every confirmation tick and whenever a peer's `Pull` arrives while they differ, the
+  daemon re-reads the configured PEM paths, validates the identity it would commit (the exact
+  host SAN under `required`, the chain and both TLS usages), and swaps only if the leaf there
+  equals the declaration. The declaration check, the peers' confirmation and the swap are one
+  step under the manifest lock, so a newer reissue cannot slip between them. The swap waits until
+  every peer this host has an edge with has declared the manifest version in force (14-2b's
+  convergence table): a peer that has not applied the reissue pins only the retiring leaf. A
+  silent peer cannot hold it past one `t_stale_secs` lease since this host applied the reissue,
+  after which the swap runs and a `self_leaf_swapped_unconfirmed` row names the unconfirmed
+  peers.
+- **No session resumption.** The listener keeps no TLS session cache or tickets: every inbound
+  connection runs the verifier, so a resumed session cannot bind a connection to a fingerprint
+  since assigned to another peer.
 - **Owner move.** The typed reason, the durable join and the SAN-scoped listener move from Story
   21-3 to Story 23-7.
 
 Not decided here: an immediate hard cut for a compromised key (D-23-7-10 A: the exposure bound
-is the pull lag plus `G`; see `RELEASE-HOLDS.md`).
+is the pull lag per hop plus `G`, and holds only while every peer has an honest pull path to a
+member holding the new version; see `RELEASE-HOLDS.md`).

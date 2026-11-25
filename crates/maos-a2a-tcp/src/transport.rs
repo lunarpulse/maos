@@ -53,12 +53,14 @@ pub fn length_delimited_codec() -> LengthDelimitedCodec {
         .new_codec()
 }
 
-/// Story 23-7 / D-23-7-07 A — the reason a TLS-layer identity refusal is journaled under:
-/// `CertPostGraceReject` exactly when the verifier's subject peer (the dial target, or the peer a
-/// listen-side SAN named) carries a durable promotion; everything else stays
-/// `PeerIdentityUnverified`. The join is against the pin record, never against retired-leaf state.
-fn refusal_reason(pins: &InMemoryTofuPinStore, subject: Option<&PeerId>) -> RuptureReason {
-    if subject.is_some_and(|peer| pins.is_promoted(peer)) {
+/// Story 23-7 / D-23-7-07 A (review A3) — the reason a TLS-layer identity refusal is journaled
+/// under: `CertPostGraceReject` exactly when the verifier typed the refusal a retired-key
+/// candidate (a chain-validated plain fingerprint mismatch on a promoted subject, one pin-state
+/// read; see `TcpTransportError::is_retired_key_candidate`); everything else, including a
+/// restarted promoted peer presenting its current leaf and every `ca_roots`-unset handshake, is
+/// `PeerIdentityUnverified`.
+fn refusal_reason(refusal: &TcpTransportError) -> RuptureReason {
+    if refusal.is_retired_key_candidate() {
         RuptureReason::CertPostGraceReject
     } else {
         RuptureReason::PeerIdentityUnverified
@@ -66,20 +68,32 @@ fn refusal_reason(pins: &InMemoryTofuPinStore, subject: Option<&PeerId>) -> Rupt
 }
 
 /// Story 23-7 / D-23-7-06 A — under `peer_san = "required"` the own leaf must carry the SPIFFE URI
-/// SAN every `required` peer will look for; `None` (`off`) checks nothing.
+/// SAN every `required` peer will look for; `None` (`off`) checks nothing. Review B3: when the own
+/// peer id is known the SAN must name exactly THIS host (bind time passes `None`; the composition
+/// root checks the host at boot and every swap checks it here).
 fn check_own_leaf_san(
     trust_domain: Option<&str>,
+    own_peer: Option<&PeerId>,
     chain: &[CertificateDer<'static>],
 ) -> Result<(), TcpTransportError> {
     let (Some(domain), Some(leaf)) = (trust_domain, chain.first()) else {
         return Ok(());
     };
-    crate::san::peer_from_leaf(leaf.as_ref(), domain)
-        .map(|_| ())
-        .map_err(|refusal| TcpTransportError::OwnLeafSanRefused {
+    let named = crate::san::peer_from_leaf(leaf.as_ref(), domain).map_err(|refusal| {
+        TcpTransportError::OwnLeafSanRefused {
             refusal,
             trust_domain: domain.to_string(),
-        })
+        }
+    })?;
+    match own_peer {
+        Some(own) if own.as_str() != named.as_str() => {
+            Err(TcpTransportError::OwnLeafSanNamesOtherHost {
+                named: named.as_str().to_string(),
+                expected: own.as_str().to_string(),
+            })
+        }
+        _ => Ok(()),
+    }
 }
 
 /// What [`TcpA2ATransport::reload_own_identity`] found at the configured PEM paths.
@@ -96,6 +110,36 @@ pub enum OwnLeafReload {
     Pending { on_disk: PeerCertFingerprint },
     /// The files hold a leaf that is neither served nor declared: never served.
     Undeclared { on_disk: PeerCertFingerprint },
+}
+
+/// Own-leaf material that passed every check ([`TcpA2ATransport::prepare_own_identity`]) — the
+/// owned bytes the commit will publish.
+pub struct PreparedOwnLeaf(ValidatedIdentity);
+
+impl PreparedOwnLeaf {
+    /// The fingerprint of the leaf this will serve.
+    pub fn fingerprint(&self) -> &PeerCertFingerprint {
+        &self.0.leaf
+    }
+}
+
+struct ValidatedIdentity {
+    chain: Vec<CertificateDer<'static>>,
+    key: PrivateKeyDer<'static>,
+    certified: rustls::sign::CertifiedKey,
+    leaf: PeerCertFingerprint,
+}
+
+/// What [`TcpA2ATransport::prepare_own_identity`] found at the configured PEM paths.
+pub enum OwnLeafPrepare {
+    /// The files hold the leaf already served, and it is the declared one: nothing to do.
+    Current,
+    /// The files still hold the served leaf while the manifest declares another one.
+    Pending { on_disk: PeerCertFingerprint },
+    /// The files hold a leaf that is neither served nor declared: never served.
+    Undeclared { on_disk: PeerCertFingerprint },
+    /// The declared leaf is on disk and the whole identity validated; commit it.
+    Ready(PreparedOwnLeaf),
 }
 
 /// Injectable timeouts (H5). `test_profile()` keeps timeout-path tests `< 2s`.
@@ -179,6 +223,9 @@ pub struct TcpA2ATransport {
     /// Story 23-7 / D-23-7-06 A — the trust domain own-leaf swaps are SAN-checked against
     /// (`peer_san = "required"`); `None` under `off`.
     san_trust_domain: Option<Arc<str>>,
+    /// Story 23-7 review B3 — this host's own peer id, bound once by the composition root; the own
+    /// leaf's SAN must name it under `peer_san = "required"`.
+    own_peer: std::sync::OnceLock<PeerId>,
     validation_time: Option<UnixTime>,
     local_addr: SocketAddr,
     own_boot_nonce: u64,
@@ -431,7 +478,7 @@ impl TcpA2ATransport {
         let pins = tcp_config.build_pin_store(pin_persistence).await?;
         let posture = tcp_config.trust_posture()?;
         let (own_chain, own_key) = tcp_config.load_identity()?;
-        check_own_leaf_san(san_trust_domain.as_deref(), &own_chain)?;
+        check_own_leaf_san(san_trust_domain.as_deref(), None, &own_chain)?;
 
         // Story 8.9 / AC6.2 (G5a) — `try_new` HARD-FAILS on a duplicate `peer_id`
         // instead of the prior silent "last wins" overwrite; surface it to the
@@ -543,6 +590,7 @@ impl TcpA2ATransport {
                 tcp_config.own_private_key.clone(),
             ),
             san_trust_domain,
+            own_peer: std::sync::OnceLock::new(),
             posture,
             validation_time,
             local_addr,
@@ -603,66 +651,150 @@ impl TcpA2ATransport {
     /// serve the new leaf while presenting the retired one, and promoted
     /// peers refuse it — measured by the scene's beat-5 control) — and, since
     /// Story 23-7, plane C (`A2ARouterCore::local_leaf_fingerprint`), so the
-    /// Send-seam team declaration compares the leaf actually served. The
-    /// production caller is [`Self::reload_own_identity`], driven by the
-    /// composition root's own-leaf reconciler; this method trusts its caller
-    /// to have checked the leaf against the signed declaration.
+    /// Send-seam team declaration compares the leaf actually served.
+    ///
+    /// Story 23-7 review B3: the replacement is validated here, on the very bytes it commits —
+    /// key/leaf match, the exact host SAN under `peer_san = "required"`, and the chain for BOTH TLS
+    /// usages against this node's own trust posture — so no caller (public or the own-leaf
+    /// reconciler) can install an identity the peers would refuse. What this method does NOT
+    /// check is the signed declaration: the production caller is the own-leaf reconciler
+    /// ([`Self::prepare_own_identity`] / [`Self::commit_own_identity`]), which owns that check.
     pub fn swap_serving_cert(
         &self,
         chain: Vec<CertificateDer<'static>>,
         key: PrivateKeyDer<'static>,
     ) -> Result<(), TcpTransportError> {
-        // §A6 (Edge-5/Blind-5 + close-pass CloseEdge-2): VALIDATE FIRST, then
-        // ACQUIRE BOTH write guards under swap_lock BEFORE writing either —
-        // a poisoned serving lock must not leave the dial half swapped —
-        // then commit. A rejected rotation leaves the node UNCHANGED, and
-        // concurrent swaps publish one generation each.
-        let ck = SwappableServingCert::certified_key(chain.clone(), &key)?;
+        let validated = self.validate_own_identity(chain, key)?;
+        self.commit_identity(validated).map(|_| ())
+    }
+
+    /// Bind this host's own peer id (once). Under `peer_san = "required"` every own-leaf swap
+    /// then demands a SAN naming exactly this host; until it is bound such a swap is refused.
+    /// `false` when an id was already bound.
+    #[must_use]
+    pub fn bind_own_peer(&self, peer: PeerId) -> bool {
+        self.own_peer.set(peer).is_ok()
+    }
+
+    /// Every check an own identity must pass before it may be served, run on the owned bytes that
+    /// [`Self::commit_identity`] will then write, so a file replaced after this point cannot
+    /// change what was checked.
+    fn validate_own_identity(
+        &self,
+        chain: Vec<CertificateDer<'static>>,
+        key: PrivateKeyDer<'static>,
+    ) -> Result<ValidatedIdentity, TcpTransportError> {
+        // §A6 (Edge-5/Blind-5 + close-pass CloseEdge-2): an empty chain or a key that does not
+        // match the leaf is refused HERE, never after a half-written swap.
+        let certified = SwappableServingCert::certified_key(chain.clone(), &key)?;
+        if self.san_trust_domain.is_some() && self.own_peer.get().is_none() {
+            return Err(TcpTransportError::OwnIdentityRefused(
+                "peer_san = \"required\" but this host's own peer id is not bound \
+                 (`bind_own_peer`), so the SAN cannot be tied to this host"
+                    .into(),
+            ));
+        }
+        check_own_leaf_san(
+            self.san_trust_domain.as_deref(),
+            self.own_peer.get(),
+            &chain,
+        )?;
+        let now = self.validation_time.unwrap_or_else(UnixTime::now);
+        crate::verifier::check_own_chain(&self.posture, &chain, now)?;
         let leaf = PeerCertFingerprint::from_cert_der(chain[0].as_ref());
+        Ok(ValidatedIdentity {
+            chain,
+            key,
+            certified,
+            leaf,
+        })
+    }
+
+    /// Publish a validated identity: BOTH write guards under `swap_lock` before either is written
+    /// (a poisoned serving lock must not leave the dial half swapped), then plane C. Returns the
+    /// leaf plane C held before. Concurrent swaps publish one generation each.
+    fn commit_identity(
+        &self,
+        validated: ValidatedIdentity,
+    ) -> Result<Option<PeerCertFingerprint>, TcpTransportError> {
+        let ValidatedIdentity {
+            chain,
+            key,
+            certified,
+            leaf,
+        } = validated;
         let _guard = self
             .swap_lock
             .lock()
             .map_err(|_| TcpTransportError::Config("swap lock poisoned".into()))?;
         let mut dial_guard = self.dial_materials.write_guard()?;
         let mut serve_guard = self.serving_cert.write_guard()?;
+        let retired = self.core.local_leaf_fingerprint();
         *dial_guard = (chain, key);
-        *serve_guard = Arc::new(ck);
+        *serve_guard = Arc::new(certified);
         // Plane C last: for the instant between the writes the Send seam fails closed (the
         // declaration is stamped only when the signed fingerprint equals plane C).
         self.core.set_local_leaf_fingerprint(leaf);
-        Ok(())
+        Ok(retired)
     }
 
-    /// Story 23-7 / D-23-7-02 C — re-read the configured PEM paths and, if the leaf they hold IS
-    /// the fingerprint the signed manifest declares for this host, swap it in (serving, dialing
-    /// and plane C). The equality is the whole guard: a leaf the manifest does not declare is
-    /// never served, and a declared leaf that is not on disk yet changes nothing.
-    pub fn reload_own_identity(
+    /// Story 23-7 / D-23-7-02 C — step 1 of an own-leaf reload, OFF any manifest lock: re-read the
+    /// configured PEM paths and, if the leaf they hold IS the fingerprint the signed manifest
+    /// declares for this host, validate the whole identity (review B3) and hand back the checked
+    /// bytes. Nothing is served yet: the caller commits them with
+    /// [`Self::commit_own_identity`] after re-checking the declaration at the commit (review B2).
+    pub fn prepare_own_identity(
         &self,
         declared: &PeerCertFingerprint,
-    ) -> Result<OwnLeafReload, TcpTransportError> {
+    ) -> Result<OwnLeafPrepare, TcpTransportError> {
         let (chain, key) =
             crate::config::load_identity_paths(&self.own_identity.0, &self.own_identity.1)?;
         let on_disk = PeerCertFingerprint::from_cert_der(chain[0].as_ref());
         if &on_disk != declared {
             return Ok(
                 if self.core.local_leaf_fingerprint().as_ref() == Some(&on_disk) {
-                    OwnLeafReload::Pending { on_disk }
+                    OwnLeafPrepare::Pending { on_disk }
                 } else {
-                    OwnLeafReload::Undeclared { on_disk }
+                    OwnLeafPrepare::Undeclared { on_disk }
                 },
             );
         }
         if self.core.local_leaf_fingerprint().as_ref() == Some(&on_disk) {
-            return Ok(OwnLeafReload::Current);
+            return Ok(OwnLeafPrepare::Current);
         }
-        check_own_leaf_san(self.san_trust_domain.as_deref(), &chain)?;
-        let retired = self.core.local_leaf_fingerprint();
-        self.swap_serving_cert(chain, key)?;
-        Ok(OwnLeafReload::Swapped {
-            retired,
-            serving: on_disk,
-        })
+        Ok(OwnLeafPrepare::Ready(PreparedOwnLeaf(
+            self.validate_own_identity(chain, key)?,
+        )))
+    }
+
+    /// Step 2: publish bytes [`Self::prepare_own_identity`] validated; returns
+    /// `(retired, serving)`, the leaf plane C held before and the one it holds now. Cheap and
+    /// non-blocking (two in-memory write guards), so a caller may run it under a lock that excludes
+    /// manifest replacement.
+    pub fn commit_own_identity(
+        &self,
+        prepared: PreparedOwnLeaf,
+    ) -> Result<(Option<PeerCertFingerprint>, PeerCertFingerprint), TcpTransportError> {
+        let serving = prepared.0.leaf.clone();
+        let retired = self.commit_identity(prepared.0)?;
+        Ok((retired, serving))
+    }
+
+    /// [`Self::prepare_own_identity`] then [`Self::commit_own_identity`] with NO manifest gate:
+    /// for callers that hold no manifest state. The production reconciler does not use it.
+    pub fn reload_own_identity(
+        &self,
+        declared: &PeerCertFingerprint,
+    ) -> Result<OwnLeafReload, TcpTransportError> {
+        match self.prepare_own_identity(declared)? {
+            OwnLeafPrepare::Current => Ok(OwnLeafReload::Current),
+            OwnLeafPrepare::Pending { on_disk } => Ok(OwnLeafReload::Pending { on_disk }),
+            OwnLeafPrepare::Undeclared { on_disk } => Ok(OwnLeafReload::Undeclared { on_disk }),
+            OwnLeafPrepare::Ready(prepared) => {
+                let (retired, serving) = self.commit_own_identity(prepared)?;
+                Ok(OwnLeafReload::Swapped { retired, serving })
+            }
+        }
     }
 
     /// A client `ClientConfig` carrying this endpoint's own auth cert + the
@@ -875,7 +1007,7 @@ impl TcpA2ATransport {
                     }
                     if last_err.is_tofu_mismatch() {
                         // The dial target IS the verifier's subject (`expected_peer`).
-                        let reason = refusal_reason(&self.pins, Some(&peer_cfg.peer_id));
+                        let reason = refusal_reason(&last_err);
                         if let Err(journal_err) = self
                             .core
                             .journal_peer_identity_refusal(
@@ -1160,9 +1292,12 @@ async fn serve_connection(
                 if let Err(journal_err) = core
                     .journal_peer_identity_refusal(
                         PeerRefusalDirection::Listen,
-                        peer_addr_hint.as_str(),
+                        // The SAN-named subject when the verifier had one, else the socket.
+                        subject
+                            .as_ref()
+                            .map_or(peer_addr_hint.as_str(), |peer| peer.as_str()),
                         detail.as_str(),
-                        refusal_reason(&pins, subject.as_ref()),
+                        refusal_reason(&classified),
                     )
                     .await
                 {
@@ -1466,11 +1601,21 @@ pub fn build_server_config_with_san(
     );
     let resolver = Arc::new(SwappableServingCert::new(chain.to_vec(), key)?);
     let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let config = ServerConfig::builder_with_provider(provider)
+    let mut config = ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
         .map_err(|e| TcpTransportError::Config(format!("protocol versions: {e}")))?
         .with_client_cert_verifier(verifier)
         .with_cert_resolver(resolver.clone());
+    // Story 23-7 review B4 — NO session resumption, on any path. A resumed handshake restores the
+    // cached client chain without running `verify_client_cert`, while the post-handshake consumer
+    // (`resolve_verified_peer`) resolves identity by a flat fingerprint lookup: a fingerprint
+    // admitted earlier and since assigned to another peer would bind the resumed connection to the
+    // NEW pin owner although the leaf's SAN names the old one. Every connection is a full
+    // handshake, so the verifier (pin, SAN scoping, chain, validity) judges every connection. This
+    // also keeps the dial-side constraint above ("every dial MUST remain a full handshake") true
+    // for the peers that dial us.
+    config.session_storage = Arc::new(rustls::server::NoServerSessionStorage {});
+    config.send_tls13_tickets = 0;
     Ok((config, resolver))
 }
 

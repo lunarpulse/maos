@@ -435,10 +435,13 @@ pub enum RuptureReason {
     /// grant this addressee. Distinct from `IntentAllowlistMismatch`, which is
     /// the RECEIVER's allowlist.
     ConsentNotGranted,
-    /// Story 23-7 / D-23-7-07 A — a peer presented a certificate its signed rotation retired:
-    /// the subject peer's durable pin record carries a promotion (`promoted`), and the
-    /// observed leaf is not its serving or open-window leaf. Emitted only when that join
-    /// holds; an unknown leaf or a never-promoted peer stays `PeerIdentityUnverified`.
+    /// Story 23-7 / D-23-7-07 A — a possible retired-key presentation: the verifier saw a leaf
+    /// that chained to the configured `ca_roots`, did not match the subject peer's serving or
+    /// open-window fingerprint (`EPinMismatch::Mismatch`), and the subject's durable pin record
+    /// carries a promotion (`promoted`). It does NOT prove the leaf is the retired one (no
+    /// retired fingerprint is stored): any other leaf issued for that SAN reads the same. An
+    /// invalidated pin (a restarted promoted peer), a never-promoted peer, an unknown or
+    /// non-chaining leaf and every handshake with `ca_roots` unset stay `PeerIdentityUnverified`.
     CertPostGraceReject,
 }
 

@@ -13469,7 +13469,14 @@ async fn run_cohort_a2a_daemon(
             "a2a-pins-{}.json",
             hex::encode(bootstrap.local_host.as_str())
         ));
-    bootstrap.pin_persistence = Some(Arc::new(maos_persistence::FilePinStore::open(&pin_file)?));
+    let pin_store = Arc::new(maos_persistence::FilePinStore::open(&pin_file)?);
+    // Story 23-7 review B1 — the loaded manifest floor is installed into the state BEFORE the
+    // transport binds and the pull service spawns, so no manifest traffic can reach
+    // `apply_reissue` while the floor still reads 0.
+    bootstrap
+        .state
+        .install_manifest_floor(maos_a2a_core::tofu::PinPersistence::load_floor(&*pin_store));
+    bootstrap.pin_persistence = Some(pin_store);
     validate_enterprise_daemon_wiring(enterprise_posture_required, &enterprise_daemon_governance)?;
     // Story 13.5a — the SIEM export consumer previously never ran in daemon
     // mode (the dispatch returns above its spawn). It shares the posture's
@@ -13632,6 +13639,17 @@ async fn run_cohort_a2a_daemon(
     let observer_wake = Arc::clone(&own_leaf_wake);
     if !rotation_state.install_local_leaf_observer(Arc::new(move || observer_wake.notify_one())) {
         return Err("cohort daemon: the own-leaf observer was already installed".into());
+    }
+    // Story 23-7 review B3 — tie every own-leaf swap to THIS host: under `peer_san = "required"`
+    // the transport refuses a leaf whose SAN names any other host (and refuses all swaps until
+    // the id is bound).
+    if !runtime
+        .transport
+        .bind_own_peer(maos_a2a_core::identity::PeerId::new(
+            rotation_state.local_host().as_str(),
+        ))
+    {
+        return Err("cohort daemon: the transport's own peer id was already bound".into());
     }
     let _own_leaf_reconciler = Arc::new(maos_bin::cert_rotation::OwnLeafReconciler::new(
         Arc::clone(&runtime.transport),

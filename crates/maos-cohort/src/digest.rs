@@ -26,7 +26,7 @@ use std::sync::Arc;
 use maos_a2a_core::router::A2APeerRouter;
 use maos_a2a_core::{ConsentRuptureSink, COHORT_INTENT_DIGEST_READ};
 use maos_domain::frame::{
-    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, TelemetryEventPayload,
+    ConsentEnvelope, FrameAddress, FramePayload, IacFrame, RuptureReason, TelemetryEventPayload,
 };
 use maos_domain::invariants::i1::IntentClass;
 use maos_domain::invariants::i13::IntentLineage;
@@ -307,6 +307,22 @@ impl CohortDigestDistributor {
     }
 }
 
+/// The intent label a router-minted TLS-layer peer-identity refusal is journaled under: it
+/// names the transport event, never a consent intent (Story 23-7, review A1).
+pub const PEER_IDENTITY_REFUSAL_INTENT: &str = "a2a:peer-identity-refusal";
+
+/// A frame the router minted for a TLS-layer identity refusal: a rupture with no consent envelope
+/// whose every rejection is a peer-identity reason.
+fn is_transport_identity_refusal(frame: &IacFrame) -> bool {
+    frame.consent_envelope.is_none()
+        && matches!(&frame.payload, FramePayload::ConsentRupture(rupture)
+        if !rupture.rejected.is_empty()
+            && rupture.rejected.iter().all(|rejection| matches!(
+                rejection.reason,
+                RuptureReason::PeerIdentityUnverified | RuptureReason::CertPostGraceReject
+            )))
+}
+
 /// Story 12.4a / AC4 — journal a production-produced `ConsentRupture` frame into
 /// the Transparency Log, preserving the router-minted `rupture_id`. This is the
 /// receiver-drain endpoint the F4 fix wires: `A2ARouterCore::install_rupture_sink`
@@ -328,14 +344,32 @@ pub fn journal_rupture_frame(log: &TransparencyLogAdapter, frame: &IacFrame) -> 
     if frame.kind != FrameKind::ConsentRupture {
         return Err("rupture sink received a non-rupture frame".into());
     }
-    let intent = frame
+    let envelope_intent = frame
         .consent_envelope
         .as_ref()
         .and_then(|envelope| envelope.intent_class.as_ref())
-        .map(|intent| intent.as_str())
-        .ok_or_else(|| "rupture frame is missing denied intent attribution".to_string())?;
+        .map(|intent| intent.as_str());
+    // Story 23-7 (review A1): a TLS-layer refusal has no consent envelope and must not get a
+    // fabricated one; it is attributed to the transport's own identity-refusal label instead,
+    // and its row keeps the subject the router knew (`<direction>@<peer>`).
+    let transport_refusal = is_transport_identity_refusal(frame);
+    let intent = match (envelope_intent, transport_refusal) {
+        (Some(intent), _) => intent,
+        (None, true) => PEER_IDENTITY_REFUSAL_INTENT,
+        (None, false) => return Err("rupture frame is missing denied intent attribution".into()),
+    };
     let payload_bytes = serde_json::to_vec(&frame.payload).map_err(|error| error.to_string())?;
-    let to_spirit_id = frame.to.first().map_or("", |a| a.spirit_id.as_str());
+    let subject_label;
+    let to_spirit_id = match frame.to.first() {
+        Some(address) if transport_refusal => {
+            subject_label = address.host_id.as_ref().map_or_else(
+                || address.spirit_id.as_str().to_string(),
+                |host| format!("{}@{}", address.spirit_id.as_str(), host.0),
+            );
+            subject_label.as_str()
+        }
+        first => first.map_or("", |address| address.spirit_id.as_str()),
+    };
     let grant = frame.consent_envelope.as_ref().filter(|envelope| {
         frame
             .to

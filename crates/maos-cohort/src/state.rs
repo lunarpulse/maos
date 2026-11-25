@@ -33,6 +33,16 @@ fn confirmation_of(manifest: &CohortManifest) -> Duration {
     Duration::from_secs((manifest.t_stale_secs + 1) / 2)
 }
 
+/// The lag the rotation grace must cover (review B5/B6). Two members apply one reissue up to one
+/// pull interval apart, and this host's own-leaf swap then trails the last peer's apply by up to
+/// one more (it waits for that peer's next `Pull` to confirm) — hence twice the interval. The
+/// interval is the LARGER of the manifest being applied and the one in force: the pull cadence
+/// that actually delivers the reissue is the one already in force, while the grace is armed from
+/// the new one (a reissue that lowers `t_stale_secs` must not shrink the cover).
+fn window_lag(candidate: &CohortManifest, in_force: &CohortManifest) -> Duration {
+    confirmation_of(candidate).max(confirmation_of(in_force)) * 2
+}
+
 struct SystemCohortClock {
     base: Instant,
 }
@@ -58,6 +68,9 @@ struct CachedManifest {
     /// reuses this artifact rather than reconstructing a body/signature pair.
     signed_toml: String,
     confirmed_at_secs: u64,
+    /// Cohort-clock seconds at which this manifest VERSION was applied (or loaded). Unlike
+    /// `confirmed_at_secs`, a same-version confirmation never refreshes it.
+    applied_at_secs: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -148,6 +161,20 @@ impl PeerConvergence {
     }
 }
 
+/// What [`CohortManifestState::commit_own_leaf`] did (Story 23-7 review B2 + B5).
+#[derive(Debug, PartialEq, Eq)]
+pub enum OwnLeafCommit<R> {
+    /// A newer reissue replaced or removed this host's signed declaration after the leaf was
+    /// prepared: nothing was committed.
+    Superseded,
+    /// Peers have not yet confirmed the manifest version in force and the stale-lease bound has not
+    /// elapsed: nothing was committed, the retiring leaf stays served.
+    Held { unconfirmed: Vec<String> },
+    /// The commit ran. `unconfirmed` is non-empty only when the stale-lease bound elapsed before
+    /// every peer confirmed.
+    Committed { result: R, unconfirmed: Vec<String> },
+}
+
 /// The verified, local authority for a cohort manifest cache.
 ///
 /// All state transitions verify a candidate under the operator-pinned genesis
@@ -213,6 +240,11 @@ pub struct CohortManifestState {
     /// own-leaf reconciler wakes on it; implementations MUST NOT block (they run on the caller of
     /// `apply_reissue`) and may call back into this state (the lock is released).
     local_leaf_observer: std::sync::OnceLock<Arc<dyn Fn() + Send + Sync>>,
+    /// Story 23-7 / D-23-7-09 A (review B1) — the highest signed-manifest version this host
+    /// applied or loaded as a durable floor. Held HERE, not only in the pin store, so a floor
+    /// loaded at boot is enforced before `install_cert_rotation` runs (the listener and the pull
+    /// service are live before it), and raised before a reissue becomes visible.
+    manifest_floor: std::sync::atomic::AtomicU64,
 }
 
 impl CohortManifestState {
@@ -252,6 +284,7 @@ impl CohortManifestState {
                 manifest,
                 signed_toml: manifest_toml.to_string(),
                 confirmed_at_secs: clock.now_secs(),
+                applied_at_secs: clock.now_secs(),
             }),
             pull_requests: Mutex::new(Vec::new()),
             halt_presence: Mutex::new(HashMap::new()),
@@ -263,6 +296,7 @@ impl CohortManifestState {
             peer_convergence: Mutex::new(BTreeMap::new()),
             cert_rotation: std::sync::OnceLock::new(),
             local_leaf_observer: std::sync::OnceLock::new(),
+            manifest_floor: std::sync::atomic::AtomicU64::new(0),
             clock,
         })
     }
@@ -304,6 +338,14 @@ impl CohortManifestState {
                         .into(),
                 )
             })?;
+        // Review B1 — a version applied before this install raised only the floor held here;
+        // carry it into the durable pin store (a no-op when the store already holds it).
+        if let Some(rotation) = self.cert_rotation.get() {
+            rotation.raise_manifest_floor(
+                self.manifest_floor
+                    .load(std::sync::atomic::Ordering::Acquire),
+            );
+        }
         // ⚠ RECONCILE IMMEDIATELY, and this is not belt-and-braces.
         //
         // The transport's accept loop and the manifest pull service are BOTH
@@ -335,7 +377,7 @@ impl CohortManifestState {
                     None,
                     self.local_leaf_declaration_event(&cached.manifest, None)
                         .as_ref(),
-                    confirmation_of(&cached.manifest),
+                    window_lag(&cached.manifest, &cached.manifest),
                 )?;
             }
             // The SAME named row the reissue path writes for the identical
@@ -597,13 +639,15 @@ impl CohortManifestState {
     }
 
     /// Story 23-7 — journal what the own-leaf reconciler did, through the same sink as every other
-    /// rotation row.
+    /// rotation row. `detail` names the peers that had not confirmed the declaring version
+    /// (comma separated; empty when there were none).
     pub fn journal_self_leaf(
         &self,
         outcome: crate::audit::SelfLeafOutcome,
         on_disk: &str,
         declared: &str,
         version: u64,
+        detail: &str,
     ) -> Result<(), CohortError> {
         self.audit.append(&CohortAuditEvent::SelfLeafReconciled {
             host: self.local_host.as_str().to_string(),
@@ -611,7 +655,91 @@ impl CohortManifestState {
             on_disk: on_disk.to_string(),
             declared: declared.to_string(),
             version,
+            detail: detail.to_string(),
         })
+    }
+
+    /// Stories 23-7 review B2 + B5 — commit this host's own-leaf swap ATOMICALLY with respect to
+    /// manifest replacement, and only once the peers can accept it.
+    ///
+    /// Under the `cached` lock (so no reissue can replace the declaration between the check and
+    /// the commit) it (1) re-reads this host's signed declaration and refuses to run `commit` if it
+    /// is no longer `prepared_for` ([`OwnLeafCommit::Superseded`]), and (2) holds the swap
+    /// ([`OwnLeafCommit::Held`]) until EVERY peer this host has an edge with has told this host,
+    /// in a `Pull` it sent, that it holds the manifest version in force (14-2b's convergence table,
+    /// restart- and lease-aware): a peer that has not applied the reissue still pins only the
+    /// retiring leaf and would refuse this host in both directions, and its pulls over mTLS could
+    /// not even fetch the reissue from us. An unreachable or silent peer must not hold the rotation
+    /// forever: once the manifest's own stale lease has elapsed since this host applied it, the
+    /// commit runs anyway (the peer is stale by that lease) and reports the unconfirmed peers.
+    ///
+    /// `commit` runs with the `cached` lock held: it MUST be quick and MUST NOT call back into this
+    /// state (the transport's two in-memory write guards qualify).
+    pub fn commit_own_leaf<R>(
+        &self,
+        prepared_for: &PeerCertFingerprint,
+        commit: impl FnOnce() -> R,
+    ) -> Result<OwnLeafCommit<R>, CohortError> {
+        let cached = self
+            .cached
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        if self.local_declared_fingerprint(&cached.manifest).as_ref() != Some(prepared_for) {
+            return Ok(OwnLeafCommit::Superseded);
+        }
+        let unconfirmed = self.unconfirmed_peers(&cached)?;
+        let held_for = self.clock.now_secs().saturating_sub(cached.applied_at_secs);
+        if !unconfirmed.is_empty() && held_for < cached.manifest.t_stale_secs {
+            return Ok(OwnLeafCommit::Held { unconfirmed });
+        }
+        Ok(OwnLeafCommit::Committed {
+            result: commit(),
+            unconfirmed,
+        })
+    }
+
+    /// The peers (this host's edges in the manifest in force) with no CURRENT convergence claim at
+    /// a version `>=` the one in force (same hash at that version). Caller holds `cached`.
+    fn unconfirmed_peers(&self, cached: &CachedManifest) -> Result<Vec<String>, CohortError> {
+        let required = cached.manifest.version;
+        let required_hash = hex::encode(cached.canonical_hash);
+        let peers = cached.manifest.peer_configs_for(self.local_host.as_str())?;
+        let now = self.clock.now_secs();
+        let table = self
+            .peer_convergence
+            .lock()
+            .map_err(|_| CohortError::EStatePoisoned)?;
+        Ok(peers
+            .iter()
+            .map(|peer| peer.peer_id.as_str())
+            .filter(|peer| {
+                !table.get(*peer).is_some_and(|record| {
+                    now <= record.expires_at_secs
+                        && self.pin_generation(peer) == record.pin_generation
+                        && (record.declared_version > required
+                            || (record.declared_version == required
+                                && record.declared_hash == required_hash))
+                })
+            })
+            .map(str::to_string)
+            .collect())
+    }
+
+    /// A peer's `Pull` just told this host which version it holds: if this host's own leaf swap is
+    /// pending, wake the reconciler now instead of leaving the swap to the next tick (the swap has
+    /// to trail the last peer's apply by as little as possible: the rotation grace is sized for
+    /// it).
+    fn wake_own_leaf_reconciler(&self) {
+        let Some(observer) = self.local_leaf_observer.get() else {
+            return;
+        };
+        let pending = self
+            .local_leaf_fingerprint()
+            .zip(self.local_declaration().ok().flatten())
+            .is_some_and(|(serving, (declared, _))| serving != declared);
+        if pending {
+            observer();
+        }
     }
 
     /// Story 14-2c — `Some` only when this manifest MOVES the local host's
@@ -647,6 +775,32 @@ impl CohortManifestState {
             .get()
             .and_then(|rotation| rotation.pin_generation(peer))
             .unwrap_or(0)
+    }
+
+    /// Review B1 — adopt the durable floor the pin file recorded at boot, before any manifest
+    /// traffic can reach [`Self::apply_reissue`]. Never lowers the floor.
+    pub fn install_manifest_floor(&self, floor: u64) {
+        self.manifest_floor
+            .fetch_max(floor, std::sync::atomic::Ordering::AcqRel);
+    }
+
+    /// The larger of the floor held here and the one the installed pin store carries.
+    fn effective_floor(&self) -> u64 {
+        let held = self
+            .manifest_floor
+            .load(std::sync::atomic::Ordering::Acquire);
+        self.cert_rotation
+            .get()
+            .map_or(held, |rotation| held.max(rotation.manifest_floor()))
+    }
+
+    /// Raise the floor here and, when the pin store is installed, durably there.
+    fn raise_manifest_floor(&self, version: u64) {
+        self.manifest_floor
+            .fetch_max(version, std::sync::atomic::Ordering::AcqRel);
+        if let Some(rotation) = self.cert_rotation.get() {
+            rotation.raise_manifest_floor(version);
+        }
     }
 
     /// Applies a signed reissue. A same-version, same-body manifest is an
@@ -698,12 +852,7 @@ impl CohortManifestState {
                 Some(CohortManifestForkReason::VersionRegression)
             } else if candidate.version == seen_version && candidate_hash != cached.canonical_hash {
                 Some(CohortManifestForkReason::ConcurrentFork)
-            } else if candidate.version
-                < self
-                    .cert_rotation
-                    .get()
-                    .map_or(0, |rotation| rotation.manifest_floor())
-            {
+            } else if candidate.version < self.effective_floor() {
                 // Story 23-7 / D-23-7-09 A — below the highest version this host ever applied,
                 // which survives a restart (the in-memory `seen_version` does not).
                 Some(CohortManifestForkReason::VersionBelowDurableFloor)
@@ -755,6 +904,12 @@ impl CohortManifestState {
         // The projection is 12.1's `peer_configs_for`, which validates every
         // fingerprint through `PeerCertFingerprint::parse` (AC2.4). Nothing
         // here accepts a fingerprint from any other source.
+        // Review B1 — the durable floor is committed BEFORE the signed artifact, the trust
+        // windows or the cached manifest become visible, and under the `cached` guard, so a
+        // crash anywhere after this line finds the floor already at this version and no apply
+        // can interleave with the raise. A failed apply leaves the floor raised, which only
+        // narrows (a retry of the same version is still accepted; a lower one is not).
+        self.raise_manifest_floor(candidate.version);
         let accepted_event = CohortAuditEvent::MemberReissueAccepted {
             cohort_id: candidate.cohort_id.clone(),
             version: candidate.version,
@@ -773,7 +928,7 @@ impl CohortManifestState {
                         self.clock.now_secs(),
                         Some(&accepted_event),
                         local_leaf_event.as_ref(),
-                        confirmation_of(&candidate),
+                        window_lag(&candidate, &cached.manifest),
                     )?;
                     true
                 }
@@ -807,6 +962,7 @@ impl CohortManifestState {
             canonical_hash: candidate_hash,
             signed_toml: manifest_toml.to_string(),
             confirmed_at_secs: self.clock.now_secs(),
+            applied_at_secs: self.clock.now_secs(),
         };
         // The observation surface represents the CURRENT signed cohort. The
         // cached-manifest guard serializes this purge with record insertion.
@@ -834,12 +990,8 @@ impl CohortManifestState {
             .lock()
             .map_err(|_| CohortError::EStatePoisoned)?
             .clear();
-        // Story 23-7: both effects run with the `cached` lock RELEASED — the floor write fsyncs,
-        // and the observer may read this state.
+        // The observer may read this state: it runs with the `cached` lock RELEASED.
         drop(cached);
-        if let Some(rotation) = self.cert_rotation.get() {
-            rotation.raise_manifest_floor(version);
-        }
         if local_leaf_diverged {
             if let Some(observer) = self.local_leaf_observer.get() {
                 observer();
@@ -1207,6 +1359,7 @@ impl CohortManifestGate for CohortManifestState {
                     known_version,
                     known_hash,
                 );
+                self.wake_own_leaf_reconciler();
                 self.pull_requests
                     .lock()
                     .map_err(|_| CohortReissueRejection {
