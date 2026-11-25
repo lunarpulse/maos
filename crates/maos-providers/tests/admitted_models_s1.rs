@@ -56,9 +56,20 @@ impl IoSubsystemPort for Wire {
     ) -> Result<HttpExchange, IoError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         *self.last.lock().unwrap() = (url.into(), body.into());
+        // `"$echo"` in a canned reply stands for the model the request named,
+        // as the Messages API echoes the model that served the call.
+        let served = serde_json::from_slice::<Value>(body)
+            .ok()
+            .and_then(|b| b["model"].as_str().map(str::to_owned));
+        let reply = match served {
+            Some(model) => String::from_utf8_lossy(&self.reply)
+                .replace("$echo", &model)
+                .into_bytes(),
+            None => self.reply.clone(),
+        };
         Ok(HttpExchange {
             status: 200,
-            body: self.reply.clone(),
+            body: reply,
             header: None,
         })
     }
@@ -81,6 +92,7 @@ fn request(model: Option<&str>) -> InferenceRequest {
 
 fn anthropic_reply() -> Value {
     json!({
+        "model": "$echo",
         "content": [{ "type": "text", "text": "ok" }],
         "stop_reason": "end_turn",
         "usage": { "input_tokens": 1, "output_tokens": 1 }

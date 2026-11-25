@@ -585,6 +585,10 @@ fn epic_18_exit_runs_line_2_verbatim_and_its_drift_blind_twin() {
     );
     let uploaded = str_of(key(upload, "with"), "path").expect("upload path");
     assert!(
+        !uploaded.trim().is_empty(),
+        "an empty upload path would make the prefix check below vacuous"
+    );
+    assert!(
         "crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.verdicts.json"
             .starts_with(uploaded.trim()),
         "the upload carries the judge sidecar: {uploaded}"
@@ -671,17 +675,71 @@ fn nightly_researcher_judge_repeats_use_a_fixed_survey() {
     assert_eq!(str_of(researcher, "id"), Some("researcher-record"));
     const JUDGE_STEP: &str = "Measure Researcher judge agreement (fixed survey, k repeats)";
     let judge = &steps(rerecord)[step_index(rerecord, JUDGE_STEP)];
+    // The PAID step needs: the validated repeats input, the record step's
+    // success AND exactly k structurally valid, digest-checked result lines.
     assert_eq!(
         condition(judge).as_deref(),
-        Some("!cancelled()&&inputs.include_researcher==true&&steps.researcher-record.outcome=='success'")
+        Some("!cancelled()&&inputs.include_researcher==true&&steps.repeats-validation.outcome=='success'&&steps.researcher-record.outcome=='success'&&steps.researcher-structure.outcome=='success'")
     );
+    // Every Researcher step is gated on the validated `repeats` input; the
+    // validation step exposes its id.
+    let validate = &steps(rerecord)[step_index(rerecord, "Validate the repeats input")];
+    assert_eq!(str_of(validate, "id"), Some("repeats-validation"));
+    assert_eq!(condition(validate), None, "validation always runs first");
+    const STRUCTURE_STEP: &str = "Validate the Researcher result set (k lines)";
+    let structure = &steps(rerecord)[step_index(rerecord, STRUCTURE_STEP)];
+    assert_eq!(str_of(structure, "id"), Some("researcher-structure"));
+    assert_eq!(
+        condition(structure).as_deref(),
+        Some("!cancelled()&&inputs.include_researcher==true&&steps.repeats-validation.outcome=='success'&&steps.researcher-record.outcome=='success'")
+    );
+    let structure_run = str_of(structure, "run").expect("structure run");
+    assert!(structure_run.contains("eval-report --structure-only"));
+    assert!(structure_run.contains("--results \"$results/researcher.results.jsonl\""));
+    assert!(structure_run.contains("--repeats \"$REPEATS\""));
+    assert!(!structure_run.contains("${{"));
+    let report = &steps(rerecord)[step_index(
+        rerecord,
+        "Report the Researcher live evaluation (k repeats)",
+    )];
+    assert_eq!(condition(report).as_deref(), Some(RESEARCHER_CONDITION));
+    // A refusal (exit 1, no result line) is not a floor miss: the record loop stops on it.
+    let record_run = str_of(researcher, "run").expect("record run");
+    assert!(record_run
+        .contains("before=$(cat \"$results/researcher.results.jsonl\" 2>/dev/null | wc -l)"));
+    assert!(record_run
+        .contains("after=$(cat \"$results/researcher.results.jsonl\" 2>/dev/null | wc -l)"));
+    assert!(record_run.contains("if [ \"$rc\" -eq 1 ] && [ \"$after\" -le \"$before\" ]; then"));
+    assert!(
+        step_index(rerecord, JUDGE_STEP) > step_index(rerecord, STRUCTURE_STEP)
+            && step_index(rerecord, STRUCTURE_STEP)
+                > step_index(
+                    rerecord,
+                    "Re-record the Researcher five-metric cassette and judge (live)"
+                )
+    );
+    // Defence in depth: the workflow token is read-only, no job widens it.
+    assert_eq!(
+        key(&nightly, "permissions"),
+        &serde_yaml::from_str::<Value>("contents: read").unwrap()
+    );
+    for (name, job) in key(&nightly, "jobs").as_mapping().expect("jobs") {
+        assert!(
+            get(job, "permissions").is_none(),
+            "{name:?} must not widen the token"
+        );
+    }
     let env = key(judge, "env");
     assert_eq!(str_of(env, "MAOS_INFERENCE_MODE"), Some("record"));
     assert_eq!(str_of(env, "REPEATS"), Some("${{ inputs.repeats }}"));
+    let key_of =
+        |step: &Value| str_of(key(step, "env"), "MAOS_ANTHROPIC_API_KEY").map(str::to_owned);
     assert_eq!(
-        str_of(env, "MAOS_ANTHROPIC_API_KEY"),
-        str_of(key(researcher, "env"), "MAOS_ANTHROPIC_API_KEY")
+        key_of(judge).as_deref(),
+        Some("${{ secrets.MAOS_ANTHROPIC_API_KEY }}"),
+        "the paid step carries the provider secret (two absent keys would compare equal)"
     );
+    assert_eq!(key_of(judge), key_of(researcher));
     // The judge replies are recorded to a sibling DISTINCT from the survey.
     assert_eq!(
         str_of(env, "MAOS_REPLAY_CASSETTE"),
@@ -711,9 +769,79 @@ fn nightly_researcher_judge_repeats_use_a_fixed_survey() {
     assert!(record < step_index(rerecord, JUDGE_STEP) && step_index(rerecord, JUDGE_STEP) < upload);
     let uploaded = str_of(key(&steps(rerecord)[upload], "with"), "path").expect("upload path");
     assert!(
+        !uploaded.trim().is_empty(),
+        "an empty upload path makes the prefix check vacuous"
+    );
+    assert!(
         "crates/maos-journey-test/cassettes/eval-results/researcher.judge-only.json"
             .starts_with(uploaded.trim()),
         "the judge-only result is archived with the cassettes"
+    );
+}
+
+/// Round 2 (C): the Researcher record step's REAL script, run with a stub
+/// `maos`. A repeat that exits 1 AFTER printing a result line is a measured
+/// floor miss (kept, the loop goes on); one that exits 1 with no line is a
+/// refusal and stops the loop, so the paid steps behind it never see a short set.
+#[test]
+fn the_record_loop_keeps_a_floor_miss_but_stops_on_a_refusal() {
+    use std::os::unix::fs::PermissionsExt;
+    let nightly: Value = serde_yaml::from_str(
+        &fs::read_to_string(root().join(".github/workflows/journey-nightly.yml"))
+            .expect("read journey-nightly"),
+    )
+    .expect("parse journey-nightly");
+    let rerecord = key(key(&nightly, "jobs"), "tier-2-rerecord");
+    let record = &steps(rerecord)[step_index(
+        rerecord,
+        "Re-record the Researcher five-metric cassette and judge (live)",
+    )];
+    let script = str_of(record, "run").expect("record run").to_owned();
+    let run = |mode: &str, repeats: &str| {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let bin = dir.path().join("target/debug");
+        fs::create_dir_all(&bin).unwrap();
+        let stub = bin.join("maos");
+        fs::write(
+            &stub,
+            "#!/bin/bash\n\
+             n=\"${MAOS_REPLAY_CASSETTE##*live.}\"; n=\"${n%.json}\"\n\
+             echo \"$n\" >> attempts.log\n\
+             if [ \"$n\" = 2 ] && [ \"$MODE\" = refuses ]; then exit 1; fi\n\
+             echo \"{\\\"event\\\":\\\"eval_distill\\\",\\\"repeat\\\":$n}\"\n\
+             exit 1\n",
+        )
+        .unwrap();
+        fs::set_permissions(&stub, fs::Permissions::from_mode(0o755)).unwrap();
+        let status = std::process::Command::new("bash")
+            .arg("-c")
+            .arg(&script)
+            .current_dir(dir.path())
+            .env("MODE", mode)
+            .env("REPEATS", repeats)
+            .status()
+            .expect("run the record script");
+        let read = |p: &str| fs::read_to_string(dir.path().join(p)).unwrap_or_default();
+        (
+            status.code(),
+            read("attempts.log")
+                .lines()
+                .map(str::to_owned)
+                .collect::<Vec<_>>(),
+            read("crates/maos-journey-test/cassettes/eval-results/researcher.results.jsonl")
+                .lines()
+                .count(),
+        )
+    };
+    // Every repeat misses its floor but prints its line: kept, all k run, step green.
+    assert_eq!(
+        run("misses", "3"),
+        (Some(0), vec!["1".into(), "2".into(), "3".into()], 3)
+    );
+    // Repeat 2 is refused (exit 1, no line): the loop stops, the step is red, 1 line.
+    assert_eq!(
+        run("refuses", "3"),
+        (Some(1), vec!["1".into(), "2".into()], 1)
     );
 }
 
@@ -723,7 +851,8 @@ const RERECORD_DISPATCH_GUARD: &str =
 /// `tier-2-rerecord`: the dispatch guard, then the secret probe's output.
 const RERECORD_CONDITION: &str = "github.event_name=='workflow_dispatch'&&inputs.rerecord==true&&needs.secret-gate.outputs.has_anthropic_key=='true'";
 /// The Researcher + Sonnet judge leg: `!cancelled()` AND the opt-in input.
-const RESEARCHER_CONDITION: &str = "!cancelled()&&inputs.include_researcher==true";
+const RESEARCHER_CONDITION: &str =
+    "!cancelled()&&inputs.include_researcher==true&&steps.repeats-validation.outcome=='success'";
 
 /// Every way the paid live re-record could become reachable from the daily
 /// cron, or lose its opt-ins (operator ruling 2026-11-12: on-demand only).
@@ -862,8 +991,12 @@ fn journey_nightly_paid_rerecord_is_on_demand_only() {
             "",
         ),
         (
-            "if: ${{ !cancelled() && inputs.include_researcher == true }}",
+            "if: ${{ !cancelled() && inputs.include_researcher == true && steps.repeats-validation.outcome == 'success' }}",
             "if: ${{ !cancelled() }}",
+        ),
+        (
+            "if: ${{ !cancelled() && inputs.include_researcher == true && steps.repeats-validation.outcome == 'success' }}",
+            "if: ${{ !cancelled() && inputs.include_researcher == true }}",
         ),
         (
             "      include_researcher:\n        description: 'Also run the Researcher five-metric + Sonnet judge leg (needs rerecord)'\n        type: boolean\n        default: false\n",

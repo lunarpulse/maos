@@ -19,9 +19,45 @@ fn a_survey_reply_that_is_not_exactly_one_finding_object_is_a_format_error_never
         "```json\n{\"finding\":\"x\"}\n```",
         "plain text",
         "",
+        // Round 2 (H): blank and control-character findings are format errors.
+        r#"{"finding":""}"#,
+        r#"{"finding":"   "}"#,
+        r#"{"finding":"\u0000"}"#,
+        r#"{"finding":"line one\nline two"}"#,
     ] {
         assert!(!is_finding_completion(bad), "{bad}");
     }
+}
+
+/// Round 2 (A) — a judge reply whose attribution is absent (the provider
+/// reported no serving model) or another model's is not pinned-judge evidence.
+#[test]
+fn a_judge_reply_without_or_with_another_attribution_is_not_pinned_judge_evidence() {
+    use maos_domain::ports::inference::{
+        InferenceResponse, ProviderAttribution, StopReason, TokenUsage,
+    };
+    let reply = |model: Option<&str>| InferenceResponse {
+        text: "faithful".into(),
+        stop_reason: StopReason::StopSequence,
+        usage: TokenUsage {
+            input_tokens: 1,
+            output_tokens: 1,
+        },
+        provider_attribution: ProviderAttribution {
+            provider_id: "anthropic".into(),
+            endpoint_url: "x".into(),
+            model_id: model.map(Into::into),
+        },
+    };
+    use maos_eval::distill_replay::judge_reply_verdict;
+    assert_eq!(judge_reply_verdict(&reply(Some(PIN)), PIN), Ok(true));
+    let none = judge_reply_verdict(&reply(None), PIN).unwrap_err();
+    assert!(none.contains("unverified"), "{none}");
+    let other = judge_reply_verdict(&reply(Some("claude-haiku-5-5")), PIN).unwrap_err();
+    assert!(
+        other.contains("claude-haiku-5-5") && !other.contains("unverified"),
+        "{other}"
+    );
 }
 
 const PIN: &str = "claude-sonnet-5-5";
@@ -92,35 +128,58 @@ fn the_record_carries_the_judge_model_and_agreement_or_it_is_refused() {
     let error = apply(&record_text(&no_agree, 0.93, None)).unwrap_err();
     assert!(error.contains("agree"), "{error}");
 
-    for (name, edit) in [
+    type Edit = Box<dyn Fn(String) -> String>;
+    // (case, edit, the message of the check that must fire — not just ANY refusal)
+    let cases: Vec<(&str, Edit, &str)> = vec![
         (
             "another model",
-            Box::new(|t: String| t.replacen(PIN, "claude-haiku-5-5", 1))
-                as Box<dyn Fn(String) -> String>,
+            Box::new(|t: String| t.replacen(PIN, "claude-haiku-5-5", 1)),
+            "is not the pinned",
         ),
         (
             "another prompt",
             Box::new(|t| t.replace(&prompt_sha(), &"0".repeat(64))),
+            "judge prompt_sha256",
         ),
         (
             "k below 2",
             Box::new(|t| t.replace("k = 5\nfindings", "k = 1\nfindings")),
+            "one repeat establishes no agreement",
+        ),
+        (
+            "k above the hosted bound (k 11, findings 3, calls 33, agree 33)",
+            Box::new(|t| {
+                t.replace(
+                    "k = 5\nfindings = 3\ncalls = 15\nagree = 14",
+                    "k = 11\nfindings = 3\ncalls = 33\nagree = 33",
+                )
+            }),
+            "above the hosted bound 10",
+        ),
+        (
+            "no findings",
+            Box::new(|t| t.replace("findings = 3", "findings = 0")),
+            "at least one finding",
         ),
         (
             "calls != k * findings",
             Box::new(|t| t.replace("calls = 15", "calls = 16")),
+            "calls must equal k * findings",
         ),
         (
             "agree above calls",
             Box::new(|t| t.replace("agree = 14", "agree = 16")),
+            "agree must be in",
         ),
         (
             "agree below findings",
             Box::new(|t| t.replace("agree = 14", "agree = 2")),
+            "agree must be in",
         ),
         (
             "untraceable result_file",
             Box::new(|t| t.replace("spirits/researcher/eval/judge-repeat.json", "../x")),
+            "relative archived path",
         ),
         (
             "blank rule",
@@ -130,10 +189,30 @@ fn the_record_carries_the_judge_model_and_agreement_or_it_is_refused() {
                     "rule = \" \"",
                 )
             }),
+            "needs a rule and a rationale",
         ),
-    ] {
-        assert!(apply(&record_text(&*edit, 0.93, None)).is_err(), "{name}");
+    ];
+    for (name, edit, fired) in cases {
+        let error = apply(&record_text(&*edit, 0.93, None)).unwrap_err();
+        assert!(
+            error.contains(fired),
+            "{name}: wanted `{fired}`, got `{error}`"
+        );
     }
+}
+
+#[test]
+fn no_ruling_lowers_traceability() {
+    let text = record_text(&keep, 0.50, Some("decisions-2026-11-25 D-x"))
+        .replace("metric = \"recall\"", "metric = \"traceability\"");
+    let error = apply(&text).unwrap_err();
+    assert!(
+        error.contains("no operator ruling lowers traceability"),
+        "{error}"
+    );
+    // The same ruling still lowers recall (the open decision J-2 of the evidence note).
+    let recall = record_text(&keep, 0.50, Some("decisions-2026-11-25 D-x"));
+    assert_eq!(apply(&recall).unwrap().recall, 0.50);
 }
 
 #[test]
@@ -146,7 +225,11 @@ fn non_finite_or_out_of_range_evidence_is_refused() {
         ("floor = 0.93", "floor = 1.5"),
     ] {
         let text = record_text(&keep, 0.93, None).replace(field, bad);
-        assert!(apply(&text).is_err(), "{bad}");
+        let error = apply(&text).unwrap_err();
+        assert!(
+            error.contains("must be finite and within [0, 1]"),
+            "{bad}: {error}"
+        );
     }
 }
 

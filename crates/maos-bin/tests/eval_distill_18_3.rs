@@ -693,14 +693,19 @@ fn judge_repeat_over(
     output_is_survey: bool,
     script: Script,
 ) -> Repeat {
-    use maos_bench::distill_eval::{evaluate_with_repeat, JudgeRepeat};
-
     let survey = survey.unwrap_or_else(|| record(dir, faithful, None).1);
     let output = if output_is_survey {
         survey.clone()
     } else {
         dir.join("judge-only.live.json")
     };
+    judge_repeat_at(survey, output, k, script)
+}
+
+/// The judge-only repeat of `survey`, recording to `output`.
+fn judge_repeat_at(survey: PathBuf, output: PathBuf, k: usize, script: Script) -> Repeat {
+    use maos_bench::distill_eval::{evaluate_with_repeat, JudgeRepeat};
+
     let recorder = Arc::new(CassetteRecorder::new(
         output.clone(),
         "maos".into(),
@@ -1012,4 +1017,101 @@ fn the_judge_output_cassette_holds_exactly_the_measured_judge_calls() {
             PINNED
         );
     }
+}
+
+/// Round 2 (B) — EVERY write destination (the recorded cassette and its
+/// `.verdicts.json` sidecar) against EVERY read input (survey cassette and its
+/// sidecar, the committed seed, the corpus, the judge config, the floor record)
+/// and against each other: symlinks, hard links, relative and not-yet-existing
+/// spellings. Refused before the judge is asked; nothing is overwritten.
+#[test]
+fn no_write_destination_may_alias_a_read_input_or_another_write() {
+    use std::os::unix::fs::symlink;
+    let home = tempfile::tempdir().unwrap();
+    let dir = home.path();
+    std::env::set_current_dir(root()).unwrap();
+    let (_, survey) = record(dir, faithful, None);
+    let survey_sidecar = dir.join("distill-corpus-v0.live.verdicts.json");
+    assert!(survey_sidecar.exists());
+    let seed = root().join(CASSETTE);
+    let fixed = |rel: &str| root().join(rel);
+    // A survey whose NAME is the sidecar of the output below.
+    let trapped = dir.join("trap.verdicts.json");
+    std::fs::copy(&survey, &trapped).unwrap();
+    let link = dir.join("link.json");
+    symlink(&survey, &link).unwrap();
+    let hard = dir.join("hard.json");
+    std::fs::hard_link(&survey, &hard).unwrap();
+    let relative =
+        PathBuf::from("spirits/researcher/tests/fixtures/../fixtures/distill-corpus-v0.jsonl");
+
+    let before = |p: &Path| std::fs::read(p).unwrap();
+    let (survey_bytes, seed_bytes, sidecar_bytes) =
+        (before(&survey), before(&seed), before(&survey_sidecar));
+    let cases: Vec<(&str, PathBuf, PathBuf)> = vec![
+        (
+            "output is the survey's sidecar name",
+            survey.clone(),
+            survey_sidecar.clone(),
+        ),
+        ("output is the committed seed", survey.clone(), seed.clone()),
+        (
+            "output's sidecar is the survey",
+            trapped.clone(),
+            dir.join("trap.json"),
+        ),
+        (
+            "output is the corpus",
+            survey.clone(),
+            fixed("spirits/researcher/tests/fixtures/distill-corpus-v0.jsonl"),
+        ),
+        (
+            "output is the corpus, spelled relative",
+            survey.clone(),
+            relative,
+        ),
+        (
+            "output is the judge config",
+            survey.clone(),
+            fixed("tests/judge-config.toml"),
+        ),
+        (
+            "output is the (absent) floor record",
+            survey.clone(),
+            fixed("spirits/researcher/eval/floors.toml"),
+        ),
+        ("output is a symlink to the survey", survey.clone(), link),
+        ("output is a hard link to the survey", survey.clone(), hard),
+        ("output is the survey", survey.clone(), survey.clone()),
+    ];
+    for (name, survey, output) in cases {
+        let r = judge_repeat_at(survey, output, 2, always_faithful());
+        let error = r.run.unwrap_err();
+        assert!(error.contains("same file"), "{name}: {error}");
+        assert_eq!(r.calls, 0, "{name}: refused before the judge is asked");
+    }
+    assert_eq!(before(&survey), survey_bytes, "the survey is untouched");
+    assert_eq!(before(&seed), seed_bytes, "the seed is untouched");
+    assert_eq!(before(&survey_sidecar), sidecar_bytes);
+
+    // The plain record (no repeat) refuses the same destinations.
+    let parsed = maos_bench::distill_eval::parse_args_with_repeat(
+        &repeat_args(&[
+            "--cassette",
+            survey.to_str().unwrap(),
+            "--judge-repeat",
+            "2",
+        ]),
+        Some("record"),
+        Some(survey_sidecar.clone()),
+        None,
+    );
+    assert!(parsed.unwrap_err().contains("same file"));
+    let parsed = maos_bench::distill_eval::parse_args_with_repeat(
+        &repeat_args(&[]),
+        Some("record"),
+        Some(seed),
+        None,
+    );
+    assert!(parsed.unwrap_err().contains("same file"));
 }

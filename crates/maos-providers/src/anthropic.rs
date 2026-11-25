@@ -199,6 +199,19 @@ fn parse_response(
     let input_tokens = crate::provider::usage_count(usage, "input_tokens")?;
     let output_tokens = crate::provider::usage_count(usage, "output_tokens")?;
 
+    // Story 28-3 review (round 2, A): attribute the call to the model the
+    // Messages API says SERVED it (the response's `model`), not the one asked
+    // for. A snapshot of the requested model (`-YYYYMMDD` suffix) keeps the
+    // requested id; any other served model is reported as itself, so a
+    // consumer comparing it with its pin sees the mismatch. A response with no
+    // `model` field is unattributed (`None`): nothing verifies the model.
+    let served = json.get("model").and_then(|m| m.as_str()).map(|served| {
+        if base_id(served) == base_id(model_id) {
+            model_id.to_owned()
+        } else {
+            served.to_owned()
+        }
+    });
     Ok(InferenceResponse {
         text: texts.concat(),
         stop_reason,
@@ -209,7 +222,7 @@ fn parse_response(
         provider_attribution: ProviderAttribution {
             provider_id: "anthropic".into(),
             endpoint_url: endpoint_url.into(),
-            model_id: Some(model_id.into()),
+            model_id: served,
         },
     })
 }
@@ -403,6 +416,7 @@ mod tests {
     #[test]
     fn request_model_id_overrides_the_configured_model() {
         let response_json = serde_json::json!({
+            "model": "claude-sonnet-5-5",
             "content": [{ "type": "text", "text": "faithful" }],
             "stop_reason": "end_turn",
             "usage": { "input_tokens": 3, "output_tokens": 1 }
@@ -427,6 +441,20 @@ mod tests {
             resp.provider_attribution.model_id.as_deref(),
             Some("claude-sonnet-5-5")
         );
+        // The configured model, as the API names it in its own response.
+        let haiku = serde_json::json!({
+            "model": "claude-3-haiku-20240307",
+            "content": [{ "type": "text", "text": "faithful" }],
+            "stop_reason": "end_turn",
+            "usage": { "input_tokens": 3, "output_tokens": 1 }
+        });
+        let provider = AnthropicProvider::with_api_key(
+            std::sync::Arc::new(MockTransport(serde_json::to_vec(&haiku).unwrap())),
+            "https://api.anthropic.com".into(),
+            "claude-3-haiku-20240307".into(),
+            "fake-key".into(),
+        )
+        .unwrap();
         let resp = provider.complete(&sample_request()).unwrap();
         assert_eq!(
             resp.provider_attribution.model_id.as_deref(),
@@ -473,5 +501,39 @@ mod tests {
         let req = sample_request();
         let resp = provider.complete(&req).expect("call should succeed");
         assert!(!resp.text.is_empty());
+    }
+
+    #[test]
+    fn attribution_comes_from_the_response_model_not_the_request() {
+        let respond = |model: Option<&str>| {
+            let mut json = serde_json::json!({
+                "content": [{ "type": "text", "text": "x" }],
+                "stop_reason": "end_turn",
+                "usage": { "input_tokens": 1, "output_tokens": 1 }
+            });
+            if let Some(model) = model {
+                json["model"] = model.into();
+            }
+            parse_response(&json, "https://api.anthropic.com", "claude-sonnet-5-5")
+                .unwrap()
+                .provider_attribution
+                .model_id
+        };
+        assert_eq!(
+            respond(Some("claude-sonnet-5-5")).as_deref(),
+            Some("claude-sonnet-5-5")
+        );
+        // A dated snapshot of the requested model is that model.
+        assert_eq!(
+            respond(Some("claude-sonnet-5-5-20261101")).as_deref(),
+            Some("claude-sonnet-5-5")
+        );
+        // Another model is reported as itself, never as the requested one.
+        assert_eq!(
+            respond(Some("claude-haiku-5-5")).as_deref(),
+            Some("claude-haiku-5-5")
+        );
+        // No `model` in the response: unattributed, not the requested id.
+        assert_eq!(respond(None), None);
     }
 }

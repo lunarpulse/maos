@@ -104,6 +104,22 @@ fn write_lines(dir: &Path, name: &str, lines: &[Value]) -> PathBuf {
     path
 }
 
+/// k lines as k separate repeats: line i names its own cassette
+/// `…live.<i>.json`, a copy of the archived one in the returned directory (the
+/// recorded digest still matches). Returns the results file and that directory.
+fn write_repeats(dir: &Path, name: &str, lines: &mut [Value]) -> (PathBuf, PathBuf) {
+    let cassettes = dir.join(format!("{name}.cassettes"));
+    std::fs::create_dir_all(&cassettes).unwrap();
+    let archived = std::fs::read(fixtures().join("distill-corpus-v0.live.json")).unwrap();
+    for (i, line) in lines.iter_mut().enumerate() {
+        let file = format!("distill-corpus-v0.live.{}.json", i + 1);
+        std::fs::write(cassettes.join(&file), &archived).unwrap();
+        line["cassette"] = json!(format!(
+            "crates/maos-journey-test/cassettes/j-researcher/{file}"
+        ));
+    }
+    (write_lines(dir, &format!("{name}.jsonl"), lines), cassettes)
+}
 /// `line` with the given rows' verdicts set, `errors` named as malformed
 /// completions (no halt), and the score's counts re-derived from the corpus.
 fn edited(line: &Value, halted: &[(&str, bool)], errors: &[&str]) -> Value {
@@ -618,8 +634,8 @@ const SURVEY_DRIFT: &str = "rd05: survey differs from the frozen one (re-pin nee
 fn a_structural_failure_of_one_repeat_makes_the_distill_aggregate_red() {
     let dir = tempfile::tempdir().unwrap();
     let clean = distill_line(|_| {});
-    let two = write_lines(dir.path(), "clean.jsonl", &[clean.clone(), clean.clone()]);
-    let out = aggregate(&two, &fixtures(), &[]);
+    let (two, repeats) = write_repeats(dir.path(), "clean", &mut [clean.clone(), clean.clone()]);
+    let out = aggregate(&two, &repeats, &[]);
     assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
     assert_eq!(json_of(&out)["pass"], true);
 
@@ -627,8 +643,8 @@ fn a_structural_failure_of_one_repeat_makes_the_distill_aggregate_red() {
         l["missed_floors"] = json!([SURVEY_DRIFT]);
         l["pass"] = json!(false);
     });
-    let mixed = write_lines(dir.path(), "mixed.jsonl", &[clean, bad]);
-    let out = aggregate(&mixed, &fixtures(), &[]);
+    let (mixed, repeats) = write_repeats(dir.path(), "mixed", &mut [clean, bad]);
+    let out = aggregate(&mixed, &repeats, &[]);
     assert_eq!(
         out.status.code(),
         Some(1),
@@ -825,7 +841,7 @@ fn decided_line(flips: &[(usize, &str)]) -> Value {
     distill_line(|l| {
         l["score"]["metrics"] = json!({
             "recall": recall, "faithfulness": faithfulness, "hedge_preservation": hedge,
-            "traceability": traceability, "secret_leakage": leakage,
+            "traceability": traceability, "secret_leakage": leakage, "format_errors": 0,
         });
         l["decisions"] = json!(decisions);
     })
@@ -843,16 +859,16 @@ fn lower(v: &Value) -> f64 {
 fn decisions_give_the_distill_metrics_a_wilson_interval_over_the_per_claim_majority() {
     let dir = tempfile::tempdir().unwrap();
     let clean = decided_line(&[]);
-    let one = write_lines(
+    let (one, c1) = write_repeats(
         dir.path(),
-        "one.jsonl",
-        &[
+        "one",
+        &mut [
             clean.clone(),
             decided_line(&[(3, "faithful")]),
             clean.clone(),
         ],
     );
-    let r = json_of(&aggregate(&one, &fixtures(), &[]));
+    let r = json_of(&aggregate(&one, &c1, &[]));
     let faith = &r["metrics"]["faithfulness"];
     assert_eq!(
         (faith["n"].as_u64(), faith["majority"].as_f64()),
@@ -869,34 +885,30 @@ fn decisions_give_the_distill_metrics_a_wilson_interval_over_the_per_claim_major
     assert!(r["metrics"]["secret_leakage"]["wilson95"].is_array());
     assert_eq!(r["pass"], true, "{}", r["failures"]);
 
-    let two = write_lines(
+    let (two, c2) = write_repeats(
         dir.path(),
-        "two.jsonl",
-        &[
+        "two",
+        &mut [
             decided_line(&[(3, "faithful")]),
             decided_line(&[(3, "faithful")]),
             clean.clone(),
         ],
     );
-    let r = json_of(&aggregate(&two, &fixtures(), &[]));
+    let r = json_of(&aggregate(&two, &c2, &[]));
     let faith = &r["metrics"]["faithfulness"];
     assert_eq!(faith["majority"].as_f64(), Some(0.96));
     assert!((lower(faith) - 0.8046).abs() < 1e-3, "{faith}");
 
     // A claim the majority did not find leaves every finding denominator.
     let missing = decided_line(&[(0, "found")]);
-    let three = write_lines(
-        dir.path(),
-        "three.jsonl",
-        &[missing.clone(), missing, clean],
-    );
-    let r = json_of(&aggregate(&three, &fixtures(), &[]));
+    let (three, c3) = write_repeats(dir.path(), "three", &mut [missing.clone(), missing, clean]);
+    let r = json_of(&aggregate(&three, &c3, &[]));
     assert_eq!(r["metrics"]["recall"]["majority"].as_f64(), Some(0.96));
     assert_eq!(r["metrics"]["faithfulness"]["n"], 24);
 
     // The calibration path now has an interval to take its lower bound from.
     let live = dir.path().join("decided.live.json");
-    aggregate(&one, &fixtures(), &["--out", s(&live)]);
+    aggregate(&one, &c1, &["--out", s(&live)]);
     let out = xtask(&[
         "eval-report",
         "--calibrate",
@@ -939,8 +951,8 @@ fn a_line_whose_metrics_disagree_with_its_decisions_or_that_half_carries_them_is
 
     let mut bare = decided_line(&[]);
     bare.as_object_mut().unwrap().remove("decisions");
-    let results = write_lines(dir.path(), "half.jsonl", &[decided_line(&[]), bare]);
-    let out = aggregate(&results, &fixtures(), &[]);
+    let (results, repeats) = write_repeats(dir.path(), "half", &mut [decided_line(&[]), bare]);
+    let out = aggregate(&results, &repeats, &[]);
     assert!(
         stderr(&out).contains("only some result lines carry `decisions`"),
         "{}",
@@ -1004,6 +1016,296 @@ fn a_judge_repeat_line_is_checked_against_both_of_its_artifacts() {
     assert_eq!(out.status.code(), Some(1));
     assert!(
         stderr(&out).contains("(cassette_sha256)"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Round 2 (C, D, E, F) — the result SET, format errors, the floors the runs
+// applied, and hedge vectors checked against the source claims.
+// ---------------------------------------------------------------------------
+
+/// The decided line of a run that reported `n` format errors: a malformed
+/// reply fell back to the source statement, so every ratio is still healthy.
+fn with_format_errors(n: u64) -> Value {
+    let mut line = decided_line(&[]);
+    line["score"]["metrics"]["format_errors"] = json!(n);
+    if n > 0 {
+        line["missed_floors"] = json!([format!("format_errors {n} above floor 0")]);
+        line["pass"] = json!(false);
+    }
+    line
+}
+
+/// D — the aggregate carries the per-run format-error counts (summed over the
+/// k runs, tolerance 0) and neither a green verdict nor a calibration comes out
+/// of such evidence, however healthy the ratios look.
+#[test]
+fn format_errors_are_summed_and_refuse_a_green_verdict_and_a_calibration() {
+    let dir = tempfile::tempdir().unwrap();
+    let (results, repeats) = write_repeats(
+        dir.path(),
+        "errors",
+        &mut [
+            with_format_errors(1),
+            with_format_errors(0),
+            with_format_errors(2),
+        ],
+    );
+    let live = dir.path().join("errors.live.json");
+    let out = aggregate(&results, &repeats, &["--out", s(&live)]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    let r = json_of(&out);
+    assert_eq!(r["format_errors"]["count"], 3, "summed over the runs");
+    assert_eq!(r["format_errors"]["rows"], json!(["run 1", "run 3"]));
+    assert_eq!(r["pass"], false);
+    assert!(
+        r["failures"].as_array().unwrap().iter().any(|f| f
+            .as_str()
+            .unwrap()
+            .starts_with("format_errors 3 above floor 0")),
+        "{}",
+        r["failures"]
+    );
+    for metric in ["recall", "faithfulness", "traceability"] {
+        assert_eq!(
+            r["metrics"][metric]["pass"], true,
+            "the ratios look healthy"
+        );
+    }
+    let out = xtask(&[
+        "eval-report",
+        "--calibrate",
+        "--spec",
+        "0.9",
+        "--metric",
+        "recall",
+        "--result",
+        s(&live),
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("structurally invalid evidence"),
+        "{}",
+        stderr(&out)
+    );
+
+    // A line with decisions that omits the count is refused outright.
+    let mut silent = decided_line(&[]);
+    silent["score"]["metrics"]
+        .as_object_mut()
+        .unwrap()
+        .remove("format_errors");
+    let (results, repeats) = write_repeats(dir.path(), "silent", &mut [silent]);
+    let out = aggregate(&results, &repeats, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("`score.metrics.format_errors` is missing"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+/// E — the aggregate is gated against the floors the runs applied (the lines'
+/// agreed `floors` object): an operator-ruled hedge floor of 0.94 passes each
+/// CLI run and the aggregate; without it the compiled 0.95 would fail. Leakage
+/// keeps its zero ceiling whatever the object says.
+#[test]
+fn the_aggregate_is_gated_against_the_floors_the_runs_applied() {
+    let dir = tempfile::tempdir().unwrap();
+    let one_hedge = clean_claims().iter().position(|(_, _, h)| *h == 1).unwrap();
+    let run = |floors: Option<Value>, flips: &[(usize, &str)]| {
+        let mut line = decided_line(flips);
+        if let Some(floors) = floors {
+            line["floors"] = floors;
+        }
+        line
+    };
+    let ruled = json!({"recall": 0.9, "faithfulness": 0.98, "hedge_preservation": 0.94, "traceability": 1.0});
+    // 17 of 18 hedges kept: 0.944 — above 0.94, below the compiled 0.95.
+    let hedge_miss = [(one_hedge, "hedge")];
+    let (results, repeats) = write_repeats(
+        dir.path(),
+        "ruled",
+        &mut [
+            run(Some(ruled.clone()), &hedge_miss),
+            run(Some(ruled), &hedge_miss),
+        ],
+    );
+    let out = aggregate(&results, &repeats, &[]);
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    let r = json_of(&out);
+    assert_eq!(r["metrics"]["hedge_preservation"]["floor"], 0.94);
+    assert_eq!(r["pass"], true);
+
+    let (results, repeats) = write_repeats(
+        dir.path(),
+        "compiled",
+        &mut [run(None, &hedge_miss), run(None, &hedge_miss)],
+    );
+    let out = aggregate(&results, &repeats, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("hedge_preservation mean 0.944"),
+        "{}",
+        stderr(&out)
+    );
+
+    // Leakage: a clean finding trips redaction; a floors object cannot move it.
+    let lax = json!({"recall": 0.0, "faithfulness": 0.0, "hedge_preservation": 0.0, "traceability": 0.0, "secret_leakage": 1.0});
+    let (results, repeats) = write_repeats(
+        dir.path(),
+        "leak",
+        &mut [
+            run(Some(lax.clone()), &[(0, "leaks")]),
+            run(Some(lax), &[(0, "leaks")]),
+        ],
+    );
+    let out = aggregate(&results, &repeats, &[]);
+    assert_eq!(out.status.code(), Some(1), "{}", stderr(&out));
+    assert!(
+        stderr(&out).contains("secret_leakage mean"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+/// F — a finding's hedge flags are checked against its source claim in the
+/// digest-checked corpus: repeating every flag in all lines would double the
+/// hedge denominator and narrow the interval.
+#[test]
+fn hedge_vectors_are_checked_against_the_source_claims() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = clean_claims().iter().position(|(_, _, h)| *h > 0).unwrap();
+    let doubled = || {
+        let mut line = decided_line(&[]);
+        let flags = line["decisions"][target]["finding"]["hedges"].clone();
+        let both: Vec<Value> = flags
+            .as_array()
+            .unwrap()
+            .iter()
+            .chain(flags.as_array().unwrap())
+            .cloned()
+            .collect();
+        line["decisions"][target]["finding"]["hedges"] = json!(both);
+        line
+    };
+    let (results, repeats) = write_repeats(
+        dir.path(),
+        "doubled",
+        &mut [doubled(), doubled(), doubled()],
+    );
+    let out = aggregate(&results, &repeats, &[]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("its source claim has"),
+        "{}",
+        stderr(&out)
+    );
+
+    // Dropping a flag is as wrong as adding one.
+    let mut short = decided_line(&[]);
+    short["decisions"][target]["finding"]["hedges"] = json!([]);
+    let (results, repeats) = write_repeats(dir.path(), "short", &mut [short]);
+    let out = aggregate(&results, &repeats, &[]);
+    assert!(
+        stderr(&out).contains("its source claim has"),
+        "{}",
+        stderr(&out)
+    );
+}
+
+/// C — `--structure-only` accepts exactly `--repeats` valid, distinct,
+/// digest-checked lines, a genuine floor miss included, and refuses a missing,
+/// short, over-long, duplicated or digest-broken set; the workflow's paid
+/// steps depend on it.
+#[test]
+fn structure_only_separates_a_floor_miss_from_a_broken_result_set() {
+    let dir = tempfile::tempdir().unwrap();
+    let structure = |results: &Path, cassettes: &Path, k: &str| {
+        aggregate(results, cassettes, &["--structure-only", "--repeats", k])
+    };
+    // A genuine numeric miss (faithfulness 0.96 < 0.98) in a valid pair.
+    let (miss, repeats) = write_repeats(
+        dir.path(),
+        "miss",
+        &mut [
+            decided_line(&[(3, "faithful")]),
+            decided_line(&[(3, "faithful")]),
+        ],
+    );
+    let out = aggregate(&miss, &repeats, &["--repeats", "2"]);
+    assert_eq!(
+        out.status.code(),
+        Some(1),
+        "the verdict step still fails the miss"
+    );
+    let out = structure(&miss, &repeats, "2");
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(json_of(&out)["structure_only"], true);
+
+    // Short (a refusal left one line), over-long, and no --repeats.
+    let (short, repeats1) = write_repeats(dir.path(), "one", &mut [decided_line(&[])]);
+    for k in ["2", "0"] {
+        let out = structure(&short, &repeats1, k);
+        assert_eq!(out.status.code(), Some(1), "k={k}");
+        assert!(
+            stderr(&out).contains("result lines for"),
+            "{}",
+            stderr(&out)
+        );
+    }
+    let out = structure(&miss, &repeats, "1");
+    assert_eq!(out.status.code(), Some(1), "over-long");
+    let out = aggregate(&miss, &repeats, &["--structure-only"]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("--structure-only needs --repeats"),
+        "{}",
+        stderr(&out)
+    );
+
+    // Duplicated: one line twice, and two lines naming one cassette.
+    let twice = write_lines(
+        dir.path(),
+        "twice.jsonl",
+        &[decided_line(&[]), decided_line(&[])],
+    );
+    let out = structure(&twice, &fixtures(), "2");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("duplicates an earlier one"),
+        "{}",
+        stderr(&out)
+    );
+    let mut other = decided_line(&[(3, "faithful")]);
+    other["cassette"] = decided_line(&[])["cassette"].clone();
+    let same_cassette = write_lines(dir.path(), "same.jsonl", &[decided_line(&[]), other]);
+    let out = structure(&same_cassette, &fixtures(), "2");
+    assert!(
+        stderr(&out).contains("duplicates an earlier one"),
+        "{}",
+        stderr(&out)
+    );
+
+    // A digest that is not the cassette's.
+    let mut lines = vec![decided_line(&[]), decided_line(&[(3, "faithful")])];
+    let (_, repeats) = write_repeats(dir.path(), "digest", &mut lines);
+    lines[1]["cassette_sha256"] = json!("00".repeat(32));
+    let broken = write_lines(dir.path(), "broken.jsonl", &lines);
+    let out = structure(&broken, &repeats, "2");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(stderr(&out).contains("cassette_sha256"), "{}", stderr(&out));
+
+    // An inconsistent set (the lines disagree on the floors they applied).
+    let mut lines = vec![decided_line(&[]), decided_line(&[])];
+    lines[1]["floors"] = json!({"recall": 0.5});
+    let (inconsistent, repeats) = write_repeats(dir.path(), "floors", &mut lines);
+    let out = structure(&inconsistent, &repeats, "2");
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        stderr(&out).contains("disagree on `floors`"),
         "{}",
         stderr(&out)
     );

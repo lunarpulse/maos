@@ -39,6 +39,14 @@ pub const CASSETTE: &str = "crates/maos-journey-test/cassettes/j-researcher/dist
 /// The pinned-judge contract; `[judge.researcher-faithfulness]` is the
 /// nightly record's judge.
 pub const JUDGE_CONFIG: &str = "tests/judge-config.toml";
+/// The hosted bound on judge repeats (`journey-nightly.yml` `repeats`, the
+/// `--judge-repeat` CLI bound and a judge-evidence record's `k`).
+pub const MAX_JUDGE_REPEAT: usize = 10;
+/// The fewest repeats that can say anything about judge AGREEMENT. One repeat
+/// is a legal judge-only pass (one verdict per finding, the first-verdict
+/// gate), but every finding trivially agrees with itself, so it establishes no
+/// agreement and cannot back a floor record's `[judge]` evidence.
+pub const MIN_AGREEMENT_REPEAT: usize = 2;
 
 /// The live judge's prompt template (nightly record only); its SHA-256 is
 /// `tests/judge-config.toml`'s `[judge.researcher-faithfulness]` pin.
@@ -277,15 +285,21 @@ pub struct JudgeReply(pub String, pub String, pub InferenceResponse);
 
 /// One judge reply's verdict: refused unless its provider attributes it to the
 /// pinned `model` (R3) and it is one of the two words. Applied to EVERY reply
-/// of a judge-only repeat, not only the first.
+/// of a judge-only repeat, not only the first. The attribution must be what the
+/// provider reports the SERVING model to be (the Anthropic adapter reads the
+/// response's `model`); a reply with no attribution is unverified and is never
+/// counted as pinned-judge evidence.
 pub fn judge_reply_verdict(response: &InferenceResponse, model: &str) -> Result<bool, String> {
-    let attributed = response.provider_attribution.model_id.as_deref();
-    if attributed != Some(model) {
-        return Err(format!(
-            "judge reply attributed to {attributed:?}, not the pinned {model}"
-        ));
+    match response.provider_attribution.model_id.as_deref() {
+        Some(attributed) if attributed == model => judge_verdict(&response.text),
+        Some(attributed) => Err(format!(
+            "judge reply attributed to {:?}, not the pinned {model}",
+            Some(attributed)
+        )),
+        None => Err(format!(
+            "judge reply carries no model attribution (unverified), not the pinned {model}"
+        )),
     }
-    judge_verdict(&response.text)
 }
 
 /// Parse every reply into its scenario's verdicts. A reply its provider
@@ -555,8 +569,20 @@ impl JudgeEvidence {
         if self.prompt_sha256 != prompt {
             return Err("judge prompt_sha256 is not the pinned judge prompt's".into());
         }
-        if self.k < 2 || self.findings == 0 {
-            return Err("judge evidence needs k >= 2 over at least one finding".into());
+        if self.findings == 0 {
+            return Err("judge evidence needs at least one finding".into());
+        }
+        if self.k < MIN_AGREEMENT_REPEAT {
+            return Err(format!(
+                "judge evidence k {} is below {MIN_AGREEMENT_REPEAT}: one repeat establishes no agreement",
+                self.k
+            ));
+        }
+        if self.k > MAX_JUDGE_REPEAT {
+            return Err(format!(
+                "judge evidence k {} is above the hosted bound {MAX_JUDGE_REPEAT}",
+                self.k
+            ));
         }
         if self.k.checked_mul(self.findings) != Some(self.calls) {
             return Err("judge calls must equal k * findings".into());
@@ -646,6 +672,15 @@ impl DistillFloorRecord {
             let required = compiled
                 .max(e.spec_minimum)
                 .max(crate::halt_replay::round_down_hundredth(lo));
+            // NFR-Aud-7 digest-traceability is 100 %: no free-text ruling
+            // lowers it (and leakage is not a calibrated floor at all).
+            if e.metric == "traceability" && e.floor < compiled {
+                return Err(format!(
+                    "floor record 'traceability': floor {} is below the NFR-Aud-7 {compiled}; \
+                     no operator ruling lowers traceability",
+                    e.floor
+                ));
+            }
             if e.floor < required && !ruled {
                 return Err(format!(
                     "floor record '{}': floor {} is below the one its evidence requires \

@@ -15,13 +15,18 @@ use thiserror::Error;
 /// shared by the Researcher Spirit and the eval scorer so they cannot
 /// disagree: exactly one JSON object whose only field `finding` is a string.
 /// Unknown, duplicate or missing fields, arrays, scalars, code fences and
-/// trailing material are all `None` (never a panic). The string borrows from
-/// `text` unless it held escapes. It checks SHAPE only: a schema-valid string
-/// may still hold several sentences or meta-text.
+/// trailing material are all `None` (never a panic). So is a finding that is
+/// blank after trimming (it would be "faithful" to any claim and pass recall,
+/// traceability and leakage) or that holds a control character, newline and
+/// tab included: the prompt asks for ONE sentence, and a second paragraph is
+/// the meta-text the format floor exists to count. The string borrows from
+/// `text` unless it held escapes. Beyond that it checks SHAPE only: a
+/// schema-valid single line may still hold several sentences.
 pub fn parse_finding_completion(text: &str) -> Option<Cow<'_, str>> {
     serde_json::from_str::<StrictFinding<'_>>(text)
         .ok()
         .map(|f| f.0)
+        .filter(|finding| !finding.trim().is_empty() && !finding.chars().any(char::is_control))
 }
 
 /// A JSON string borrowed when escape-free.
@@ -317,8 +322,8 @@ mod tests {
         );
         // Escapes decode (owned); surrounding JSON whitespace is legal.
         assert_eq!(
-            parse_finding_completion(" {\"finding\":\"a \\\"q\\\" \\u00e9\\n\"}\n").as_deref(),
-            Some("a \"q\" é\n")
+            parse_finding_completion(" {\"finding\":\"a \\\"q\\\" \\u00e9\"}\n").as_deref(),
+            Some("a \"q\" é")
         );
         assert!(matches!(
             parse_finding_completion(r#"{"finding":"plain"}"#),
@@ -331,6 +336,15 @@ mod tests {
         for bad in [
             "",
             "plain text",
+            // Blank, whitespace-only, control-character and multi-line findings
+            // are format errors (round 2, H).
+            r#"{"finding":""}"#,
+            r#"{"finding":"  "}"#,
+            r#"{"finding":" \t "}"#,
+            r#"{"finding":"\u0000"}"#,
+            r#"{"finding":"a\u0007b"}"#,
+            r#"{"finding":"one sentence.\nA second paragraph."}"#,
+            r#"{"finding":"tab\tseparated"}"#,
             r#"{}"#,
             r#"{"summary":"x"}"#,
             r#"{"other":"x"}"#,

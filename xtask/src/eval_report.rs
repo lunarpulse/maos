@@ -79,6 +79,13 @@ pub struct Args {
     /// Calibrate: the `maos.eval.live/v1` file.
     #[arg(long)]
     result: Option<PathBuf>,
+    /// Validate only the SET of result lines (exactly `--repeats` lines, each
+    /// digest-checked against its cassette, consistent, undecided duplicates
+    /// refused) and exit 0 whatever the metrics say: a genuine floor miss is a
+    /// valid line, a missing/short/duplicated/invalid set is not. Gates the
+    /// workflow's paid steps.
+    #[arg(long, requires = "results")]
+    structure_only: bool,
 }
 
 pub fn run(args: Args) -> Result<(), String> {
@@ -311,6 +318,10 @@ struct Body {
     flip_rate: Value,
     format_errors: (usize, Vec<String>),
     failures: Vec<String>,
+    /// The failures no averaging can hide (a refused or drifted run, an
+    /// undetected control, a format error): `--calibrate` refuses evidence that
+    /// carries any.
+    structural: Vec<String>,
 }
 
 fn halt_body(lines: &[Value], rows: &[Row]) -> Result<Body, String> {
@@ -425,6 +436,7 @@ fn halt_body(lines: &[Value], rows: &[Row]) -> Result<Body, String> {
             error_rows.into_iter().cloned().collect(),
         ),
         failures,
+        structural: Vec::new(),
     })
 }
 
@@ -600,7 +612,8 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
         0 => None,
         n if n == lines.len() => {
             let runs: Vec<ClaimDecisions> = decided.into_iter().flatten().collect();
-            let clean: Vec<String> = corpus
+            // (scenario/claim id, hedge count) of every clean claim, corpus order.
+            let clean: Vec<(String, usize)> = corpus
                 .iter()
                 .filter(|r| r["control"].is_null())
                 .flat_map(|r| {
@@ -610,13 +623,36 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
                         .into_iter()
                         .flatten()
                         .map(move |c| {
-                            format!("{scenario}/{}", c["claim_id"].as_str().unwrap_or_default())
+                            (
+                                format!(
+                                    "{scenario}/{}",
+                                    c["claim_id"].as_str().unwrap_or_default()
+                                ),
+                                c["hedges"].as_array().map_or(0, Vec::len),
+                            )
                         })
                         .collect::<Vec<_>>()
                 })
                 .collect();
-            if runs[0].iter().map(|(id, _)| id.clone()).ne(clean) {
+            if runs[0]
+                .iter()
+                .map(|(id, _)| id.as_str())
+                .ne(clean.iter().map(|(id, _)| id.as_str()))
+            {
                 return Err("eval-report: `decisions` are not the corpus' clean claims".into());
+            }
+            // Every present finding carries exactly its source claim's hedges:
+            // repeating a flag cannot widen n and narrow the interval.
+            for (i, run) in runs.iter().enumerate() {
+                for ((id, finding), (_, want)) in run.iter().zip(&clean) {
+                    if finding.as_ref().is_some_and(|f| f.hedges.len() != *want) {
+                        return Err(format!(
+                            "eval-report: run {}: {id} decides {} hedges, its source claim has {want}",
+                            i + 1,
+                            finding.as_ref().map_or(0, |f| f.hedges.len())
+                        ));
+                    }
+                }
             }
             for (i, (run, line)) in runs.iter().zip(lines).enumerate() {
                 let metrics = field(field(line, "score")?, "metrics")?;
@@ -644,7 +680,26 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
         .sum();
     let mut metrics = Map::new();
     let mut failures = Vec::new();
-    for (i, (name, bound, ceiling)) in DISTILL.into_iter().enumerate() {
+    // The numeric floors are the ones the CLI applied (its `floors` object,
+    // agreed across the lines): an operator-ruled floor passes the aggregate
+    // exactly when it passes each run. A line without one (archived before
+    // 28-3) is held to the compiled constants. Leakage stays at its fixed zero
+    // ceiling: it is not calibrated.
+    let applied = lines[0].get("floors").filter(|f| f.is_object());
+    for (i, (name, compiled, ceiling)) in DISTILL.into_iter().enumerate() {
+        let bound = if ceiling {
+            compiled
+        } else {
+            applied
+                .and_then(|f| f.get(name))
+                .map_or(Ok(compiled), |v| {
+                    v.as_f64()
+                        .filter(|b| (0.0..=1.0).contains(b))
+                        .ok_or_else(|| {
+                            format!("eval-report: floor `{name}` is not a number in [0, 1]")
+                        })
+                })?
+        };
         let values = lines
             .iter()
             .map(|l| num(field(field(l, "score")?, "metrics")?, name))
@@ -684,21 +739,59 @@ fn distill_body(lines: &[Value], corpus: &[Value]) -> Result<Body, String> {
         .filter_map(Value::as_str)
         .filter(|f| !is_gate_failure(f))
         .collect();
-    failures.extend(structural.into_iter().map(str::to_owned));
+    let mut structural: BTreeSet<String> = structural.into_iter().map(str::to_owned).collect();
     if !undetected.is_empty() {
-        failures.push(format!(
+        structural.insert(format!(
             "controls not detected: {}",
             undetected.iter().cloned().collect::<Vec<_>>().join(",")
         ));
     }
+    // The format-error count each CLI run reported (a malformed reply falls
+    // back to the source statement, so the ratios alone cannot show it): the
+    // aggregate SUMS them over the k runs and the tolerance is 0. A line with
+    // decisions must carry the count; one archived before 28-3 predates it.
+    let mut format_errors = 0usize;
+    let mut error_runs = Vec::new();
+    for (i, l) in lines.iter().enumerate() {
+        let reported = field(l, "score")?["metrics"].get("format_errors");
+        let count = match (reported, l.get("decisions").is_some()) {
+            (Some(v), _) => v
+                .as_u64()
+                .ok_or("eval-report: `score.metrics.format_errors` is not a count")?
+                as usize,
+            (None, true) => {
+                return Err(format!(
+                    "eval-report: run {}: `score.metrics.format_errors` is missing",
+                    i + 1
+                ))
+            }
+            (None, false) => 0,
+        };
+        if count > 0 {
+            format_errors += count;
+            error_runs.push(format!("run {}", i + 1));
+        }
+    }
+    if format_errors > 0 {
+        structural.insert(format!(
+            "format_errors {format_errors} above floor 0 ({})",
+            error_runs.join(", ")
+        ));
+    }
+    // A line already says its own format errors in `missed_floors`; the summed
+    // message above is the aggregate's.
+    structural.retain(|f| !f.starts_with("format_errors ") || f.contains(" (run "));
+    let structural: Vec<String> = structural.into_iter().collect();
+    failures.extend(structural.iter().cloned());
     Ok(Body {
         metrics,
         confusion: json!({}),
         majority: Value::Null,
         flip_rows: Vec::new(),
         flip_rate: Value::Null,
-        format_errors: (0, Vec::new()),
+        format_errors: (format_errors, error_runs),
         failures,
+        structural,
     })
 }
 
@@ -828,6 +921,23 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
             ));
         }
     }
+    if args.structure_only && args.repeats.is_none() {
+        return Err("eval-report: --structure-only needs --repeats".into());
+    }
+    // A repeat is one run: the same line twice, or two lines naming one
+    // cassette, is a duplicated repeat, never k measurements.
+    for (i, line) in lines.iter().enumerate() {
+        let name = text(line, "cassette")?;
+        if lines[..i]
+            .iter()
+            .any(|earlier| earlier == line || earlier["cassette"] == name)
+        {
+            return Err(format!(
+                "eval-report: result line {} duplicates an earlier one (cassette `{name}`)",
+                i + 1
+            ));
+        }
+    }
     let kind = match text(first, "event")? {
         "eval_halt" => "halt",
         "eval_distill" => "distill",
@@ -929,9 +1039,18 @@ fn aggregate(args: &Args) -> Result<(Value, Vec<String>), String> {
         "cost_usd": cost,
         "price_book": {"path": book.display().to_string(), "sha256": book_hash},
         "failures": body.failures,
+        "structural_failures": body.structural,
+        "structure_only": args.structure_only,
         "pass": body.failures.is_empty(),
     });
-    Ok((report, body.failures))
+    // `--structure-only` reports a valid set (reaching here means every check
+    // above held) and leaves the verdict to the report step.
+    let failures = if args.structure_only {
+        Vec::new()
+    } else {
+        body.failures
+    };
+    Ok((report, failures))
 }
 
 fn live(path: &Path) -> Result<Value, String> {
@@ -1018,6 +1137,21 @@ fn calibrate(args: &Args) -> Result<(Value, Vec<String>), String> {
         return Err("eval-report: --calibrate needs --spec, --metric and --result".into());
     };
     let live = live(path)?;
+    // A green verdict, and a floor taken from it, need structurally valid
+    // evidence: a distill report carrying format errors or any failure no
+    // averaging hides (refused/drifted run, undetected control) calibrates
+    // nothing — a malformed reply falls back to the source statement, so the
+    // ratios can look healthy.
+    if live["eval"] == "distill" {
+        let errors = live["format_errors"]["count"].as_u64().unwrap_or(u64::MAX);
+        let structural = live["structural_failures"].as_array().map(Vec::len);
+        if errors != 0 || structural != Some(0) {
+            return Err(format!(
+                "eval-report: the result is structurally invalid evidence (format errors {}, structural failures {:?}); nothing is calibrated from it",
+                live["format_errors"]["count"], live["structural_failures"]
+            ));
+        }
+    }
     let m = object(&live, "metrics")?
         .get(name)
         .ok_or_else(|| format!("eval-report: the result has no metric `{name}`"))?;

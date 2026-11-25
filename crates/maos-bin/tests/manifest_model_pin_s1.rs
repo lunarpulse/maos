@@ -87,7 +87,12 @@ fn fake_anthropic(text: &'static str) -> (String, Arc<Mutex<Vec<Value>>>) {
                 seen.lock()
                     .unwrap()
                     .push(serde_json::from_slice(&body).expect("a JSON request body"));
+                // The Messages API names the model that served the call.
+                let served = serde_json::from_slice::<serde_json::Value>(&body)
+                    .ok()
+                    .and_then(|b| b["model"].as_str().map(str::to_owned));
                 let reply = json!({
+                    "model": served,
                     "content": [{ "type": "text", "text": text }],
                     "stop_reason": "end_turn",
                     "usage": { "input_tokens": 3, "output_tokens": 2 }

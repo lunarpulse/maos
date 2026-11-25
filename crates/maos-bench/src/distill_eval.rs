@@ -51,9 +51,12 @@ pub use maos_eval::distill_replay::CASSETTE as COMMITTED_CASSETTE;
 const USAGE: &str = "usage: maos eval distill --class researcher [--cassette <path>] \
                      [--judge-repeat <k>]";
 const INTENT: &str = "researcher:corpus_claim";
-/// The hosted dispatch bound on repeats (`journey-nightly.yml` `repeats`): a
-/// judge-only repeat is `1..=MAX_JUDGE_REPEAT` live judge calls per finding.
-pub const MAX_JUDGE_REPEAT: usize = 10;
+/// The Researcher's calibrated-floor record, read when present.
+const FLOORS_FILE: &str = "spirits/researcher/eval/floors.toml";
+/// The hosted dispatch bound on repeats, shared with the floor record's judge
+/// evidence: a judge-only repeat is `1..=MAX_JUDGE_REPEAT` live judge calls per
+/// finding (see [`scorer::MIN_AGREEMENT_REPEAT`] for what one repeat cannot say).
+pub const MAX_JUDGE_REPEAT: usize = scorer::MAX_JUDGE_REPEAT;
 
 /// A parsed `maos eval distill` invocation.
 #[derive(Debug)]
@@ -133,8 +136,9 @@ pub fn parse_args_with_repeat(
     if record && cassette.is_some() && judge_repeat.is_none() {
         return Err("record writes MAOS_REPLAY_CASSETTE; --cassette is replay-only".into());
     }
-    if let (Some(survey), Some(output), Some(_)) = (&cassette, &env_cassette, judge_repeat) {
-        refuse_aliased(survey, output)?;
+    if let (true, Some(output)) = (record, &env_cassette) {
+        let survey = cassette.as_deref().filter(|_| judge_repeat.is_some());
+        check_destinations(output, survey)?;
     }
     let cassette = cassette.or_else(|| env_cassette.filter(|_| !record || judge_repeat.is_some()));
     Ok(DistillRequest {
@@ -156,21 +160,30 @@ fn check_repeat_count(k: usize) -> Result<(), String> {
     }
 }
 
-/// Whether two paths name one file: the same canonical path (a missing file by
-/// its canonical parent and name) or, on unix, the same device and inode.
+/// `p` resolved as far as the file system lets it: made absolute, then its
+/// nearest existing ancestor canonicalised (symlinks followed) and the missing
+/// tail appended.
+fn resolved(p: &Path) -> PathBuf {
+    let absolute = std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
+    let (mut tail, mut at) = (Vec::new(), absolute.as_path());
+    loop {
+        if let Ok(mut found) = at.canonicalize() {
+            found.extend(tail.iter().rev());
+            return found;
+        }
+        match (at.parent(), at.file_name()) {
+            (Some(parent), Some(name)) => {
+                tail.push(name.to_owned());
+                at = parent;
+            }
+            _ => return absolute,
+        }
+    }
+}
+
+/// Whether two paths name one file: the same resolved path or, on unix, the
+/// same device and inode (hard links).
 fn same_file(a: &Path, b: &Path) -> bool {
-    let canonical = |p: &Path| {
-        p.canonicalize().unwrap_or_else(|_| {
-            let parent = p
-                .parent()
-                .filter(|d| !d.as_os_str().is_empty())
-                .unwrap_or_else(|| Path::new("."));
-            parent.canonicalize().map_or_else(
-                |_| p.to_path_buf(),
-                |d| d.join(p.file_name().unwrap_or_default()),
-            )
-        })
-    };
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
@@ -180,21 +193,56 @@ fn same_file(a: &Path, b: &Path) -> bool {
             }
         }
     }
-    canonical(a) == canonical(b)
+    resolved(a) == resolved(b)
 }
 
-/// The recorder writes the judge replies to the output cassette: were that the
-/// survey cassette, it would be overwritten with judge-only replies.
-fn refuse_aliased(survey: &Path, output: &Path) -> Result<(), String> {
-    if same_file(survey, output) {
-        Err(format!(
-            "--cassette (the survey replayed) and MAOS_REPLAY_CASSETTE (the judge replies \
-             recorded) are the same file {}; the recorder would overwrite the survey",
-            survey.display()
-        ))
-    } else {
-        Ok(())
+/// Every file a record run writes — the recorded cassette (judge replies, or
+/// the recorder's survey) and its `.verdicts.json` sidecar — against every file
+/// it reads (the survey cassette and its sidecar, the committed seed, the
+/// corpus, the judge config, the floor record) and against each other. Equality
+/// is by canonical path (symlinks, relative/absolute spellings) or device and
+/// inode (hard links); a destination that does not exist yet is compared by its
+/// canonical parent and name. Refused before any inference.
+fn check_destinations(output: &Path, survey: Option<&Path>) -> Result<(), String> {
+    let sidecar = scorer::verdicts_sidecar(output);
+    let mut reads: Vec<(&str, PathBuf)> = vec![
+        (
+            "the committed seed cassette",
+            PathBuf::from(scorer::CASSETTE),
+        ),
+        ("the corpus", PathBuf::from(scorer::CORPUS)),
+        ("the judge config", PathBuf::from(scorer::JUDGE_CONFIG)),
+        ("the floor record", PathBuf::from(FLOORS_FILE)),
+    ];
+    if let Some(survey) = survey {
+        reads.push(("the survey cassette", survey.to_path_buf()));
+        reads.push((
+            "the survey's verdict sidecar",
+            scorer::verdicts_sidecar(survey),
+        ));
     }
+    let writes = [
+        ("the recorded cassette (MAOS_REPLAY_CASSETTE)", output),
+        ("its verdict sidecar", sidecar.as_path()),
+    ];
+    for (write, path) in writes {
+        for (read, other) in &reads {
+            if same_file(path, other) {
+                return Err(format!(
+                    "{write} {} is the same file as {read} {}; the recorder would overwrite it",
+                    path.display(),
+                    other.display()
+                ));
+            }
+        }
+    }
+    if same_file(output, &sidecar) {
+        return Err(format!(
+            "the recorded cassette and its verdict sidecar are the same file {}",
+            output.display()
+        ));
+    }
+    Ok(())
 }
 
 impl DistillRequest {
@@ -294,10 +342,13 @@ pub fn evaluate_with_repeat(
         if !record {
             return Err("--judge-repeat needs the record mode's live router".into());
         }
-        // Both before any inference: the hosted bound, and no recording over
-        // the survey being replayed.
+        // Before any inference: the hosted bound.
         check_repeat_count(repeat.k)?;
-        refuse_aliased(&repeat.survey_cassette, &cassette)?;
+    }
+    if record {
+        // ... and no write destination over any read input or another write.
+        let survey = judge_repeat.as_ref().map(|r| r.survey_cassette.as_path());
+        check_destinations(&cassette, survey)?;
     }
     let survey_replay_router = judge_repeat
         .as_ref()

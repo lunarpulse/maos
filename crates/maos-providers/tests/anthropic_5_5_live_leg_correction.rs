@@ -31,6 +31,7 @@ fn io(status: u16, body: impl Into<Vec<u8>>) -> Arc<MockTransport> {
 
 fn ok(content: Value) -> Arc<MockTransport> {
     let body = json!({
+        "model": "claude-sonnet-5-5",
         "content": content,
         "stop_reason": "end_turn",
         "usage": { "input_tokens": 11, "output_tokens": 7 }

@@ -203,6 +203,11 @@ fn a_malformed_completion_falls_back_to_the_source_summary_not_the_model_text() 
         r#"{"finding":42}"#,
         "```json\n{\"finding\":\"fenced finding\"}\n```",
         r#"{"finding":"x"} trailing"#,
+        // Round 2 (H): an empty, blank, control-character or multi-line finding.
+        r#"{"finding":""}"#,
+        r#"{"finding":"   "}"#,
+        r#"{"finding":"\u0000"}"#,
+        r#"{"finding":"one sentence.\nA second paragraph."}"#,
     ] {
         let (port, mints) = (Port::replying(bad), Arc::new(AtomicUsize::new(0)));
         let r = bound(

@@ -29,6 +29,11 @@ env:
   CARGO_TERM_COLOR: always
   MAOS_SECRETS_BACKEND: env
 
+# Defence in depth: the token this workflow runs with only reads the repository
+# (the paid steps authenticate with the provider secret, never the token).
+permissions:
+  contents: read
+
 # Serialize nightly runs: a long manual re-record must not overlap the cron.
 concurrency:
   group: journey-nightly
@@ -118,6 +123,7 @@ jobs:
           tool: cargo-nextest@0.9.149
 
       - name: Validate the repeats input
+        id: repeats-validation
         env:
           REPEATS: ${{ inputs.repeats }}
         run: |
@@ -218,7 +224,7 @@ jobs:
       # (owner `ops-nightly-cassette-rerecord`).
       - name: Re-record the Researcher five-metric cassette and judge (live)
         id: researcher-record
-        if: ${{ !cancelled() && inputs.include_researcher == true }}
+        if: ${{ !cancelled() && inputs.include_researcher == true && steps.repeats-validation.outcome == 'success' }}
         env:
           MAOS_INFERENCE_MODE: record
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
@@ -226,18 +232,43 @@ jobs:
         run: |
           results=crates/maos-journey-test/cassettes/eval-results
           mkdir -p "$results"
+          # A provider refusal exits 1 like a measured floor miss, but prints no
+          # result line: only a LINE makes exit 1 a measurement. A repeat that
+          # exits 1 without appending one stops the loop here.
           for i in $(seq 1 "$REPEATS"); do
             rc=0
+            before=$(cat "$results/researcher.results.jsonl" 2>/dev/null | wc -l)
             MAOS_REPLAY_CASSETTE="crates/maos-journey-test/cassettes/j-researcher/distill-corpus-v0.live.$i.json" \
               target/debug/maos eval distill --class researcher >> "$results/researcher.results.jsonl" || rc=$?
+            after=$(cat "$results/researcher.results.jsonl" 2>/dev/null | wc -l)
             if [ "$rc" -gt 1 ]; then
               echo "::error::Researcher repeat $i exited $rc"
               exit "$rc"
             fi
+            if [ "$rc" -eq 1 ] && [ "$after" -le "$before" ]; then
+              echo "::error::Researcher repeat $i exited 1 without a result line (a refusal, not a floor miss)"
+              exit 1
+            fi
           done
 
+      # Exactly k structurally valid, digest-checked result lines, whatever the
+      # metrics say (a genuine floor miss is a valid line; a missing, short,
+      # duplicated or inconsistent set is not). The paid judge-only step below
+      # needs this to succeed.
+      - name: Validate the Researcher result set (k lines)
+        id: researcher-structure
+        if: ${{ !cancelled() && inputs.include_researcher == true && steps.repeats-validation.outcome == 'success' && steps.researcher-record.outcome == 'success' }}
+        env:
+          REPEATS: ${{ inputs.repeats }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          results=crates/maos-journey-test/cassettes/eval-results
+          cargo run --locked -p xtask -- eval-report --structure-only \
+            --results "$results/researcher.results.jsonl" \
+            --repeats "$REPEATS" --run-id "$RUN_ID"
+
       - name: Report the Researcher live evaluation (k repeats)
-        if: ${{ !cancelled() && inputs.include_researcher == true }}
+        if: ${{ !cancelled() && inputs.include_researcher == true && steps.repeats-validation.outcome == 'success' }}
         env:
           REPEATS: ${{ inputs.repeats }}
           RUN_ID: ${{ github.run_id }}
@@ -258,7 +289,7 @@ jobs:
       # results, so `eval-report` never counts it as a repeat. A measured floor
       # miss (exit 1) is kept; a structural refusal (exit 1, no line) is not.
       - name: Measure Researcher judge agreement (fixed survey, k repeats)
-        if: ${{ !cancelled() && inputs.include_researcher == true && steps.researcher-record.outcome == 'success' }}
+        if: ${{ !cancelled() && inputs.include_researcher == true && steps.repeats-validation.outcome == 'success' && steps.researcher-record.outcome == 'success' && steps.researcher-structure.outcome == 'success' }}
         env:
           MAOS_INFERENCE_MODE: record
           MAOS_ANTHROPIC_API_KEY: ${{ secrets.MAOS_ANTHROPIC_API_KEY }}
