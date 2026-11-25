@@ -595,9 +595,14 @@ mod online {
         assert_eq!(gaps.len(), 1, "exactly one siem.gap row");
         let payload: serde_json::Value = serde_json::from_str(&gaps[0].payload).unwrap();
         assert_eq!(
-            payload,
-            serde_json::json!({ "from": 1, "to": 2, "segment_seq": 1 })
+            (
+                payload["from"].as_i64(),
+                payload["to"].as_i64(),
+                payload["segment_seq"].as_i64()
+            ),
+            (Some(1), Some(2), Some(1))
         );
+        assert_eq!(payload["sink"].as_str().map(str::len), Some(16));
 
         // The next tick delivers the journal rows themselves and invents no second gap.
         let next = host.export().expect("second tick");
@@ -693,7 +698,10 @@ mod online {
         }
         host.fake.set_mode(Mode::CloseWithoutNotify);
         let outcome = host.runtime.forward_audit_to_siem();
-        let Err(EnterpriseFailure::SiemSinkDown { buffered, reason }) = &outcome else {
+        let Err(EnterpriseFailure::SiemSinkDown {
+            buffered, reason, ..
+        }) = &outcome
+        else {
             panic!("expected a sink-down outcome, got {outcome:?}");
         };
         assert_eq!((*buffered, *reason), (5, "siem_sink_no_close_notify"));
@@ -808,6 +816,144 @@ mod online {
             .expect("mutual TLS delivery");
         assert!(tick.delivered >= 1);
         assert!(matches!(fake.next_event(), Event::Acked { .. }));
+    }
+
+    // ── review round 1 ───────────────────────────────────────────────────────────
+
+    /// An expired segment with unsent rows (as in the gap test); returns the Host ready to export.
+    fn host_with_expired_segment(options: Options) -> Host {
+        let host = Host::with(options, true);
+        let old = now_ns() - 200 * 86_400 * 1_000_000_000;
+        for n in 1..=3 {
+            host.put(n);
+        }
+        let raw = rusqlite::Connection::open(&host.db).expect("raw connection");
+        for rowid in 1..=2 {
+            raw.execute(
+                "UPDATE transparency_log SET timestamp_ns = ?1 WHERE rowid = ?2",
+                [old, rowid],
+            )
+            .unwrap();
+        }
+        host.rotate();
+        host.put(4);
+        assert_eq!(
+            host.tl.expire_segments(90, now_ns() as u64).unwrap(),
+            vec![1]
+        );
+        host
+    }
+
+    fn snapshots(host: &Host) -> Vec<String> {
+        std::fs::read_dir(host.db.parent().unwrap())
+            .unwrap()
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name.contains(".siem-snapshot-"))
+            .collect()
+    }
+
+    /// A blocked cursor temp file fails every tick AFTER the gap row is written. However many
+    /// ticks fail, the log holds exactly one `siem.gap` row (the writer dedupes by the
+    /// deterministic payload), and no snapshot is left behind by a failed tick.
+    #[test]
+    fn a_blocked_cursor_write_adds_one_gap_row_however_many_ticks_fail() {
+        let host = host_with_expired_segment(Options::default());
+        let tmp = host.cursor().with_extension("json.tmp");
+        std::fs::create_dir(&tmp).expect("block the cursor temp file");
+        for _ in 0..4 {
+            match host.runtime.forward_audit_to_siem() {
+                Err(EnterpriseFailure::SiemSinkDown { reason, .. }) => {
+                    assert_eq!(reason, "siem_cursor_io")
+                }
+                other => panic!("expected a cursor failure, got {other:?}"),
+            }
+            assert!(snapshots(&host).is_empty(), "{:?}", snapshots(&host));
+        }
+        assert_eq!(
+            host.rows_with_intent("siem.gap").len(),
+            1,
+            "one row after four failing ticks"
+        );
+        std::fs::remove_dir(&tmp).unwrap();
+        assert!(host.export().is_ok());
+        assert_eq!(host.rows_with_intent("siem.gap").len(), 1);
+    }
+
+    /// A gap journaled earlier in a tick that then fails on the sink is still reported: the
+    /// failure carries the tick's typed lines, and `SiemReport` prints them.
+    #[test]
+    fn a_gap_noted_before_a_sink_failure_is_not_lost() {
+        let host = host_with_expired_segment(Options::default());
+        host.fake.set_mode(Mode::CloseWithoutNotify);
+        let outcome = host.runtime.forward_audit_to_siem();
+        let Err(EnterpriseFailure::SiemSinkDown { notes, reason, .. }) = &outcome else {
+            panic!("expected a sink failure, got {outcome:?}");
+        };
+        assert_eq!(*reason, "siem_sink_no_close_notify");
+        assert!(
+            notes.iter().any(|note| note.starts_with("siem_gap")),
+            "{notes:?}"
+        );
+        let lines = SiemReport::default().lines(&outcome);
+        assert!(
+            lines.iter().any(|line| line.contains("siem_gap")),
+            "{lines:?}"
+        );
+    }
+
+    /// Snapshots a crashed export left behind are removed when the sink is built at boot.
+    #[test]
+    fn stale_snapshots_are_removed_when_the_exporter_is_built() {
+        let host = Host::new();
+        let stale = host.db.with_extension("siem-snapshot-1-0.sqlite");
+        std::fs::write(&stale, b"a copy of the log").unwrap();
+        let siem = configure_siem(
+            &SiemEnv {
+                file: Some("/tmp/e234-unused-sink.log"),
+                ..SiemEnv::default()
+            },
+            public(),
+        )
+        .unwrap()
+        .unwrap();
+        let _runtime = EnterpriseRuntime::from_ports(
+            EnterpriseConfig::empty().with_siem_available(),
+            None,
+            None,
+            Some(Arc::new(SiemExporter) as Arc<dyn SiemProjectionPort>),
+            None,
+            Some(host.db.clone()),
+            None,
+            NONCE,
+        )
+        .with_configured_siem(&siem);
+        assert!(!stale.exists(), "the stale snapshot is removed at boot");
+    }
+
+    /// `cancel_siem_export` reaches the blocking export through the runtime.
+    #[test]
+    fn the_runtime_cancel_ends_an_export_held_in_the_handshake() {
+        let host = Arc::new(Host::with(Options::default(), true));
+        host.put(1);
+        host.fake.set_mode(Mode::HoldHandshake);
+        let exporter = {
+            let runtime = Arc::clone(&host.runtime);
+            std::thread::spawn(move || runtime.forward_audit_to_siem())
+        };
+        assert!(matches!(host.fake.next_event(), Event::Held));
+        host.runtime.cancel_siem_export();
+        match exporter.join().unwrap() {
+            Err(EnterpriseFailure::SiemSinkDown { reason, .. }) => {
+                assert_eq!(reason, "siem_export_cancelled")
+            }
+            other => panic!("expected a cancelled export, got {other:?}"),
+        }
+        assert!(
+            snapshots(&host).is_empty(),
+            "the cancelled export removed its snapshot"
+        );
+        host.fake.handshake_gate.open();
     }
 }
 
@@ -1007,4 +1153,47 @@ fn boot_with_no_siem_variable_starts_no_consumer_and_the_file_sink_alone_boots()
     let text = stderr(&file);
     assert!(file.status.success(), "{text}");
     assert!(text.contains("SIEM sink selected: local file"), "{text}");
+}
+
+/// The mTLS key is read through the configured store: with `encrypted-file` and the key ONLY
+/// in the sealed vault (not in the environment) the boot succeeds and settles it.
+#[cfg(feature = "online-adapters")]
+#[test]
+fn boot_reads_the_client_key_from_the_encrypted_file_store() {
+    use maos_domain::ports::SecretStore as _;
+
+    let temp = tempfile::tempdir().expect("fixture");
+    let root = temp.path();
+    let ca = Ca::new("siem-boot-ca");
+    let client = ca.client("maos-host");
+    let ca_file = write(root, "ca.pem", &ca.pem);
+    let cert_file = write(root, "client.pem", &client.cert_pem);
+    let maos_home = root.join("maos-home-sealed");
+    std::fs::create_dir_all(&maos_home).unwrap();
+    let kms = maos_secrets::LocalMasterKeyKms::from_master_key(&[0x42_u8; 32]).expect("kms");
+    maos_secrets::EncryptedFileSecretStore::new(
+        maos_home.join("secrets"),
+        Arc::new(kms),
+        Arc::new(maos_kernel_core::security::RingCryptoProvider),
+    )
+    .put(SecretKey::SiemClientKey, &client.key_pem)
+    .expect("seal the client key");
+
+    let master = "42".repeat(32);
+    let output = boot(
+        root,
+        "sealed",
+        &[
+            ("MAOS_SECRETS_BACKEND", "encrypted-file"),
+            ("MAOS_KMS_MASTER_KEY", &master),
+            ("MAOS_SIEM_ENDPOINT", "127.0.0.1:1"),
+            ("MAOS_SIEM_ALLOW_PRIVATE", "1"),
+            ("MAOS_SIEM_CA_FILE", &ca_file),
+            ("MAOS_SIEM_CLIENT_CERT_FILE", &cert_file),
+        ],
+    );
+    let text = stderr(&output);
+    assert!(output.status.success(), "{text}");
+    assert!(text.contains("SIEM client key read"), "{text}");
+    assert!(!text.contains("PRIVATE KEY"), "{text}");
 }

@@ -22,7 +22,8 @@ use maos_domain::outbound::OutboundPolicy;
 use maos_kernel_core::iac::transparency_log::{FrameKind, TransparencyLogAdapter};
 use maos_siem::cursor::{Cursor, CursorStore, CURSOR_FILE};
 use maos_siem::export::{
-    run_tick, BatchSink, ExportError, Frame, Tick, MAX_BATCH_BYTES, MAX_BATCH_FRAMES,
+    run_tick, run_tick_cancellable, BatchSink, Frame, Tick, TickFailure, MAX_BATCH_BYTES,
+    MAX_BATCH_FRAMES,
 };
 use maos_siem::tls_sink::{client_config, SetupError, Timeouts, TlsSink};
 use tempfile::TempDir;
@@ -155,7 +156,7 @@ impl Rig {
         CursorStore::beside(&self.db, &self.sink().identity())
     }
 
-    fn tick(&self, sink: &mut TlsSink, store: &CursorStore) -> Result<Tick, ExportError> {
+    fn tick(&self, sink: &mut TlsSink, store: &CursorStore) -> Result<Tick, TickFailure> {
         // As the daemon does: export a quiesced snapshot, never the live file.
         let snapshot = snapshot(&self.db);
         let result = run_tick(&snapshot, store, sink, &|intent, payload| {
@@ -752,4 +753,163 @@ fn the_secret_canary_never_reaches_the_collector() {
         wire.contains("REDACTED"),
         "the redaction marker is on the wire: {wire}"
     );
+}
+
+// ── review round 1 ───────────────────────────────────────────────────────────
+
+/// A collector that closes first (its close_notify and FIN arrive with the last handshake
+/// flight, before it read the batch) is NOT an acknowledgement: counting that close_notify
+/// would move the cursor past rows it never saw. TLS 1.2 is the deterministic case (the
+/// server's `close_notify` shares a flight with its Finished); the TLS 1.3 ordering depends on
+/// when the server's post-handshake record lands and is not asserted (see the README).
+#[test]
+fn a_collector_that_closes_first_is_not_an_acknowledgement() {
+    let rig = Rig::with(Options {
+        tls12_ecdhe_gcm_only: true,
+        ..Options::default()
+    });
+    rig.fake.set_mode(Mode::CloseFirst);
+    seed(&rig.db, 3, "closed-first");
+    let (mut sink, store) = (rig.sink(), rig.store());
+    let failure = rig
+        .tick(&mut sink, &store)
+        .expect_err("a close that came first");
+    assert_eq!(failure.code(), "siem_sink_no_close_notify");
+    assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
+    assert!(!rig.cursor_path().exists(), "the cursor did not move");
+
+    // The same collector answering properly is acknowledged and the same rows go.
+    rig.fake.set_mode(Mode::Ack);
+    assert_eq!(rig.tick(&mut sink, &store).unwrap().delivered, 3);
+}
+
+/// Every handshake step re-checks the deadline: a peer that hands over one byte and then
+/// goes quiet (a trickle held by a gate, not a sleep) ends the phase with a timeout.
+#[test]
+fn a_trickling_peer_cannot_stretch_the_handshake() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("trickle listener");
+    let port = listener.local_addr().unwrap().port();
+    let (release, gate) = std::sync::mpsc::channel::<()>();
+    let thread = std::thread::spawn(move || {
+        use std::io::{Read, Write};
+        let (mut stream, _) = listener.accept().expect("accept");
+        let mut hello = [0_u8; 4096];
+        let _ = stream.read(&mut hello);
+        let _ = stream.write_all(&[0x16]); // one byte of a handshake record header
+        let _ = gate.recv_timeout(fake_siem::OUTER); // then nothing until released
+    });
+    let rig = Rig::new();
+    let mut sink = TlsSink::new(
+        HOST,
+        port,
+        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
+        OutboundPolicy::strict().allow_private(),
+        rig.resolver.clone(),
+        Timeouts {
+            handshake: Duration::from_millis(400),
+            ..Timeouts::default()
+        },
+    );
+    let failure = sink
+        .deliver(&[dummy_frame()])
+        .expect_err("trickled handshake");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    release.send(()).unwrap();
+    thread.join().unwrap();
+}
+
+/// Shutdown reaches a blocking export: with the collector holding the handshake, raising the
+/// flag ends the tick at its next read slice, and nothing is left behind (the tick can run
+/// again at once, the cursor never moved).
+#[test]
+fn a_cancel_stops_an_export_stuck_in_a_held_handshake() {
+    let rig = Rig::new();
+    seed(&rig.db, 2, "cancel");
+    rig.fake.set_mode(Mode::HoldHandshake);
+    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut sink = rig.sink();
+    sink.set_cancel(Arc::clone(&cancel));
+    let store = rig.store();
+    let snapshot = snapshot(&rig.db);
+    let flag = Arc::clone(&cancel);
+    let worker = std::thread::spawn(move || {
+        run_tick_cancellable(&snapshot, &store, &mut sink, &|_, _| Ok(()), &flag)
+    });
+    assert!(matches!(rig.fake.next_event(), Event::Held));
+    cancel.store(true, std::sync::atomic::Ordering::SeqCst);
+    let failure = worker.join().unwrap().expect_err("cancelled");
+    assert_eq!(failure.code(), "siem_export_cancelled");
+    rig.fake.handshake_gate.open();
+    assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
+    assert!(!rig.cursor_path().exists());
+}
+
+/// Negative control for the CA-only witness: a client whose root store is WIDENED with the
+/// foreign collector's CA accepts that collector, which is exactly what
+/// `a_server_certificate_from_another_ca_is_refused...` must be able to see. The shipped
+/// `client_config` built from the operator's bundle alone still refuses it.
+#[test]
+fn a_widened_root_store_is_detected_by_the_ca_only_witness() {
+    let rig = Rig::new();
+    let foreign = Ca::new("foreign-collector-ca");
+    let foreign_fake = FakeSiem::start(&foreign.server(HOST), Options::default());
+    let sink_for = |config| {
+        TlsSink::new(
+            HOST,
+            foreign_fake.addr.port(),
+            config,
+            OutboundPolicy::strict().allow_private(),
+            rig.resolver.clone(),
+            Timeouts::default(),
+        )
+    };
+
+    let mut roots = rustls::RootCertStore::empty();
+    roots.add(rig.ca.der()).unwrap();
+    roots.add(foreign.der()).unwrap();
+    let widened = Arc::new(
+        rustls::ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_root_certificates(roots)
+        .with_no_client_auth(),
+    );
+    sink_for(widened)
+        .deliver(&[dummy_frame()])
+        .expect("a widened root store accepts the foreign collector (the control)");
+    assert!(matches!(foreign_fake.next_event(), Event::Acked { .. }));
+
+    let only = client_config(rig.ca.pem.as_bytes(), None).unwrap();
+    let failure = sink_for(only)
+        .deliver(&[dummy_frame()])
+        .expect_err("the CA-only config refuses it");
+    assert_eq!(failure.code, "siem_sink_tls_refused");
+}
+
+/// A tick that fails does not leave a snapshot or a lock: the next tick runs at once.
+#[test]
+fn the_gap_note_survives_a_sink_failure_in_the_same_tick() {
+    let rig = Rig::new();
+    seed(&rig.db, 3, "notes");
+    let (mut sink, store) = (rig.sink(), rig.store());
+    // An unreadable cursor is reset (journaled, noted), then the sink fails: the typed line
+    // of the reset must travel with the failure.
+    std::fs::write(rig.cursor_path(), b"\0junk").unwrap();
+    rig.fake.set_mode(Mode::CloseWithoutNotify);
+    let failure = rig
+        .tick(&mut sink, &store)
+        .expect_err("sink fails after the reset");
+    assert_eq!(failure.code(), "siem_sink_no_close_notify");
+    assert!(
+        failure
+            .tick
+            .notes
+            .iter()
+            .any(|note| note.starts_with("siem_cursor_unreadable")),
+        "{:?}",
+        failure.tick.notes
+    );
+    assert_eq!(rig.journal.entries().len(), 1);
 }

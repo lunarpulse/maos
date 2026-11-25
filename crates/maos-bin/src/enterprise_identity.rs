@@ -49,7 +49,7 @@ use maos_domain::ports::{
 use maos_loom_lite::seal::AtRestSeal;
 use maos_secrets::{seal_at_rest_opt, LocalMasterKeyKms};
 use maos_siem::cursor::CursorStore;
-use maos_siem::export::{run_tick, BatchSink, FileSink, Tick};
+use maos_siem::export::{run_tick_cancellable, BatchSink, FileSink, Tick};
 use maos_siem::SiemExporter;
 use maos_sso::{OidcAlgorithm, OidcVerifier};
 use rusqlite::OpenFlags;
@@ -167,6 +167,8 @@ pub struct EnterpriseRuntime {
     /// One export tick at a time: the consumer is the only production caller, but a
     /// second concurrent tick would race the cursor.
     siem_tick: std::sync::Mutex<()>,
+    /// Raised at shutdown: the running export stops at its next step.
+    siem_cancel: Arc<std::sync::atomic::AtomicBool>,
     /// Acknowledged batches so far (D-23-4-09 A).
     siem_delivery: tokio::sync::watch::Sender<u64>,
     boot_nonce: u64,
@@ -190,6 +192,7 @@ impl EnterpriseRuntime {
             #[cfg(feature = "online-adapters")]
             siem_network: None,
             siem_tick: std::sync::Mutex::new(()),
+            siem_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce: 0,
             kms_probe: None,
@@ -269,7 +272,17 @@ impl EnterpriseRuntime {
         {
             self.siem_network = siem.network();
         }
+        if let Some(db) = &self.audit_db_path {
+            remove_stale_snapshots(db);
+        }
         self
+    }
+
+    /// Ask a running export to stop at its next step (a bounded read slice, a batch boundary):
+    /// shutdown cannot interrupt a blocking thread, so the export looks for this flag itself.
+    pub fn cancel_siem_export(&self) {
+        self.siem_cancel
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Story 13.5a — port-injection constructor. The production `from_env`
@@ -299,6 +312,7 @@ impl EnterpriseRuntime {
             #[cfg(feature = "online-adapters")]
             siem_network: None,
             siem_tick: std::sync::Mutex::new(()),
+            siem_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce,
             kms_probe: None,
@@ -451,6 +465,7 @@ impl EnterpriseRuntime {
         let down = |reason: &'static str| EnterpriseFailure::SiemSinkDown {
             buffered: 0,
             reason,
+            notes: Vec::new(),
         };
         match self.config.siem {
             SubsystemState::Disabled => Ok(Tick::default()),
@@ -488,7 +503,20 @@ impl EnterpriseRuntime {
                         "siem-snapshot-{}-{sequence}.sqlite",
                         std::process::id()
                     ));
-                    let _ = std::fs::remove_file(&path);
+                    for suffix in ["", "-wal", "-shm"] {
+                        let mut sidecar = path.clone().into_os_string();
+                        sidecar.push(suffix);
+                        let _ = std::fs::remove_file(sidecar);
+                    }
+                    // The snapshot holds the whole redacted log: create it owner-only BEFORE
+                    // SQLite writes into it (`VACUUM INTO` accepts an existing empty file).
+                    let mut create = std::fs::OpenOptions::new();
+                    create.write(true).create_new(true);
+                    #[cfg(unix)]
+                    std::os::unix::fs::OpenOptionsExt::mode(&mut create, 0o600);
+                    if create.open(&path).is_err() {
+                        return Err(down("siem_source_unavailable"));
+                    }
                     let connection = rusqlite::Connection::open(db)
                         .map_err(|_| down("siem_source_unavailable"))?;
                     let path_text = path.to_string_lossy().into_owned();
@@ -504,10 +532,17 @@ impl EnterpriseRuntime {
 
                 let store = CursorStore::beside(db, &sink.identity());
                 let boot_nonce = self.boot_nonce;
-                let outcome = run_tick(&source_db, &store, sink.as_mut(), &|intent, payload| {
-                    append_siem_event(db, boot_nonce, intent, &payload)
-                        .map_err(|error| error.to_string())
-                });
+                sink.set_cancel(Arc::clone(&self.siem_cancel));
+                let outcome = run_tick_cancellable(
+                    &source_db,
+                    &store,
+                    sink.as_mut(),
+                    &|intent, payload| {
+                        append_siem_event(db, boot_nonce, intent, &payload)
+                            .map_err(|error| error.to_string())
+                    },
+                    &self.siem_cancel,
+                );
                 if let Some(path) = snapshot {
                     for suffix in ["", "-wal", "-shm"] {
                         let mut sidecar = path.clone().into_os_string();
@@ -523,9 +558,12 @@ impl EnterpriseRuntime {
                         }
                         Ok(tick)
                     }
-                    Err(error) => Err(EnterpriseFailure::SiemSinkDown {
-                        buffered: usize::try_from(error.buffered()).unwrap_or(usize::MAX),
-                        reason: error.code(),
+                    // The tick's completed work (a gap or reset it journaled before the sink
+                    // failed) travels with the error, so its typed line always prints.
+                    Err(failure) => Err(EnterpriseFailure::SiemSinkDown {
+                        buffered: usize::try_from(failure.buffered()).unwrap_or(usize::MAX),
+                        reason: failure.code(),
+                        notes: failure.tick.notes,
                     }),
                 }
             }
@@ -631,6 +669,8 @@ pub enum EnterpriseFailure {
     SiemSinkDown {
         buffered: usize,
         reason: &'static str,
+        /// Typed lines (gap, reset) the failed tick completed before it stopped.
+        notes: Vec<String>,
     },
 }
 
@@ -660,7 +700,12 @@ impl SiemReport {
                     ));
                 }
             }
-            Err(EnterpriseFailure::SiemSinkDown { buffered, reason }) => {
+            Err(EnterpriseFailure::SiemSinkDown {
+                buffered,
+                reason,
+                notes,
+            }) => {
+                lines.extend(notes.iter().map(|note| format!("maos: {note}")));
                 if self.last_failure != Some(reason) {
                     self.last_failure = Some(reason);
                     lines.push(format!(
@@ -672,6 +717,24 @@ impl SiemReport {
             Err(other) => lines.push(format!("maos: SIEM export failed: {other}")),
         }
         lines
+    }
+}
+
+/// Remove `siem-snapshot-*` files (and their `-wal`/`-shm`) a crashed export left beside the
+/// audit database. They hold a copy of the redacted log; the daemon removes them at boot, and
+/// `maos purge` names any that remain. Called once while the single exporter is being built.
+fn remove_stale_snapshots(db: &Path) {
+    let (Some(dir), Some(stem)) = (db.parent(), db.file_stem()) else {
+        return;
+    };
+    let prefix = format!("{}.siem-snapshot-", stem.to_string_lossy());
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        if entry.file_name().to_string_lossy().starts_with(&prefix) {
+            let _ = std::fs::remove_file(entry.path());
+        }
     }
 }
 
@@ -1637,6 +1700,23 @@ fn append_raw_row(
     // Plain INSERT (NOT `INSERT OR IGNORE`): a frame_id PK collision surfaces as
     // SQLITE_CONSTRAINT_PRIMARYKEY → AuditError::Query rather than being silently
     // swallowed (Story 11.4c "fail closed" requirement).
+    // The SIEM journal (`busy_wait` set) is idempotent: its payload is deterministic (sink
+    // hash, range or bad-cursor fingerprint), so a row with the same intent and payload is
+    // already the record of this transition and a retry after a cursor I/O failure, or a
+    // crash between this write and the cursor write, adds nothing.
+    if busy_wait.is_some() {
+        let present: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM transparency_log WHERE intent = ?1 \
+                 AND payload_redacted = ?2)",
+                rusqlite::params![intent, payload],
+                |row| row.get(0),
+            )
+            .map_err(AuditError::Read)?;
+        if present {
+            return Ok(());
+        }
+    }
     conn.execute(
         "INSERT INTO transparency_log \
          (frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, \
@@ -1768,6 +1848,7 @@ mod available_arm_tests {
             #[cfg(feature = "online-adapters")]
             siem_network: None,
             siem_tick: std::sync::Mutex::new(()),
+            siem_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             siem_delivery: tokio::sync::watch::channel(0).0,
             boot_nonce: 7,
             kms_probe: None,
@@ -1943,7 +2024,9 @@ mod available_arm_tests {
             Some(unwritable_sink),
         );
         match rt.forward_audit_to_siem() {
-            Err(EnterpriseFailure::SiemSinkDown { buffered, reason }) => {
+            Err(EnterpriseFailure::SiemSinkDown {
+                buffered, reason, ..
+            }) => {
                 assert_eq!(reason, "siem_sink_file_io");
                 assert_eq!(
                     buffered, 2,

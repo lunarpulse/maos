@@ -111,7 +111,7 @@ fn fault_inject_bypass_drops_redaction_provenance_so_a_leak_can_invert() {
 fn fault_inject_bypass_also_inverts_the_insertion_id_reader() {
     let (_dir, db_path) = seed_tl_with_secret();
     let rows = maos_audit::insertion::LogView::open(&db_path)
-        .and_then(|view| view.read_after(0, 10))
+        .and_then(|view| view.read_after(0, 10, usize::MAX))
         .expect("the cursor reader must read a real, quiesced TL");
     assert!(!rows.is_empty(), "the seeded TL row must be read");
     assert!(

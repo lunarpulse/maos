@@ -663,11 +663,43 @@ pub fn open_log_sources(db_path: &Path) -> Result<Vec<Connection>, crate::AuditE
     open_sources(db_path, true)
 }
 
+/// As [`open_log_sources`], but every source is opened `immutable=1`: SQLite never touches a
+/// `-wal`/`-shm` sidecar, so a read leaves nothing beside a quiesced or snapshot database.
+/// Only valid when nothing writes the files while they are read (a checkpointed snapshot).
+pub fn open_log_sources_immutable(db_path: &Path) -> Result<Vec<Connection>, crate::AuditError> {
+    open_sources_with(db_path, true, true)
+}
+
 fn open_sources(db_path: &Path, strict: bool) -> Result<Vec<Connection>, crate::AuditError> {
+    open_sources_with(db_path, strict, false)
+}
+
+fn open_ro(path: &Path, immutable: bool) -> rusqlite::Result<Connection> {
     let flags = OpenFlags::SQLITE_OPEN_READ_ONLY
         | OpenFlags::SQLITE_OPEN_NO_MUTEX
         | OpenFlags::SQLITE_OPEN_NOFOLLOW;
-    let live = Connection::open_with_flags(db_path, flags).map_err(crate::AuditError::Open)?;
+    if !immutable {
+        return Connection::open_with_flags(path, flags);
+    }
+    let mut uri = String::from("file:");
+    for byte in path.to_string_lossy().bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'/' | b'-' | b'_' | b'.' | b'~' => {
+                uri.push(byte as char)
+            }
+            other => uri.push_str(&format!("%{other:02X}")),
+        }
+    }
+    uri.push_str("?immutable=1");
+    Connection::open_with_flags(uri, flags | OpenFlags::SQLITE_OPEN_URI)
+}
+
+fn open_sources_with(
+    db_path: &Path,
+    strict: bool,
+    immutable: bool,
+) -> Result<Vec<Connection>, crate::AuditError> {
+    let live = open_ro(db_path, immutable).map_err(crate::AuditError::Open)?;
     let registered: bool = live
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' \
@@ -693,7 +725,7 @@ fn open_sources(db_path: &Path, strict: bool) -> Result<Vec<Connection>, crate::
             .join("segments");
         for seq in seqs {
             let path = dir.join(format!("{seq:010}.sqlite"));
-            match Connection::open_with_flags(&path, flags) {
+            match open_ro(&path, immutable) {
                 Ok(conn) => sources.push(conn),
                 Err(_) if !strict => {}
                 Err(error) => {

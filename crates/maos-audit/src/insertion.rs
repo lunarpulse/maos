@@ -5,9 +5,9 @@
 //! it orders the merged view (sealed segments, then the live file) where a timestamp does
 //! not. Rows come out through the same redaction mapper as
 //! [`crate::query_with_redaction`]. Like it, [`LogView::open`] refuses a database with an
-//! active WAL (ADR-028 D6), so a caller passes a quiesced copy or snapshot; it checks once,
-//! because the read-only opens that follow may themselves leave a `-wal` file beside a
-//! WAL-mode database.
+//! active WAL (ADR-028 D6), so a caller passes a quiesced copy or snapshot. Every source is then
+//! opened `immutable=1`, so reading never creates a `-wal`/`-shm` sidecar that would make the
+//! original database look un-quiesced to the next reader.
 
 #[cfg(all(feature = "siem-fault-inject", not(debug_assertions)))]
 compile_error!("siem-fault-inject is dev/CI-only and MUST NOT ship in release builds");
@@ -42,10 +42,21 @@ pub struct ExpiredRange {
     pub last_rowid: i64,
 }
 
+/// Fixed per-row allowance added to a row's stored bytes when planning a batch against a byte
+/// bound (the RFC 5424/CEF envelope around the payload).
+const ROW_OVERHEAD_BYTES: usize = 600;
+
 /// Every readable source of one quiesced Transparency Log, opened once: the unexpired sealed
 /// segments, then the live file (last).
 pub struct LogView {
     sources: Vec<Connection>,
+}
+
+struct Meta {
+    id: i64,
+    frame: Vec<u8>,
+    bytes: usize,
+    source: usize,
 }
 
 impl LogView {
@@ -57,44 +68,100 @@ impl LogView {
     pub fn open(db_path: &Path) -> Result<Self, AuditError> {
         crate::refuse_active_wal(db_path)?;
         Ok(Self {
-            sources: segment::open_log_sources(db_path)?,
+            sources: segment::open_log_sources_immutable(db_path)?,
         })
     }
 
-    /// The sanctioned, redaction-applying read: up to `limit` rows with `insertion_id > after`,
-    /// in insertion-id order across every source.
+    /// The sanctioned, redaction-applying read: rows with `insertion_id > after`, in
+    /// insertion-id order across every source, at most `max_rows` of them and, once the first
+    /// row is taken, no more than about `max_bytes` of stored payload (each row also counts a
+    /// fixed envelope allowance). A single row larger than `max_bytes` is returned alone: a
+    /// log row cannot be split. Only the chosen rows are materialised, so memory is bounded by
+    /// the batch, never by the number of sources or the size of the backlog.
     ///
     /// # Errors
-    /// A read failure of any source.
-    pub fn read_after(&self, after: i64, limit: usize) -> Result<Vec<InsertionRow>, AuditError> {
-        let limit_sql = i64::try_from(limit).map_err(|_| AuditError::ValueOverflow {
+    /// A read failure of any source, or two sources holding the same insertion id under
+    /// different `frame_id`s (a corrupt or tampered set of segments).
+    pub fn read_after(
+        &self,
+        after: i64,
+        max_rows: usize,
+        max_bytes: usize,
+    ) -> Result<Vec<InsertionRow>, AuditError> {
+        let limit_sql = i64::try_from(max_rows).map_err(|_| AuditError::ValueOverflow {
             field: "limit",
-            value: limit as u64,
+            value: max_rows as u64,
         })?;
-        let mut rows = Vec::new();
-        for conn in &self.sources {
+        // Pass 1: ids, frame ids and sizes only (cheap), merged in insertion order.
+        let mut metas: Vec<Meta> = Vec::new();
+        for (source, conn) in self.sources.iter().enumerate() {
             let mut statement = conn
                 .prepare(
-                    "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, \
-                     kind, intent, payload_redacted, rowid FROM transparency_log \
-                     WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
+                    "SELECT rowid, frame_id, length(payload_redacted) + length(intent) \
+                     FROM transparency_log WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
                 )
                 .map_err(AuditError::Read)?;
             let mapped = statement
                 .query_map([after, limit_sql], |row| {
+                    Ok(Meta {
+                        id: row.get(0)?,
+                        frame: row.get(1)?,
+                        bytes: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(usize::MAX),
+                        source,
+                    })
+                })
+                .map_err(AuditError::Read)?;
+            for meta in mapped {
+                metas.push(meta.map_err(AuditError::Read)?);
+            }
+        }
+        metas.sort_by_key(|meta| meta.id);
+        let mut merged: Vec<Meta> = Vec::with_capacity(metas.len());
+        for meta in metas {
+            match merged.last() {
+                Some(previous) if previous.id == meta.id => {
+                    if previous.frame != meta.frame {
+                        return Err(AuditError::Row(format!(
+                            "insertion id {} is held by two different frames",
+                            meta.id
+                        )));
+                    }
+                }
+                _ => merged.push(meta),
+            }
+        }
+        let mut chosen = Vec::new();
+        let mut planned = 0_usize;
+        for meta in merged {
+            let cost = meta.bytes.saturating_add(ROW_OVERHEAD_BYTES);
+            if !chosen.is_empty() && planned.saturating_add(cost) > max_bytes {
+                break;
+            }
+            planned = planned.saturating_add(cost);
+            chosen.push(meta);
+            if chosen.len() >= max_rows {
+                break;
+            }
+        }
+        // Pass 2: only the chosen rows, in full.
+        let mut rows = Vec::with_capacity(chosen.len());
+        for meta in chosen {
+            let mut statement = self.sources[meta.source]
+                .prepare_cached(
+                    "SELECT frame_id, timestamp_ns, spirit_pid, boot_nonce, capability_token, \
+                     kind, intent, payload_redacted, rowid FROM transparency_log WHERE rowid = ?1",
+                )
+                .map_err(AuditError::Read)?;
+            let row = statement
+                .query_row([meta.id], |row| {
                     Ok(InsertionRow {
                         entry: sanctioned_entry(row)?,
                         insertion_id: row.get(8)?,
                     })
                 })
                 .map_err(AuditError::Read)?;
-            for row in mapped {
-                rows.push(row.map_err(AuditError::Read)?);
-            }
+            rows.push(row);
         }
-        rows.sort_by_key(|row| row.insertion_id);
-        rows.dedup_by_key(|row| row.insertion_id);
-        rows.truncate(limit);
         Ok(rows)
     }
 
@@ -153,17 +220,32 @@ impl LogView {
         })
     }
 
-    /// Expired segments whose ids reach beyond `after`, oldest first (D-23-4-06 A: the rows
-    /// are gone, so the exporter journals a gap rather than pretending they were delivered).
+    /// Expired segments whose ids reach beyond `after`, in insertion order (D-23-4-06 A: the
+    /// rows are gone, so the exporter journals a gap rather than pretending they were
+    /// delivered). Expiry need not remove a prefix: a legal hold can keep an older segment.
     ///
     /// # Errors
     /// A read failure of the live file's registry.
     pub fn expired_ranges_after(&self, after: i64) -> Result<Vec<ExpiredRange>, AuditError> {
-        Ok(self
+        let mut ranges: Vec<ExpiredRange> = self
             .registry(true)?
             .into_iter()
             .filter(|range| range.last_rowid > after)
-            .collect())
+            .collect();
+        ranges.sort_by_key(|range| (range.first_rowid, range.seq));
+        Ok(ranges)
+    }
+
+    /// Whether some CURRENTLY expired segment ends exactly at `insertion_id` (the evidence
+    /// behind a cursor the exporter parked after a gap).
+    ///
+    /// # Errors
+    /// A read failure of the live file's registry.
+    pub fn expired_segment_ends_at(&self, insertion_id: i64) -> Result<bool, AuditError> {
+        Ok(self
+            .registry(true)?
+            .iter()
+            .any(|range| range.last_rowid == insertion_id))
     }
 
     /// The segment registry lives in the live file, the last source.

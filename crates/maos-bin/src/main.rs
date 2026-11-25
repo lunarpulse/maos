@@ -245,7 +245,12 @@ fn spawn_siem_export_consumer(
                 tokio::task::spawn_blocking(move || runtime.forward_audit_to_siem())
             };
             let outcome = tokio::select! {
-                _ = cancel.cancelled() => break,
+                _ = cancel.cancelled() => {
+                    // A running blocking export cannot be dropped: raise its flag; it stops at
+                    // its next read slice or batch boundary.
+                    runtime.cancel_siem_export();
+                    break;
+                }
                 outcome = export => outcome,
             };
             match outcome {
@@ -3956,20 +3961,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Story 23-4 (D-23-4-11 A) — settle the optional mTLS client key of the SIEM sink now
-    // that a secret store exists. Same source rule as the KMS bearer (the encrypted-file
-    // store cannot unlock itself without the KMS). With a client certificate configured a
+    // that a secret store exists. Read through the configured store, whatever the backend.
+    // With a client certificate configured a
     // missing, unparsable or foreign key is a boot refusal; until this runs the network
     // sink sends nothing. The key is never printed.
     if let Some(siem) = configured_siem
         .as_ref()
         .filter(|siem| siem.needs_client_key())
     {
-        let key_source: &dyn maos_domain::ports::SecretStore =
-            if matches!(secret_backend, maos_secrets::Backend::EncryptedFile) {
-                env_secrets.as_ref()
-            } else {
-                secret_store.as_ref()
-            };
+        // Unlike the KMS bearer, the client key has no bootstrap dependency: the bearer above
+        // is already settled, so the configured store (keyring, env, or the sealed
+        // encrypted-file vault) is readable here and is the one source.
+        let key_source: &dyn maos_domain::ports::SecretStore = secret_store.as_ref();
         let key = match key_source.get(maos_domain::ports::SecretKey::SiemClientKey) {
             Ok(key) => key,
             Err(error) => {
@@ -18005,25 +18008,48 @@ mod story_13_5a_enterprise_daemon_seam {
 
         if matches!(wiring, TestWiring::Full) {
             // Story 23-4 (D-23-4-09 A): the request path only nudges the export consumer.
-            // Wait for the consumer's acknowledged-batch event (a watch counter, no sleep;
-            // the 30 s bound is a deadline, not an expectation) before reading the sink.
+            // The witness is the GOVERNED row itself: wait (on the consumer's delivery
+            // counter, no sleep; 30 s is a deadline, not an expectation) until the sink holds
+            // a line whose CEF `externalId` is that row's frame id. An earlier batch that
+            // carried only `identity.asserted` rows does not satisfy it.
+            let governed = maos_audit::query(
+                &fixture.audit_db,
+                maos_audit::AuditFilter {
+                    intent_contains: Some("cohort:digest-read-governed".to_string()),
+                    ..Default::default()
+                },
+            )
+            .map_err(|error| format!("query governed row: {error}"))?;
+            let needle = format!(
+                " externalId={} ",
+                governed
+                    .first()
+                    .ok_or("the governed collective read journaled no row")?
+                    .frame_id_hex
+            );
             let mut delivered = runtime
                 .as_ref()
                 .expect("full wiring builds a runtime")
                 .siem_delivery_events();
+            let sink_path = fixture.siem_sink.clone();
             tokio::time::timeout(std::time::Duration::from_secs(30), async {
-                while *delivered.borrow_and_update() == 0 {
+                loop {
+                    let sink = std::fs::read_to_string(&sink_path).unwrap_or_default();
+                    if sink.contains(&needle) {
+                        break;
+                    }
                     if delivered.changed().await.is_err() {
                         break;
                     }
                 }
             })
             .await
-            .map_err(|_| "the SIEM export consumer never acknowledged a batch".to_string())?;
+            .map_err(|_| "the governed row never reached the SIEM sink".to_string())?;
             let sink = std::fs::read_to_string(&fixture.siem_sink).unwrap_or_default();
-            if sink.trim().is_empty() {
+            if !sink.contains(&needle) {
                 return Err(
-                    "the live daemon lifecycle did not forward governed rows to SIEM".to_string(),
+                    "the live daemon lifecycle did not forward the governed row to SIEM"
+                        .to_string(),
                 );
             }
         }

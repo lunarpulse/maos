@@ -10,10 +10,12 @@
 
 use std::io::Write;
 use std::net::{IpAddr, SocketAddr, TcpStream};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use maos_domain::outbound::{OutboundPolicy, ResolveHost};
+use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use rustls::{ClientConfig, ClientConnection, RootCertStore};
 
@@ -83,7 +85,7 @@ pub fn client_config(
 ) -> Result<Arc<ClientConfig>, SetupError> {
     let mut roots = RootCertStore::empty();
     let mut anchors = 0_usize;
-    for cert in rustls_pemfile::certs(&mut &*ca_pem) {
+    for cert in CertificateDer::pem_slice_iter(ca_pem) {
         let cert = cert.map_err(|_| SetupError::CaInvalid)?;
         roots.add(cert).map_err(|_| SetupError::CaInvalid)?;
         anchors += 1;
@@ -99,16 +101,14 @@ pub fn client_config(
     let config = match client {
         None => builder.with_no_client_auth(),
         Some((cert_pem, key_pem)) => {
-            let chain: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut &*cert_pem)
+            let chain: Vec<CertificateDer<'static>> = CertificateDer::pem_slice_iter(cert_pem)
                 .collect::<Result<_, _>>()
                 .map_err(|_| SetupError::ClientCertInvalid)?;
             if chain.is_empty() {
                 return Err(SetupError::ClientCertInvalid);
             }
-            let key: PrivateKeyDer<'static> = rustls_pemfile::private_key(&mut &*key_pem)
-                .ok()
-                .flatten()
-                .ok_or(SetupError::ClientKeyInvalid)?;
+            let key: PrivateKeyDer<'static> =
+                PrivateKeyDer::from_pem_slice(key_pem).map_err(|_| SetupError::ClientKeyInvalid)?;
             builder
                 .with_client_auth_cert(chain, key)
                 .map_err(|_| SetupError::ClientKeyInvalid)?
@@ -125,6 +125,7 @@ pub struct TlsSink {
     policy: OutboundPolicy,
     resolver: Arc<dyn ResolveHost>,
     timeouts: Timeouts,
+    cancel: Option<Arc<AtomicBool>>,
 }
 
 impl std::fmt::Debug for TlsSink {
@@ -159,9 +160,17 @@ impl TlsSink {
             policy,
             resolver,
             timeouts,
+            cancel: None,
         }
     }
-
+    fn check_cancel(&self) -> Result<(), SinkFailure> {
+        match &self.cancel {
+            Some(flag) if flag.load(Ordering::SeqCst) => {
+                Err(SinkFailure::new("siem_export_cancelled"))
+            }
+            _ => Ok(()),
+        }
+    }
     fn connect(&self, addresses: &[IpAddr]) -> Result<TcpStream, SinkFailure> {
         let deadline = Instant::now() + self.timeouts.connect;
         let mut refused = SinkFailure::new("siem_sink_connect_failed");
@@ -188,7 +197,12 @@ impl BatchSink for TlsSink {
         }
     }
 
+    fn set_cancel(&mut self, cancel: Arc<AtomicBool>) {
+        self.cancel = Some(cancel);
+    }
+
     fn deliver(&mut self, frames: &[Frame]) -> Result<(), SinkFailure> {
+        self.check_cancel()?;
         // One resolution per connection; the connection goes only to what it vetted.
         let addresses = self
             .policy
@@ -201,17 +215,33 @@ impl BatchSink for TlsSink {
         let mut tls = ClientConnection::new(Arc::clone(&self.config), name)
             .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
 
+        // The handshake is driven one record at a time: the deadline and the shutdown flag are
+        // re-checked on every step, so a peer that sends a byte now and then cannot stretch it.
         let handshake = Instant::now() + self.timeouts.handshake;
         while tls.is_handshaking() {
+            self.check_cancel()?;
             arm(&tcp, handshake)?;
-            tls.complete_io(&mut tcp)
-                .map_err(|error| classify(&error, "siem_sink_io"))?;
+            if tls.wants_write() {
+                tls.write_tls(&mut tcp)
+                    .map_err(|error| classify(&error, "siem_sink_io"))?;
+                continue;
+            }
+            match tls.read_tls(&mut tcp) {
+                Ok(0) => return Err(SinkFailure::new("siem_sink_io")),
+                Ok(_) => {
+                    tls.process_new_packets()
+                        .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+                }
+                Err(error) if is_timeout(&error) => {}
+                Err(error) => return Err(classify(&error, "siem_sink_io")),
+            }
         }
 
         let write = Instant::now() + self.timeouts.write;
         let payload = octet_counted(frames);
         let mut sent = 0;
         while sent < payload.len() {
+            self.check_cancel()?;
             let accepted = tls
                 .writer()
                 .write(&payload[sent..])
@@ -219,6 +249,13 @@ impl BatchSink for TlsSink {
             sent += accepted;
             flush(&mut tls, &mut tcp, write)?;
         }
+
+        // A collector that closed first (its close_notify is already here) did not read this
+        // batch through OUR close: counting that close_notify as the acknowledgement would
+        // advance the cursor past rows it never saw. Look before we send ours. Residual
+        // (RFC 5425 gives no way around it): a close_notify that crosses ours on the wire is
+        // indistinguishable from the acknowledgement.
+        early_close_check(&mut tls, &mut tcp)?;
         tls.send_close_notify();
         flush(&mut tls, &mut tcp, write)?;
 
@@ -227,14 +264,12 @@ impl BatchSink for TlsSink {
         loop {
             if tls
                 .process_new_packets()
-                .map_err(|error| {
-                    let _ = error;
-                    SinkFailure::new("siem_sink_tls_refused")
-                })?
+                .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?
                 .peer_has_closed()
             {
                 return Ok(());
             }
+            self.check_cancel()?;
             if arm(&tcp, close).is_err() {
                 return Err(SinkFailure::new("siem_sink_no_close_notify"));
             }
@@ -242,10 +277,45 @@ impl BatchSink for TlsSink {
                 // The peer closed the TCP stream without a close_notify.
                 Ok(0) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
                 Ok(_) => {}
+                Err(error) if is_timeout(&error) => {}
                 Err(_) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
             }
         }
     }
+}
+
+/// Drain whatever the peer already sent, without blocking. `Err` when it already closed.
+fn early_close_check(tls: &mut ClientConnection, tcp: &mut TcpStream) -> Result<(), SinkFailure> {
+    tcp.set_nonblocking(true)
+        .map_err(|_| SinkFailure::new("siem_sink_io"))?;
+    // A close_notify read together with the last handshake flight is already processed: ask
+    // the connection before reading more.
+    let pending = tls
+        .process_new_packets()
+        .map_err(|_| SinkFailure::new("siem_sink_tls_refused"));
+    if !matches!(&pending, Ok(state) if !state.peer_has_closed()) {
+        let _ = tcp.set_nonblocking(false);
+        return Err(pending
+            .err()
+            .unwrap_or(SinkFailure::new("siem_sink_no_close_notify")));
+    }
+    let outcome = (|| loop {
+        match tls.read_tls(tcp) {
+            Ok(0) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+            Ok(_) => {
+                let state = tls
+                    .process_new_packets()
+                    .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+                if state.peer_has_closed() {
+                    return Err(SinkFailure::new("siem_sink_no_close_notify"));
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
+            Err(_) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+        }
+    })();
+    let _ = tcp.set_nonblocking(false);
+    outcome
 }
 
 /// RFC 5425 §4.3: `MSG-LEN SP SYSLOG-MSG`, MSG-LEN in octets.
@@ -278,10 +348,14 @@ fn remaining(deadline: Instant) -> Option<Duration> {
         .filter(|left| !left.is_zero())
 }
 
-/// Bound the next socket operation by what is left of the phase.
+/// Longest a single socket read blocks. Reads wake at least this often, so every phase
+/// re-checks its deadline and the shutdown flag on EVERY step, however slowly a peer trickles.
+const SLICE: Duration = Duration::from_millis(250);
+
+/// Bound the next socket operation by what is left of the phase (reads by one [`SLICE`]).
 fn arm(tcp: &TcpStream, deadline: Instant) -> Result<(), SinkFailure> {
     let left = remaining(deadline).ok_or(SinkFailure::new("siem_sink_timeout"))?;
-    tcp.set_read_timeout(Some(left))
+    tcp.set_read_timeout(Some(left.min(SLICE)))
         .and_then(|()| tcp.set_write_timeout(Some(left)))
         .map_err(|_| SinkFailure::new("siem_sink_io"))
 }

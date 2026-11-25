@@ -119,6 +119,8 @@ pub enum Mode {
     CloseWithoutNotify,
     /// Accept the TCP connection and do nothing until the handshake gate opens.
     HoldHandshake,
+    /// Complete the handshake, send `close_notify` and close the TCP stream at once.
+    CloseFirst,
 }
 
 /// What one connection ended in.
@@ -314,11 +316,24 @@ fn serve(
             conn.reader().read_exact(&mut chunk).expect("plaintext");
             bytes.extend_from_slice(&chunk);
         }
+        if mode == Mode::CloseFirst && !conn.is_handshaking() {
+            conn.send_close_notify();
+        }
         while conn.wants_write() {
             if conn.write_tls(&mut tcp).is_err() {
                 let _ = events.send(Event::Unacked { bytes });
                 return;
             }
+        }
+        if mode == Mode::CloseFirst && !conn.is_handshaking() {
+            // The collector closes first: its close_notify and the FIN leave with the last
+            // handshake flight, before it has read (or been sent a close for) the batch. It
+            // then keeps draining the client's bytes so the close is not a reset.
+            let _ = tcp.shutdown(std::net::Shutdown::Write);
+            let mut sink = [0_u8; 4096];
+            while matches!(std::io::Read::read(&mut tcp, &mut sink), Ok(n) if n > 0) {}
+            let _ = events.send(Event::Unacked { bytes });
+            return;
         }
         if state.peer_has_closed() {
             break;

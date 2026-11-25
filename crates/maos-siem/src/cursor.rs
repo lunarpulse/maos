@@ -45,6 +45,9 @@ pub enum ResetReason {
     AnchorMismatch,
     /// The cursor is beyond every insertion id the log has (a restored or replaced log).
     AheadOfLog,
+    /// The cursor was parked after a gap (no `frame_id`) but no currently expired segment ends
+    /// at it: the registry was restored, so the evidence for the gap no longer holds.
+    GapEvidenceLost,
 }
 
 impl ResetReason {
@@ -57,6 +60,7 @@ impl ResetReason {
             Self::SinkChanged => "siem_cursor_sink_changed",
             Self::AnchorMismatch => "siem_cursor_mismatch",
             Self::AheadOfLog => "siem_cursor_ahead_of_log",
+            Self::GapEvidenceLost => "siem_cursor_gap_evidence_lost",
         }
     }
 }
@@ -68,6 +72,8 @@ pub enum Loaded {
     Absent,
     Valid(Cursor),
     Rejected(ResetReason),
+    /// The file exists but could not be read for a reason that is not its content.
+    Io(std::io::ErrorKind),
 }
 
 /// The cursor file of one sink.
@@ -101,13 +107,31 @@ impl CursorStore {
         &self.path
     }
 
+    /// The sink-identity hash stored in the file.
+    #[must_use]
+    pub fn sink_hash(&self) -> &str {
+        &self.sink_hash
+    }
+
+    /// Short stable fingerprint of the cursor file's current bytes (`"none"` when it cannot
+    /// be read): the identity of a bad cursor, so a reset is journaled once per bad file.
+    #[must_use]
+    pub fn fingerprint(&self) -> String {
+        match std::fs::read(&self.path) {
+            Ok(bytes) => hex::encode(&Sha256::digest(&bytes)[..8]),
+            Err(_) => "none".to_owned(),
+        }
+    }
+
     /// Read the file. A stray `.tmp` is never read.
     #[must_use]
     pub fn load(&self) -> Loaded {
         let bytes = match std::fs::read(&self.path) {
             Ok(bytes) => bytes,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Loaded::Absent,
-            Err(_) => return Loaded::Rejected(ResetReason::Unreadable),
+            // A transient or environmental failure (EMFILE, EIO, a permission change) says
+            // nothing about the cursor's content: keep it, fail the tick.
+            Err(error) => return Loaded::Io(error.kind()),
         };
         let Ok(file) = serde_json::from_slice::<CursorFile>(&bytes) else {
             return Loaded::Rejected(ResetReason::Unreadable);
