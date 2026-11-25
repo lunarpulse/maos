@@ -255,7 +255,7 @@ impl BatchSink for TlsSink {
         // advance the cursor past rows it never saw. Look before we send ours. Residual
         // (RFC 5425 gives no way around it): a close_notify that crosses ours on the wire is
         // indistinguishable from the acknowledgement.
-        early_close_check(&mut tls, &mut tcp)?;
+        early_close_check(&mut tls, &mut tcp, write, &|| self.check_cancel().is_err())?;
         tls.send_close_notify();
         flush(&mut tls, &mut tcp, write)?;
 
@@ -285,7 +285,15 @@ impl BatchSink for TlsSink {
 }
 
 /// Drain whatever the peer already sent, without blocking. `Err` when it already closed.
-fn early_close_check(tls: &mut ClientConnection, tcp: &mut TcpStream) -> Result<(), SinkFailure> {
+/// Most reads the pre-close look takes before it stops looking.
+const MAX_DRAIN_READS: usize = 64;
+
+fn early_close_check(
+    tls: &mut ClientConnection,
+    tcp: &mut TcpStream,
+    deadline: Instant,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<(), SinkFailure> {
     tcp.set_nonblocking(true)
         .map_err(|_| SinkFailure::new("siem_sink_io"))?;
     // A close_notify read together with the last handshake flight is already processed: ask
@@ -299,20 +307,33 @@ fn early_close_check(tls: &mut ClientConnection, tcp: &mut TcpStream) -> Result<
             .err()
             .unwrap_or(SinkFailure::new("siem_sink_no_close_notify")));
     }
-    let outcome = (|| loop {
-        match tls.read_tls(tcp) {
-            Ok(0) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
-            Ok(_) => {
-                let state = tls
-                    .process_new_packets()
-                    .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
-                if state.peer_has_closed() {
-                    return Err(SinkFailure::new("siem_sink_no_close_notify"));
-                }
+    // Bounded: a collector that keeps valid post-handshake records coming (TLS 1.3 session
+    // tickets have no receive-count cutoff) must neither hold the export past its write
+    // deadline nor ignore shutdown, so the deadline and the flag are looked at on EVERY
+    // iteration and at most `MAX_DRAIN_READS` reads are taken.
+    let outcome = (|| {
+        for _ in 0..MAX_DRAIN_READS {
+            if cancelled() {
+                return Err(SinkFailure::new("siem_export_cancelled"));
             }
-            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
-            Err(_) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+            if remaining(deadline).is_none() {
+                return Err(SinkFailure::new("siem_sink_timeout"));
+            }
+            match tls.read_tls(tcp) {
+                Ok(0) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+                Ok(_) => {
+                    let state = tls
+                        .process_new_packets()
+                        .map_err(|_| SinkFailure::new("siem_sink_tls_refused"))?;
+                    if state.peer_has_closed() {
+                        return Err(SinkFailure::new("siem_sink_no_close_notify"));
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => return Ok(()),
+                Err(_) => return Err(SinkFailure::new("siem_sink_no_close_notify")),
+            }
         }
+        Ok(())
     })();
     let _ = tcp.set_nonblocking(false);
     outcome

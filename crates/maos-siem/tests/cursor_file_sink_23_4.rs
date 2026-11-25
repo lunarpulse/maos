@@ -322,3 +322,110 @@ fn a_partial_tail_is_cut_back_before_the_retry_appends() {
     assert_eq!(text.lines().count(), 3);
     assert!(text.ends_with('\n'));
 }
+
+// ── review round 2 ───────────────────────────────────────────────────────────
+
+impl Rig {
+    /// One tick with a caller-owned sink (so its in-memory state survives between ticks).
+    fn tick_using(&self, sink: &mut FileSink) -> Result<Tick, TickFailure> {
+        let store = CursorStore::beside(&self.db, &sink.identity());
+        let snapshot = self.db.with_file_name("snap2.sqlite");
+        for suffix in ["", "-wal", "-shm"] {
+            let _ = std::fs::remove_file(format!("{}{suffix}", snapshot.display()));
+        }
+        raw(&self.db)
+            .execute("VACUUM INTO ?1", [snapshot.to_string_lossy().as_ref()])
+            .expect("snapshot");
+        let result = run_tick(&snapshot, &store, sink, &|_, _| Ok(()));
+        let _ = std::fs::remove_file(&snapshot);
+        result
+    }
+}
+
+/// R2-2: a service with write but no read permission on its SIEM file (the old daemon opened
+/// it append-only) keeps exporting: tail recovery is best-effort and never gates the append.
+#[cfg(unix)]
+#[test]
+fn a_write_only_sink_file_still_receives_batches() {
+    use std::os::unix::fs::PermissionsExt;
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    std::fs::write(&rig.sink_path, "").unwrap();
+    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o200)).unwrap();
+    assert!(
+        std::fs::File::open(&rig.sink_path).is_err(),
+        "the file is write-only for us"
+    );
+    assert_eq!(rig.tick().unwrap().delivered, 2);
+    seed(&rig.db, 1);
+    assert_eq!(rig.tick().unwrap().delivered, 1);
+    std::fs::set_permissions(&rig.sink_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(rig.lines(), 3);
+}
+
+/// R2-3: the directory sync is retried until it has succeeded once; the cursor must not
+/// advance on the attempt where it failed, even though the file now exists.
+#[test]
+fn a_failed_directory_sync_is_retried_and_the_cursor_waits_for_it() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let rig = Rig::new();
+    seed(&rig.db, 2);
+    let attempts = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&attempts);
+    let mut sink = rig.sink().with_dir_sync(Arc::new(move |_| {
+        if counter.fetch_add(1, Ordering::SeqCst) == 0 {
+            Err(std::io::Error::other("injected dir sync failure"))
+        } else {
+            Ok(())
+        }
+    }));
+    let cursor = rig.db.with_file_name("siem-cursor.json");
+    let failure = rig.tick_using(&mut sink).expect_err("first dir sync fails");
+    assert_eq!(failure.code(), "siem_sink_file_io");
+    assert!(rig.sink_path.exists(), "the file exists now");
+    assert!(!cursor.exists(), "the cursor did not advance");
+    assert_eq!(
+        rig.tick_using(&mut sink).unwrap().delivered,
+        2,
+        "the batch is re-sent"
+    );
+    assert!(cursor.exists());
+    assert_eq!(
+        attempts.load(Ordering::SeqCst),
+        2,
+        "synced once it succeeded, not again"
+    );
+}
+
+/// R2-7: a frame that is over 1 MiB ON THE WIRE (the batch bound) is sent alone, and the row
+/// after it follows in the next batch: the batch boundaries differ from a full read's (a
+/// 600-byte per-row allowance and CEF escape expansion), the row ORDER never does.
+#[test]
+fn a_frame_over_one_mebibyte_is_sent_alone_and_the_next_row_follows() {
+    let rig = Rig::new();
+    seed(&rig.db, 1);
+    let big = vec![b'a'; (1 << 20) + 4096];
+    let connection = raw(&rig.db);
+    for (n, payload) in [(1_i64, big.as_slice()), (2, b"after".as_slice())] {
+        connection
+            .execute(
+                "INSERT INTO transparency_log (frame_id, timestamp_ns, spirit_pid, boot_nonce, \
+                 kind, intent, payload_redacted, origin) VALUES (randomblob(16), ?1, 1, 1, 4, 'big', ?2, 0)",
+                rusqlite::params![n, payload],
+            )
+            .unwrap();
+    }
+    drop(connection);
+    let tick = rig.tick().unwrap();
+    assert_eq!(tick.delivered, 3);
+    assert_eq!(
+        tick.batches, 3,
+        "the small row, the big frame alone, the row after it"
+    );
+    assert_eq!(rig.lines(), 3);
+    let text = std::fs::read_to_string(&rig.sink_path).unwrap();
+    assert!(
+        text.lines().nth(1).unwrap().len() > (1 << 20),
+        "the big line is over 1 MiB"
+    );
+}

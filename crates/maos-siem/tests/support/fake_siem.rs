@@ -7,7 +7,7 @@
 #![allow(dead_code)]
 
 use std::collections::HashSet;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -66,9 +66,21 @@ impl Ca {
         self.leaf(name, ExtendedKeyUsagePurpose::ClientAuth)
     }
 
+    /// A server certificate with many extra SAN names: its handshake flight is several kB,
+    /// so a relay that hands it over one byte at a time takes measurably long.
+    pub fn server_padded(&self, name: &str) -> Leaf {
+        let mut names = vec![name.to_string()];
+        names.extend((0..300).map(|i| format!("padding-name-{i:04}.example.test")));
+        self.leaf_named(names, ExtendedKeyUsagePurpose::ServerAuth)
+    }
+
     fn leaf(&self, name: &str, usage: ExtendedKeyUsagePurpose) -> Leaf {
+        self.leaf_named(vec![name.to_string()], usage)
+    }
+
+    fn leaf_named(&self, names: Vec<String>, usage: ExtendedKeyUsagePurpose) -> Leaf {
         let key = KeyPair::generate().expect("leaf key");
-        let mut params = CertificateParams::new(vec![name.to_string()]).expect("leaf params");
+        let mut params = CertificateParams::new(names).expect("leaf params");
         params.extended_key_usages = vec![usage];
         let cert = params
             .signed_by(&key, &self.cert, &self.key)
@@ -121,6 +133,10 @@ pub enum Mode {
     HoldHandshake,
     /// Complete the handshake, send `close_notify` and close the TCP stream at once.
     CloseFirst,
+    /// After the handshake keep sending valid application records until the client leaves.
+    Flood,
+    /// Read and acknowledge normally but report no bytes (the collector did not keep them).
+    DiscardThenAck,
 }
 
 /// What one connection ended in.
@@ -316,6 +332,17 @@ fn serve(
             conn.reader().read_exact(&mut chunk).expect("plaintext");
             bytes.extend_from_slice(&chunk);
         }
+        if mode == Mode::Flood && !conn.is_handshaking() {
+            // KeyUpdate records leave no plaintext behind, so the client's receive buffer
+            // never fills: only the deadline and the cap can end the pre-close look.
+            loop {
+                if conn.refresh_traffic_keys().is_err() || conn.write_tls(&mut tcp).is_err() {
+                    break;
+                }
+            }
+            let _ = events.send(Event::Unacked { bytes });
+            return;
+        }
         if mode == Mode::CloseFirst && !conn.is_handshaking() {
             conn.send_close_notify();
         }
@@ -342,6 +369,11 @@ fn serve(
     if mode == Mode::CloseWithoutNotify {
         let _ = events.send(Event::Unacked { bytes });
         return;
+    }
+    if mode == Mode::DiscardThenAck {
+        // A collector that closes properly without having kept the batch: from the TLS layer
+        // this is indistinguishable from an acknowledgement (RFC 5425 has no application ack).
+        bytes.clear();
     }
     ack.wait();
     let version = conn

@@ -71,17 +71,36 @@ pub trait BatchSink {
     fn set_cancel(&mut self, _cancel: Arc<AtomicBool>) {}
 }
 
-/// The localhost file sink: acknowledged when the lines are written and synced (and, for a
-/// file this call created, its directory entry too).
+/// The localhost file sink: acknowledged when the lines are written and synced, and the
+/// directory entry of the file has been synced once.
 pub struct FileSink {
     path: PathBuf,
     port: Arc<dyn SiemProjectionPort>,
+    tail_clean: bool,
+    dir_synced: bool,
+    dir_sync: DirSync,
 }
+
+/// Syncs the directory holding a path (injectable so a failure can be simulated).
+pub type DirSync = Arc<dyn Fn(&Path) -> std::io::Result<()> + Send + Sync>;
 
 impl FileSink {
     #[must_use]
     pub fn new(path: PathBuf, port: Arc<dyn SiemProjectionPort>) -> Self {
-        Self { path, port }
+        Self {
+            path,
+            port,
+            tail_clean: false,
+            dir_synced: false,
+            dir_sync: Arc::new(sync_parent),
+        }
+    }
+
+    /// Replace the directory sync (tests inject a failing one).
+    #[must_use]
+    pub fn with_dir_sync(mut self, dir_sync: DirSync) -> Self {
+        self.dir_sync = dir_sync;
+        self
     }
 }
 
@@ -151,20 +170,33 @@ impl BatchSink for FileSink {
             out.extend_from_slice(line.as_bytes());
             out.push(b'\n');
         }
-        let existed = self.path.exists();
-        if existed {
-            recover_tail(&self.path).map_err(io)?;
+        // Tail recovery is best-effort and needs READ access, which a write-only service
+        // file (the old daemon opened it append-only) may not grant: when the file cannot be
+        // read the recovery is skipped (documented limit) and the append still goes through.
+        // After any successful append the tail is known clean, so recovery runs only at the
+        // first attempt and after a failed append.
+        if !self.tail_clean && self.path.exists() {
+            let _ = recover_tail(&self.path);
         }
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .map_err(io)?;
-        file.write_all(&out).map_err(io)?;
-        file.sync_data().map_err(io)?;
-        if !existed {
-            // The cursor syncs the audit directory, not this one: make the new file durable.
-            sync_parent(&self.path).map_err(io)?;
+        let appended = (|| {
+            let mut file = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.path)?;
+            file.write_all(&out)?;
+            file.sync_data()
+        })();
+        if let Err(error) = appended {
+            self.tail_clean = false; // a partial line may now end the file
+            return Err(io(error));
+        }
+        self.tail_clean = true;
+        // The cursor syncs the audit directory, not this one: make the directory entry
+        // durable, and keep retrying until that has succeeded ONCE (existence of the file
+        // proves nothing about its directory entry).
+        if !self.dir_synced {
+            (self.dir_sync)(&self.path).map_err(io)?;
+            self.dir_synced = true;
         }
         Ok(())
     }

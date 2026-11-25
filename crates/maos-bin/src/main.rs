@@ -17266,6 +17266,11 @@ mod crypto_test_world;
 // `LoomLiteStore::with_at_rest_seal` consumes — NEVER the zero-production-caller
 // `seal_row_at_rest` / `issue_under_principal` (H3).
 // ─────────────────────────────────────────────────────────────────────────
+#[cfg(all(test, feature = "online-adapters"))]
+#[path = "../../maos-siem/tests/support/fake_siem.rs"]
+#[allow(dead_code, clippy::all)]
+mod fake_siem_for_13_5a;
+
 #[cfg(all(test, feature = "network"))]
 mod story_13_5a_enterprise_daemon_seam {
     use super::*;
@@ -17474,6 +17479,7 @@ mod story_13_5a_enterprise_daemon_seam {
         client_cert_path: PathBuf,
         client_key_path: PathBuf,
         client_fingerprint: maos_a2a_core::PeerCertFingerprint,
+        held_siem: Option<HeldSiem>,
     }
 
     impl Drop for Fixture {
@@ -17629,6 +17635,7 @@ mod story_13_5a_enterprise_daemon_seam {
             client_cert_path,
             client_key_path,
             client_fingerprint,
+            held_siem: None,
         }
     }
 
@@ -17691,6 +17698,180 @@ mod story_13_5a_enterprise_daemon_seam {
         )
     }
 
+    /// The held fake collector of the R2-4 witness (the network sink needs `online-adapters`).
+    #[cfg(feature = "online-adapters")]
+    struct HeldSiem {
+        fake: fake_siem_for_13_5a::FakeSiem,
+        ca_file: PathBuf,
+        endpoint: String,
+    }
+
+    #[cfg(not(feature = "online-adapters"))]
+    struct HeldSiem;
+
+    #[cfg(feature = "online-adapters")]
+    const HELD_SIEM_HOST: &str = "siem.held.test";
+
+    #[cfg(feature = "online-adapters")]
+    impl HeldSiem {
+        /// A collector whose TLS handshake stays closed until `fake.handshake_gate` opens.
+        fn start(dir: &std::path::Path) -> Self {
+            let ca = fake_siem_for_13_5a::Ca::new("held-siem-ca");
+            let fake = fake_siem_for_13_5a::FakeSiem::start(
+                &ca.server(HELD_SIEM_HOST),
+                fake_siem_for_13_5a::Options::default(),
+            );
+            fake.set_mode(fake_siem_for_13_5a::Mode::HoldHandshake);
+            let ca_file = dir.join("held-siem-ca.pem");
+            std::fs::write(&ca_file, &ca.pem).expect("write the collector CA");
+            let endpoint = format!("{HELD_SIEM_HOST}:{}", fake.addr.port());
+            Self {
+                fake,
+                ca_file,
+                endpoint,
+            }
+        }
+    }
+
+    #[cfg(not(feature = "online-adapters"))]
+    impl HeldSiem {
+        fn start(_dir: &std::path::Path) -> Self {
+            Self
+        }
+    }
+
+    #[cfg(feature = "online-adapters")]
+    fn held_siem_runtime(
+        ports: &RecordingPorts,
+        fixture: &Fixture,
+        boot_nonce: u64,
+        crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
+    ) -> Arc<maos_bin::enterprise_identity::EnterpriseRuntime> {
+        let held = fixture.held_siem.as_ref().expect("the held collector");
+        let siem = maos_bin::enterprise_identity::configure_siem(
+            &maos_bin::enterprise_identity::SiemEnv {
+                endpoint: Some(&held.endpoint),
+                ca_file: held.ca_file.to_str(),
+                allow_private: true,
+                ..Default::default()
+            },
+            fake_siem_for_13_5a::StubResolver::loopback(HELD_SIEM_HOST),
+        )
+        .expect("select the network sink")
+        .expect("a network sink");
+        Arc::new(
+            maos_bin::enterprise_identity::EnterpriseRuntime::from_ports(
+                maos_bin::enterprise_identity::EnterpriseConfig::empty()
+                    .with_sso_available()
+                    .with_kms_available()
+                    .with_siem_available(),
+                Some(Arc::clone(&ports.sso) as Arc<dyn IdentityAssertionPort>),
+                Some(Arc::clone(&ports.kms) as Arc<dyn KeyManagementPort>),
+                Some(Arc::clone(&ports.siem) as Arc<dyn SiemProjectionPort>),
+                Some(crypto),
+                Some(fixture.audit_db.clone()),
+                Some(fixture.siem_sink.clone()),
+                boot_nonce,
+            )
+            .with_configured_siem(&siem),
+        )
+    }
+
+    #[cfg(not(feature = "online-adapters"))]
+    fn held_siem_runtime(
+        _ports: &RecordingPorts,
+        _fixture: &Fixture,
+        _boot_nonce: u64,
+        _crypto: Arc<dyn maos_domain::ports::CryptoProvider>,
+    ) -> Arc<maos_bin::enterprise_identity::EnterpriseRuntime> {
+        unreachable!("the held-collector witness needs the `online-adapters` feature")
+    }
+
+    /// R2-4: with the digest reply already received (the request completed) and the collector's
+    /// handshake gate still CLOSED, the governed row is in the log and nothing was delivered;
+    /// then the gate opens and that row's own `externalId` arrives.
+    #[cfg(feature = "online-adapters")]
+    async fn drive_held_siem(
+        fixture: &Fixture,
+        _runtime: &Arc<maos_bin::enterprise_identity::EnterpriseRuntime>,
+    ) -> Result<(), String> {
+        use fake_siem_for_13_5a::Event;
+        let held = fixture.held_siem.as_ref().ok_or("no held collector")?;
+        let governed = maos_audit::query(
+            &fixture.audit_db,
+            maos_audit::AuditFilter {
+                intent_contains: Some("cohort:digest-read-governed".to_string()),
+                ..Default::default()
+            },
+        )
+        .map_err(|error| format!("query governed row: {error}"))?;
+        let frame_id = governed
+            .first()
+            .ok_or("the request completed but its governed row is not in the log")?
+            .frame_id_hex
+            .clone();
+        // The exporter has dialled and is parked in the handshake (nothing sleeps: the task
+        // yields until the collector reports the held connection; 30 s is a deadline only).
+        tokio::time::timeout(std::time::Duration::from_secs(30), async {
+            loop {
+                match held.fake.events.try_recv() {
+                    Ok(Event::Held) => return Ok(()),
+                    Ok(other) => {
+                        return Err(format!("an event before the gate opened: {other:?}"));
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => tokio::task::yield_now().await,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        return Err("the collector went away".to_string());
+                    }
+                }
+            }
+        })
+        .await
+        .map_err(|_| "the exporter never dialled the held collector".to_string())??;
+        if let Some(event) = held
+            .fake
+            .drain()
+            .into_iter()
+            .find(|e| !matches!(e, Event::Held))
+        {
+            return Err(format!(
+                "a delivery completed with the gate closed: {event:?}"
+            ));
+        }
+
+        held.fake.handshake_gate.open();
+        tokio::time::timeout(std::time::Duration::from_secs(30), async {
+            loop {
+                match held.fake.events.try_recv() {
+                    Ok(Event::Acked { bytes, .. }) => {
+                        let frames = fake_siem_for_13_5a::octet_frames(&bytes);
+                        if fake_siem_for_13_5a::external_ids(&frames).contains(&frame_id) {
+                            return Ok(());
+                        }
+                    }
+                    Ok(Event::Held | Event::Unacked { .. }) => {}
+                    Ok(Event::Refused(reason)) => {
+                        return Err(format!("collector refused: {reason}"))
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => tokio::task::yield_now().await,
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        return Err("the collector went away".to_string());
+                    }
+                }
+            }
+        })
+        .await
+        .map_err(|_| "the governed row's externalId never reached the collector".to_string())?
+    }
+
+    #[cfg(not(feature = "online-adapters"))]
+    async fn drive_held_siem(
+        _fixture: &Fixture,
+        _runtime: &Arc<maos_bin::enterprise_identity::EnterpriseRuntime>,
+    ) -> Result<(), String> {
+        Err("the held-collector witness needs the `online-adapters` feature".to_string())
+    }
+
     fn pdp_runtime(ports: &RecordingPorts) -> enterprise_pdp_runtime::EnterprisePdpRuntime {
         enterprise_pdp_runtime::EnterprisePdpRuntime::new(
             Arc::clone(&ports.pdp) as Arc<dyn PolicyDecisionPort>,
@@ -17746,6 +17927,8 @@ mod story_13_5a_enterprise_daemon_seam {
     #[derive(Clone, Copy)]
     enum TestWiring {
         Full,
+        /// Full wiring whose SIEM sink is the NETWORK sink toward a held fake collector.
+        FullHeldSiem,
         PdpOnly,
         RequiredUnwired,
     }
@@ -17866,10 +18049,23 @@ mod story_13_5a_enterprise_daemon_seam {
                 kernel_stack(DAEMON_BOOT_NONCE, Arc::clone(&crypto));
             (crypto, capability, security, Some(audit_rx), None)
         };
-        let runtime = matches!(wiring, TestWiring::Full)
-            .then(|| enterprise_runtime(ports, fixture, DAEMON_BOOT_NONCE, crypto));
-        let pdp =
-            matches!(wiring, TestWiring::Full | TestWiring::PdpOnly).then(|| pdp_runtime(ports));
+        let runtime = match wiring {
+            TestWiring::Full => Some(enterprise_runtime(
+                ports,
+                fixture,
+                DAEMON_BOOT_NONCE,
+                crypto,
+            )),
+            TestWiring::FullHeldSiem => {
+                Some(held_siem_runtime(ports, fixture, DAEMON_BOOT_NONCE, crypto))
+            }
+            TestWiring::PdpOnly | TestWiring::RequiredUnwired => None,
+        };
+        let pdp = matches!(
+            wiring,
+            TestWiring::Full | TestWiring::FullHeldSiem | TestWiring::PdpOnly
+        )
+        .then(|| pdp_runtime(ports));
         let journal_path = fixture.home.join("journal").join("lifecycle.ndjson");
         let journal = maos_kernel_core::journal::JournalAdapter::open(&journal_path)
             .map_err(|error| format!("test journal open failed: {error}"))?;
@@ -18005,6 +18201,14 @@ mod story_13_5a_enterprise_daemon_seam {
         })
         .await
         .map_err(|_| "timed out waiting for the daemon's correlated digest reply".to_string())?;
+
+        if matches!(wiring, TestWiring::FullHeldSiem) {
+            drive_held_siem(
+                fixture,
+                runtime.as_ref().expect("held wiring builds a runtime"),
+            )
+            .await?;
+        }
 
         if matches!(wiring, TestWiring::Full) {
             // Story 23-4 (D-23-4-09 A): the request path only nudges the export consumer.
@@ -18159,6 +18363,40 @@ mod story_13_5a_enterprise_daemon_seam {
         );
     }
 
+    /// Story 23-4 review round 2 (R2-4) — the REQUEST must not wait on the SIEM. The booted
+    /// daemon exports to a NETWORK sink whose handshake is held closed: the governed read is
+    /// still admitted, answered, and its row is in the log while the collector has not even
+    /// finished the handshake; once the gate opens, that row's own `externalId` arrives.
+    #[cfg(all(
+        feature = "online-adapters",
+        not(feature = "kms-fault-inject"),
+        not(feature = "sso-fault-inject")
+    ))]
+    // Multi-thread on purpose: on the current-thread runtime a blocking request path would
+    // starve the test's own 5 s deadline and the witness could not fail.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn story_13_5a_governed_read_completes_while_the_network_sink_handshake_is_held() {
+        let _guard = env_lock();
+        let mut fixture = fixture("held-siem");
+        #[cfg(feature = "crypto-recording")]
+        std::fs::write(
+            fixture.home.join("config.toml"),
+            "[crypto]\nprovider = \"recording\"\n",
+        )
+        .unwrap();
+        set_process_env(&fixture);
+        fixture.held_siem = Some(HeldSiem::start(&fixture.dir));
+        let ports = RecordingPorts::new(PolicyVerdict::Allow);
+
+        boot_and_drive(&fixture, TestWiring::FullHeldSiem, &ports)
+            .await
+            .expect("a governed read must complete while the SIEM handshake is held");
+        let sink_file = std::fs::read_to_string(&fixture.siem_sink).unwrap_or_default();
+        assert!(
+            sink_file.is_empty(),
+            "the network sink is the only sink: the file sink stays untouched"
+        );
+    }
     // ── AC5 leg 2 — the two-sided dead-wire negative ─────────────────────
 
     /// AC5 leg 2 — two-sided. (a) Enterprise configuration with the governed

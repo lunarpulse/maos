@@ -1197,3 +1197,62 @@ fn boot_reads_the_client_key_from_the_encrypted_file_store() {
     assert!(text.contains("SIEM client key read"), "{text}");
     assert!(!text.contains("PRIVATE KEY"), "{text}");
 }
+
+/// R2-1: `MAOS_AUDIT_DB=/x/audit.db` is supported. SQLite's sidecar is `audit.db-wal` (the name
+/// is APPENDED to the full file name), so a guard that swaps the extension never sees it. The
+/// committed rows below exist ONLY in the live WAL; the export must still deliver every one.
+#[test]
+fn a_live_database_without_the_sqlite_extension_exports_rows_that_exist_only_in_the_wal() {
+    use maos_domain::invariants::i3::FrameOrigin;
+    use maos_iac::adapter::transparency_log::{FrameKind, TransparencyLogAdapter};
+
+    let dir = tempfile::tempdir().expect("fixture dir");
+    let db = dir.path().join("audit.db");
+    let tl = TransparencyLogAdapter::open(&db, 0x23_04).expect("open log");
+    for n in 0..5 {
+        tl.insert_frame_event(
+            FrameKind::TaskAssign,
+            7,
+            None,
+            &format!("wal.only.{n}"),
+            b"x",
+            FrameOrigin::HumanAuthored,
+        );
+    }
+    let wal = dir.path().join("audit.db-wal");
+    assert!(
+        wal.exists() && std::fs::metadata(&wal).unwrap().len() > 0,
+        "rows are in the WAL"
+    );
+    let sink = dir.path().join("siem.log");
+    let siem = configure_siem(
+        &SiemEnv {
+            file: Some(sink.to_str().unwrap()),
+            ..SiemEnv::default()
+        },
+        public(),
+    )
+    .unwrap()
+    .unwrap();
+    let runtime = EnterpriseRuntime::from_ports(
+        EnterpriseConfig::empty().with_siem_available(),
+        None,
+        None,
+        Some(Arc::new(SiemExporter) as Arc<dyn SiemProjectionPort>),
+        None,
+        Some(db.clone()),
+        None,
+        0x23_04,
+    )
+    .with_configured_siem(&siem);
+    let tick = runtime.forward_audit_to_siem().expect("export");
+    let text = std::fs::read_to_string(&sink).unwrap();
+    for n in 0..5 {
+        assert!(
+            text.contains(&format!("wal.only.{n}")),
+            "row {n} missing: delivered {}",
+            tick.delivered
+        );
+    }
+    drop(tl);
+}

@@ -13,8 +13,9 @@
 compile_error!("siem-fault-inject is dev/CI-only and MUST NOT ship in release builds");
 
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 
 use crate::{segment, AuditEntry, AuditError};
 
@@ -50,6 +51,7 @@ const ROW_OVERHEAD_BYTES: usize = 600;
 /// segments, then the live file (last).
 pub struct LogView {
     sources: Vec<Connection>,
+    peak_lookahead: AtomicUsize,
 }
 
 struct Meta {
@@ -60,6 +62,35 @@ struct Meta {
 }
 
 impl LogView {
+    /// The next entry of `source` after `after`: one indexed lookup, no window.
+    fn next_meta(&self, source: usize, after: i64) -> Result<Option<Meta>, AuditError> {
+        let mut statement = self.sources[source]
+            .prepare_cached(
+                "SELECT rowid, frame_id, length(payload_redacted) + length(intent) \
+                 FROM transparency_log WHERE rowid > ?1 ORDER BY rowid LIMIT 1",
+            )
+            .map_err(AuditError::Read)?;
+        statement
+            .query_row([after], |row| {
+                Ok(Meta {
+                    id: row.get(0)?,
+                    frame: row.get(1)?,
+                    bytes: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(usize::MAX),
+                    source,
+                })
+            })
+            .optional()
+            .map_err(AuditError::Read)
+    }
+
+    /// The most lookahead entries the planner has held at once since this view opened (a
+    /// memory proxy for tests: it is bounded by the number of sources).
+    #[doc(hidden)]
+    #[must_use]
+    pub fn peak_lookahead(&self) -> usize {
+        self.peak_lookahead.load(Ordering::Relaxed)
+    }
+
     /// Open the view of `db_path`.
     ///
     /// # Errors
@@ -69,6 +100,7 @@ impl LogView {
         crate::refuse_active_wal(db_path)?;
         Ok(Self {
             sources: segment::open_log_sources_immutable(db_path)?,
+            peak_lookahead: AtomicUsize::new(0),
         })
     }
 
@@ -88,51 +120,39 @@ impl LogView {
         max_rows: usize,
         max_bytes: usize,
     ) -> Result<Vec<InsertionRow>, AuditError> {
-        let limit_sql = i64::try_from(max_rows).map_err(|_| AuditError::ValueOverflow {
-            field: "limit",
-            value: max_rows as u64,
-        })?;
-        // Pass 1: ids, frame ids and sizes only (cheap), merged in insertion order.
-        let mut metas: Vec<Meta> = Vec::new();
-        for (source, conn) in self.sources.iter().enumerate() {
-            let mut statement = conn
-                .prepare(
-                    "SELECT rowid, frame_id, length(payload_redacted) + length(intent) \
-                     FROM transparency_log WHERE rowid > ?1 ORDER BY rowid LIMIT ?2",
-                )
-                .map_err(AuditError::Read)?;
-            let mapped = statement
-                .query_map([after, limit_sql], |row| {
-                    Ok(Meta {
-                        id: row.get(0)?,
-                        frame: row.get(1)?,
-                        bytes: usize::try_from(row.get::<_, i64>(2)?).unwrap_or(usize::MAX),
-                        source,
-                    })
-                })
-                .map_err(AuditError::Read)?;
-            for meta in mapped {
-                metas.push(meta.map_err(AuditError::Read)?);
-            }
+        // Pass 1: a bounded ordered k-way merge over the sources. Each source holds ONE
+        // lookahead entry (ids, frame id and size only), so the planner's memory is the number
+        // of sources plus the chosen rows, never the backlog or a per-source row window.
+        let mut heads: Vec<Option<Meta>> = Vec::with_capacity(self.sources.len());
+        for source in 0..self.sources.len() {
+            heads.push(self.next_meta(source, after)?);
         }
-        metas.sort_by_key(|meta| meta.id);
-        let mut merged: Vec<Meta> = Vec::with_capacity(metas.len());
-        for meta in metas {
-            match merged.last() {
-                Some(previous) if previous.id == meta.id => {
-                    if previous.frame != meta.frame {
-                        return Err(AuditError::Row(format!(
-                            "insertion id {} is held by two different frames",
-                            meta.id
-                        )));
+        let mut chosen: Vec<Meta> = Vec::new();
+        let mut planned = 0_usize;
+        loop {
+            self.peak_lookahead
+                .fetch_max(heads.iter().flatten().count(), Ordering::Relaxed);
+            let Some(id) = heads.iter().flatten().map(|meta| meta.id).min() else {
+                break;
+            };
+            // Every source holding `id` must hold the same frame; the first one is kept.
+            let mut taken: Option<Meta> = None;
+            for source in 0..heads.len() {
+                if heads[source].as_ref().is_some_and(|meta| meta.id == id) {
+                    let meta = heads[source].take().expect("checked");
+                    heads[source] = self.next_meta(source, id)?;
+                    match &taken {
+                        Some(first) if first.frame != meta.frame => {
+                            return Err(AuditError::Row(format!(
+                                "insertion id {id} is held by two different frames"
+                            )));
+                        }
+                        Some(_) => {}
+                        None => taken = Some(meta),
                     }
                 }
-                _ => merged.push(meta),
             }
-        }
-        let mut chosen = Vec::new();
-        let mut planned = 0_usize;
-        for meta in merged {
+            let meta = taken.expect("a head held the minimum id");
             let cost = meta.bytes.saturating_add(ROW_OVERHEAD_BYTES);
             if !chosen.is_empty() && planned.saturating_add(cost) > max_bytes {
                 break;

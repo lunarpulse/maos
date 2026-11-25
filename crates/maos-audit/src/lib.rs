@@ -502,8 +502,17 @@ fn query_with_redaction_on(
 /// ADR-028 D6: replay determinism requires a quiesced / WAL-checkpointed DB.
 /// If a SQLite WAL file is present, the DB may still have uncheckpointed
 /// writes from an open writer, making replay non-deterministic.
+/// SQLite names the sidecar by APPENDING `-wal` to the full database file name
+/// (`audit.db` -> `audit.db-wal`), whatever the extension.
+#[must_use]
+pub fn wal_sidecar(db_path: &Path) -> std::path::PathBuf {
+    let mut name = db_path.as_os_str().to_owned();
+    name.push("-wal");
+    std::path::PathBuf::from(name)
+}
+
 fn refuse_active_wal(db_path: &Path) -> Result<(), AuditError> {
-    let wal_path = db_path.with_extension("sqlite-wal");
+    let wal_path = wal_sidecar(db_path);
     if wal_path.exists() {
         return Err(AuditError::Open(rusqlite::Error::SqliteFailure(
             rusqlite::ffi::Error {

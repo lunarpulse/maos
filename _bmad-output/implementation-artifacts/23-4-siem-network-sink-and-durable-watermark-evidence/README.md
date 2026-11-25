@@ -96,3 +96,18 @@ and `prepush`; clippy `-D warnings` workspace-wide (pre-existing maos-spirit-abi
 | ADR-051 | Amendments 23-0, 23-8 | + "Amendment — Story 23-4" |
 | RELEASE-HOLDS Epic 23 | rows through 23-8.h | + 23-4.a … 23-4.h |
 | Gate | siem leg: 3 suites | + `cursor_file_sink_23_4`, `tls_sink_23_4` (`tls-sink`) |
+
+## OPERATOR DECISION D-23-4-16 — what a TLS close proves (review round 2, R2-8; NOT decided by the implementer)
+
+Delivery contract as built: **the cursor advances only when the collector completes a TLS close after our batch; a
+collector that closes without reading is indistinguishable from an acknowledging collector; a collector must read and
+process the batch before closing; rows are at-least-once only for collectors that follow RFC 5425 §4.4.** A
+`close_notify` readable before ours is refused (TLS 1.2 and 1.3 tested with a 32 MiB batch); one that crosses ours
+is accepted (tested as the documented behaviour with `Mode::DiscardThenAck`). Written into RELEASE-HOLDS row 23-4.i
+and the ADR-051 amendment.
+
+| Option | What it is | Exposure |
+|---|---|---|
+| **A (recommended)** | Accept the documented residual. | Rows are lost only when a collector closes first, or at the same instant, without reading the batch. |
+| B | Application-level acknowledgement (for example RELP). | New wire format, new story; no residual. |
+| C | The collector answers on a separate acknowledgement channel. | Not standard; collector-side work. |

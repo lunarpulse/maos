@@ -913,3 +913,147 @@ fn the_gap_note_survives_a_sink_failure_in_the_same_tick() {
     );
     assert_eq!(rig.journal.entries().len(), 1);
 }
+
+// ── review round 2 ───────────────────────────────────────────────────────────
+
+/// R2-5: a collector that KEEPS making progress (a real handshake relayed one byte at a time,
+/// every read succeeding) must still hit the handshake deadline. The old whole-handshake
+/// `complete_io` loop armed its read timeout once and let such a handshake run to completion.
+#[test]
+fn a_collector_that_keeps_making_progress_still_hits_the_handshake_deadline() {
+    use std::io::{Read, Write};
+    use std::net::{Shutdown, TcpListener, TcpStream};
+
+    let rig = Rig::new();
+    let padded = FakeSiem::start(&rig.ca.server_padded(HOST), Options::default());
+    let upstream = padded.addr;
+    let proxy = TcpListener::bind("127.0.0.1:0").expect("proxy");
+    let port = proxy.local_addr().unwrap().port();
+    let (permit, permits) = std::sync::mpsc::channel::<()>();
+    let relay = std::thread::spawn(move || {
+        let (client, _) = proxy.accept().expect("accept");
+        let server = TcpStream::connect(upstream).expect("upstream");
+        let (mut from_client, mut to_server) =
+            (client.try_clone().unwrap(), server.try_clone().unwrap());
+        let forward = std::thread::spawn(move || {
+            let _ = std::io::copy(&mut from_client, &mut to_server);
+            let _ = to_server.shutdown(Shutdown::Write);
+        });
+        let (mut from_server, mut to_client) = (server, client);
+        let _ = to_client.set_nodelay(true); // else Nagle/delayed-ACK stalls masquerade as read timeouts
+        let mut byte = [0_u8; 1];
+        // Server -> client: one byte per permit; the feeder grants them as fast as it can, so
+        // no single read ever waits, yet the whole flight takes longer than the deadline.
+        while from_server.read(&mut byte).is_ok_and(|n| n == 1) {
+            if permits.recv().is_err() || to_client.write_all(&byte).is_err() {
+                break;
+            }
+        }
+        let _ = to_client.shutdown(Shutdown::Both);
+        let _ = forward.join();
+    });
+    let feeder = std::thread::spawn(move || while permit.send(()).is_ok() {});
+    let mut sink = TlsSink::new(
+        HOST,
+        port,
+        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
+        OutboundPolicy::strict().allow_private(),
+        rig.resolver.clone(),
+        Timeouts {
+            handshake: Duration::from_millis(20),
+            ..Timeouts::default()
+        },
+    );
+    let failure = sink
+        .deliver(&[dummy_frame()])
+        .expect_err("progress beyond the deadline is still a timeout");
+    assert_eq!(failure.code, "siem_sink_timeout");
+    drop(sink);
+    relay.join().unwrap();
+    feeder.join().unwrap();
+}
+
+/// R2-6: a collector that keeps valid records coming after the handshake cannot hold the
+/// pre-close look (or the export) past its deadlines: the call returns.
+#[test]
+fn a_flood_of_valid_records_cannot_hold_the_export_past_its_deadlines() {
+    let rig = Rig::new();
+    rig.fake.set_mode(Mode::Flood);
+    let mut sink = TlsSink::new(
+        HOST,
+        rig.fake.addr.port(),
+        client_config(rig.ca.pem.as_bytes(), None).unwrap(),
+        OutboundPolicy::strict().allow_private(),
+        rig.resolver.clone(),
+        Timeouts {
+            write: Duration::from_millis(300),
+            close: Duration::from_millis(300),
+            ..Timeouts::default()
+        },
+    );
+    let (done, result) = std::sync::mpsc::channel();
+    let worker = std::thread::spawn(move || {
+        let _ = done.send(sink.deliver(&[dummy_frame()]));
+    });
+    let outcome = result
+        .recv_timeout(fake_siem::OUTER)
+        .expect("the export returned instead of draining forever");
+    let failure = outcome.expect_err("a flood never answers our close");
+    assert!(
+        [
+            "siem_sink_no_close_notify",
+            "siem_sink_timeout",
+            "siem_sink_tls_refused"
+        ]
+        .contains(&failure.code),
+        "{failure}"
+    );
+    worker.join().unwrap();
+    assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
+}
+
+fn big_frame() -> Frame {
+    // Larger than any loopback socket buffering (a few MB): the client's write cannot finish
+    // until the collector reads, and the collector sends its alert BEFORE it reads past the
+    // handshake, so the alert is on the wire before the write ends, in TLS 1.3 as in 1.2,
+    // whatever the scheduling (a 900 KB first version lost that race under CPU load).
+    Frame {
+        syslog: "x".repeat(32 << 20),
+        ..dummy_frame()
+    }
+}
+
+/// R2-8 (a): a collector alert that is ALREADY readable before ours is refused, for TLS 1.3
+/// as for 1.2 (the big batch makes the order deterministic).
+#[test]
+fn an_alert_already_readable_before_ours_is_refused_in_tls_13_and_12() {
+    for tls12 in [false, true] {
+        let rig = Rig::with(Options {
+            tls12_ecdhe_gcm_only: tls12,
+            ..Options::default()
+        });
+        rig.fake.set_mode(Mode::CloseFirst);
+        let failure = rig
+            .sink()
+            .deliver(&[big_frame()])
+            .expect_err("an early close is not an acknowledgement");
+        assert_eq!(failure.code, "siem_sink_no_close_notify", "tls12={tls12}");
+        assert!(matches!(rig.fake.next_event(), Event::Unacked { .. }));
+    }
+}
+
+/// R2-8 (a), documented residual: a collector that completes a normal TLS close after OUR
+/// close_notify without having kept the batch is indistinguishable from an acknowledging one,
+/// so the batch counts as acknowledged (RELEASE-HOLDS 23-4.i, D-23-4-16).
+#[test]
+fn a_collector_that_closes_after_ours_without_keeping_the_batch_is_acknowledged() {
+    let rig = Rig::new();
+    rig.fake.set_mode(Mode::DiscardThenAck);
+    rig.sink()
+        .deliver(&[dummy_frame()])
+        .expect("indistinguishable from an acknowledgement: the documented residual");
+    match rig.fake.next_event() {
+        Event::Acked { bytes, .. } => assert!(bytes.is_empty(), "the collector kept nothing"),
+        other => panic!("{other:?}"),
+    }
+}

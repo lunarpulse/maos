@@ -252,3 +252,71 @@ fn the_same_insertion_id_under_two_frame_ids_is_an_error() {
     let view = LogView::open(&db).unwrap();
     assert!(view.read_after(0, 10, usize::MAX).is_err());
 }
+
+// ── review round 2 ───────────────────────────────────────────────────────────
+
+/// R2-7: with many sealed segments the planner holds one lookahead entry per source, never a
+/// per-source window of the backlog (the old planner collected up to 512 entries per source
+/// and copied them into a second vector). `peak_lookahead` is the memory proxy.
+#[test]
+fn the_planner_holds_one_lookahead_per_source_however_large_the_backlog() {
+    const SEGMENTS: i64 = 40;
+    const PER_SEGMENT: i64 = 10;
+    let (dir, db, tl) = seeded(1);
+    drop(tl);
+    let segments = dir.path().join("segments");
+    std::fs::create_dir_all(&segments).unwrap();
+    let registry = raw(&db);
+    for seq in 1..=SEGMENTS {
+        let first = 100 + (seq - 1) * PER_SEGMENT;
+        let last = first + PER_SEGMENT - 1;
+        let seg = rusqlite::Connection::open(segments.join(format!("{seq:010}.sqlite"))).unwrap();
+        seg.execute_batch(
+            "CREATE TABLE transparency_log (frame_id BLOB NOT NULL PRIMARY KEY, timestamp_ns \
+             INTEGER NOT NULL, spirit_pid INTEGER NOT NULL, boot_nonce INTEGER NOT NULL, \
+             capability_token BLOB, kind INTEGER NOT NULL, intent TEXT NOT NULL, \
+             payload_redacted BLOB NOT NULL, origin INTEGER NOT NULL);",
+        )
+        .unwrap();
+        for id in first..=last {
+            seg.execute(
+                "INSERT INTO transparency_log (rowid, frame_id, timestamp_ns, spirit_pid, \
+                 boot_nonce, kind, intent, payload_redacted, origin) \
+                 VALUES (?1, randomblob(16), 1, 1, 1, 4, 'x', X'', 0)",
+                [id],
+            )
+            .unwrap();
+        }
+        registry
+            .execute(
+                "INSERT INTO transparency_log_segments VALUES (?1, 0, ?2, ?3, ?4, 1, 2, 'a', NULL, 3, NULL)",
+                rusqlite::params![seq, first, last, PER_SEGMENT],
+            )
+            .unwrap();
+    }
+    drop(registry);
+    let view = LogView::open(&db).unwrap();
+    let total = (SEGMENTS * PER_SEGMENT + 1) as usize;
+    let all = view.read_after(0, 512, usize::MAX).unwrap();
+    assert_eq!(all.len(), total.min(512));
+    let ids: Vec<i64> = all.iter().map(|row| row.insertion_id).collect();
+    assert!(
+        ids.windows(2).all(|pair| pair[0] < pair[1]),
+        "ordered across sources"
+    );
+    assert_eq!(
+        ids[0], 1,
+        "the live row first (lowest id), then the segments"
+    );
+    assert!(
+        view.peak_lookahead() <= (SEGMENTS as usize) + 1,
+        "one lookahead per source: {}",
+        view.peak_lookahead()
+    );
+    // A small batch resumes where the big one would have: boundaries differ, order never does.
+    let small = view.read_after(0, 25, usize::MAX).unwrap();
+    assert_eq!(
+        small.iter().map(|row| row.insertion_id).collect::<Vec<_>>(),
+        ids[..25]
+    );
+}

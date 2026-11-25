@@ -494,9 +494,11 @@ impl EnterpriseRuntime {
                 // ids read from the snapshot are the live ones (the cursor's unit).
                 static SNAPSHOT_SEQUENCE: std::sync::atomic::AtomicU64 =
                     std::sync::atomic::AtomicU64::new(0);
-                let wal_path = db.with_extension("sqlite-wal");
+                // ALWAYS through a normal connection: `immutable=1` is only ever used on this
+                // copy (and sealed segments), never on a file a daemon may be writing, whatever
+                // its name (`MAOS_AUDIT_DB=/x/audit.db` has `audit.db-wal`, not `audit.sqlite-wal`).
                 let mut snapshot = None;
-                let source_db = if wal_path.exists() {
+                let source_db = {
                     let sequence =
                         SNAPSHOT_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     let path = db.with_extension(format!(
@@ -526,8 +528,6 @@ impl EnterpriseRuntime {
                     }
                     snapshot = Some(path.clone());
                     path
-                } else {
-                    db.clone()
                 };
 
                 let store = CursorStore::beside(db, &sink.identity());
