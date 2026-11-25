@@ -1,12 +1,12 @@
 # Exact kernel pin: src_lines (physical, formatted), per-file digests and set_hash of crates/maos-kernel-core/src.
 # Regenerate with `xtask check-kernel-baseline --emit-pin` and `scripts/repin.py`; history is `git log -p`, not prose here.
-src_lines = 28372
+src_lines = 28390
 
 
 
 [kernel_src]
 root = "crates/maos-kernel-core/src"
-set_hash = "3b23e28a5347f7122fe81bd7c4113b3ffb99324f8d16a9672e0cfef365307561"
+set_hash = "1baed7c4af214af8d29480423ef641c994cec728967940c348f0c49256e92471"
 
 [kernel_src.files]
 "api.rs" = "253cb0c7f80ea784da2587aaec3956a77ae6d888e094ff205bd610bd4f3e057e"
@@ -43,7 +43,7 @@ set_hash = "3b23e28a5347f7122fe81bd7c4113b3ffb99324f8d16a9672e0cfef365307561"
 "lifecycle/cli_wrapper/admission.rs" = "5d1c1222faa082614f101d91cb343d4b9f636d23c340d4863bbb12008c3e41e5"
 "lifecycle/cli_wrapper/lifecycle.rs" = "87d3d77b8c646090341890990e634d71a62e72d0e032d892d23aee5e5cba950b"
 "lifecycle/cli_wrapper/mod.rs" = "048746e1d08c93a64aba4745a532883a96899526bf825ff7f67eb3d2ee2270d5"
-"lifecycle/cli_wrapper/runtime.rs" = "2773e41d557c84ca7a98999b48d57334598ec2a0341af5f4be5981d13cc92d8b"
+"lifecycle/cli_wrapper/runtime.rs" = "b1ec6d39a726f37347c9ffa89d667cffc893537b27f15fa1a58d6a5bace27a9e"
 "lifecycle/mod.rs" = "b4d995c3b6887d905790611f4145f1ea8eb349e0dc73a923d13e56abcd09d335"
 "lifecycle/upgrade.rs" = "14462e5ebdf0f3d465e558be4a91bc7a70dc891c2970ad6ea3082a9d97512804"
 "mcp/mod.rs" = "12604548a8daa78a2786b820733f4639f06759f893856745027c8083c8a42bfd"
@@ -81,7 +81,7 @@ set_hash = "3b23e28a5347f7122fe81bd7c4113b3ffb99324f8d16a9672e0cfef365307561"
 "security/sandbox/mod.rs" = "99c8c618600a4f80db6553b906bccdc50af2469fe480613dfff7f94e926d4ba5"
 "security/sandbox/t3-image.lock" = "028858c187bcfe77bde8e996866da0fcba3388cc6d81a96c2a2588cb5d94ac64"
 "security/sandbox/t3/argv.rs" = "1824511ac85216b961e517e5fdfd58ce3d30656a7be8c1adcf2b317b17707139"
-"security/sandbox/t3/child.rs" = "9500670369d34939f8a82a192f581c4b6e3048c1b1a366e1a9ad231ec1c63844"
+"security/sandbox/t3/child.rs" = "86b1e61c1f9903b679c1d3e3631c01c06195e6a91867a77542f89c034c0bfa64"
 "security/sandbox/t3/image_lock.rs" = "1ae4cc7db0290d62de482d50bf7e4cc97c672e85a32b06ffdae37823a5461b09"
 "security/sandbox/t3/image_verify.rs" = "28125115858f49ad5784c19e3baaf0088f90f5c007eeb69976836d2b1a13873b"
 "security/sandbox/t3/mod.rs" = "ec392fc9de34dcabbe3c3bb63697df32d5f373986f11b2ae79841975deaaec2d"

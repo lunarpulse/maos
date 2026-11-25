@@ -393,8 +393,13 @@ fn s2_intentional_exit_137_is_not_a_signal() {
     }));
 }
 
-/// Story 20-7 AC7.3: what a failed S3 sample must carry — the elapsed time, the
-/// podman client's exit line, the kernel's residue line and the root's stderr.
+/// Story 20-7 AC7.3: what a failed S3 sample must carry. The kernel release and
+/// the whole `cli.subprocess.exit` row payload come FIRST (hosted logs truncate
+/// the assertion message at 768 bytes, and the long stderr is last): they are
+/// the decisive evidence for a `payload_exit = unknown` sample (PIDFD_INFO_EXIT
+/// needs Linux >= 6.15; the row shows the source and the snapshot facts). Then
+/// the elapsed time, the podman client's exit line, the kernel's residue line
+/// and the root's stderr.
 fn s3_diagnostics(run: &TerminalRun, elapsed: Duration, version: &str) -> String {
     let line = |needle: &str| {
         run.stderr
@@ -403,9 +408,21 @@ fn s3_diagnostics(run: &TerminalRun, elapsed: Duration, version: &str) -> String
             .collect::<Vec<_>>()
             .join(" | ")
     };
+    let exit_rows = run
+        .rows
+        .iter()
+        .filter(|(_, intent, _)| intent == "cli.subprocess.exit")
+        .map(|(_, _, payload)| payload.to_string())
+        .collect::<Vec<_>>()
+        .join(" | ");
+    let kernel = Command::new("uname")
+        .arg("-r")
+        .output()
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+        .unwrap_or_else(|error| format!("unavailable ({error})"));
     format!(
-        "elapsed {elapsed:?}; runtime {version}; root status {:?}; client exit [{}]; \
-         residue line [{}]; stderr: {}",
+        "kernel {kernel}; exit rows [{exit_rows}]; elapsed {elapsed:?}; runtime {version}; \
+         root status {:?}; client exit [{}]; residue line [{}]; stderr: {}",
         run.status,
         line("exited ("),
         line("residue "),
