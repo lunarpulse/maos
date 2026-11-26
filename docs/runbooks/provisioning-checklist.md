@@ -196,8 +196,12 @@ under `maosctl install --from-local ./dist --verify-only --release-pubkey
 ### `CI_EVIDENCE_AUDIT_KEY` — CI-only; any machine
 
 ```sh
-# Generate OUTSIDE the checkout (a mode-0700 temp dir): the key must never be inside the repository tree.
-key_dir=$(mktemp -d) && maosctl audit keygen --output "$key_dir/ci-evidence-audit.key"   # never your ~/.config/maos/audit-signing.key
+# Generate OUTSIDE the checkout, in a private directory. `mktemp -d` alone honours TMPDIR (which may point into
+# the checkout), so create it under a fixed base and refuse if it resolved inside the repository.
+key_dir=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/maos-key.XXXXXX") && chmod 700 "$key_dir"
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+case "$(realpath "$key_dir")/" in "$repo_root"/*) echo "refusing: $key_dir is inside the checkout" >&2; rm -r "$key_dir"; false;; esac \
+  && maosctl audit keygen --output "$key_dir/ci-evidence-audit.key"   # never your ~/.config/maos/audit-signing.key
 ```
 
 Set the repository Actions secret `CI_EVIDENCE_AUDIT_KEY` to the file's

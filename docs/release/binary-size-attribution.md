@@ -50,28 +50,32 @@ A v1.0.0 stripped size is **not recorded** in `docs/release/v1.0.0.md`; the near
 Headroom under the former 39,069,022 B limit at 23-2: 33,670 B. The 23-8 figures and the 23-2 figures were taken on different
 stacked bases; they are not additive on one tree. The deltas above are not re-measured by this document.
 
-## Forecast of the pending stories (story-file forecasts, not measurements)
+## Forecast of the pending stories (forecasts, NOT measurements; every one is an `[INFERENCE]` or an unverified estimate)
 
-| Story | Forecast growth | Note |
-|---|---:|---|
-| 23-1 (MCP OAuth) | +60 KB .. +180 KB | |
-| 23-4 (SIEM sink) | +236 KB | |
-| 23-5 | +300 KB .. +600 KB | **precondition: a measure-first spike** before the story is accepted |
-| 23-6 | +1 KB .. +4 KB | |
-| 23-7 (cohort mesh) | +183 KB | implementation paused; protocol and state-machine design first |
+Story files are in the docs worktree `/home/lunarpulse/dev_ws-course28/_bmad-output/implementation-artifacts/`; the design is in
+`/home/lunarpulse/dev_ws-course28/_bmad-output/planning-artifacts/`.
 
-Sum of the forecasts: **+780 KB .. +1,203 KB** (decimal KB), added to the 23-2 measured 39,035,352 B:
+| Story | Forecast growth | Source record | Status of the figure |
+|---|---:|---|---|
+| 23-1 (MCP OAuth) | +60 KB .. +180 KB | `23-1-mcp-oauth-client.md:91` (also D-23-1-16, `:123`) | story-file forecast, `[INFERENCE]`, scaled from 23-8 (+126,336 B) and 23-0b (about +17 KB) |
+| 23-4 (SIEM sink) | +236 KB | no record found: `23-4-siem-network-sink-and-durable-watermark.md` and its evidence README (`/home/lunarpulse/dev_ws-e234/.../23-4-siem-network-sink-and-durable-watermark-evidence/README.md`) carry no such figure; the evidence README `:9` only measures the branch at 39,082,192 B stripped (no base recorded next to it) | **unverified estimate**; the only traceable datum is that measurement |
+| 23-5 (A2A v1 agent card, JSON-RPC) | +300 KB .. +600 KB | `23-5-a2a-v1-agent-card-and-jsonrpc-binding.md:95`, D-23-5-09 `:120` (T1 is a size spike before development) | story-file forecast, `[INFERENCE]`; **precondition: the measure-first spike** |
+| 23-6 (enterprise posture, air-gap) | +1 KB .. +4 KB | `23-6-enterprise-posture-in-air-gap.md:105` (+15 KB .. +40 KB under D-23-6-07 B, not ruled) | story-file forecast, `[INFERENCE]` |
+| 23-7 (peer identity rotation) | **+200 KB .. +320 KB** (redesign) | `23-7-rotation-protocol-design-2026-11-26.md:457`: net over main for the designed protocol | design-document forecast. The earlier figure, +183 KB, was the MEASURED +182,848 B of the paused implementation (`/home/lunarpulse/dev_ws-e237/.../23-7-peer-identity-rotation-evidence/README.md:102`: 39,093,904 B vs main 38,911,056 B); the design supersedes it |
+
+The arithmetic below is **not evidence of headroom**: it adds unverified estimates (23-4 in particular) and forecasts to one
+measured base. Treat it as an order-of-magnitude plan only; each story still measures at landing against the limit file.
 
 | | Bytes |
 |---|---:|
 | 23-2 measured | 39,035,352 |
-| + forecast low (60 + 236 + 300 + 1 + 183 = 780 KB, decimal) | 39,815,352 |
-| + forecast high (180 + 236 + 600 + 4 + 183 = 1,203 KB, decimal) | 40,238,352 |
+| + forecast low (60 + 236 + 300 + 1 + 200 = 797 KB, decimal) | 39,832,352 |
+| + forecast high (180 + 236 + 600 + 4 + 320 = 1,340 KB, decimal) | 40,375,352 |
 | New limit | 41,943,040 |
-| Headroom at the high forecast | 1,704,688 |
+| Arithmetic difference to the limit at the high forecast (unverified) | 1,567,688 |
 
-Even the low end exceeds the former 39,069,022 B limit (by 746,330 B). The raise therefore buys the Epic-23 stories their
-forecast plus about 1.7 MB; it is not headroom for new surface.
+Even the low end exceeds the former 39,069,022 B limit (by 763,330 B). The raise is sized for the Epic-23 stories' forecasts,
+not for new surface; the sum is dominated by the 23-5 spike result and the unsourced 23-4 figure.
 
 ## Follow-up: `later-binary-size-attribution`
 
