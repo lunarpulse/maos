@@ -258,7 +258,11 @@ containing that exact provider/model pair.
 Limitations:
 
 - Each inference hook has the dispatcher's default 30-second deadline. A
-  slower provider answer becomes an abstention (`hook did not complete`).
+  slower provider answer becomes an abstention (`hook did not complete`). The
+  comparison still waits up to 120 seconds for that call to return before it
+  starts the next run, and the call's token stays valid for that whole window
+  (150 seconds). A call that is still running after that aborts the comparison
+  with no report (`an inference call did not settle`).
 - Ollama attributes the response to the model named in the request, ignoring
   a different response `model`. It also treats a missing `done_reason` as
   complete. The Ollama model pin therefore guarantees only the request-side
