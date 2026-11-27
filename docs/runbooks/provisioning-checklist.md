@@ -196,11 +196,19 @@ under `maosctl install --from-local ./dist --verify-only --release-pubkey
 ### `CI_EVIDENCE_AUDIT_KEY` — CI-only; any machine
 
 ```sh
-maosctl audit keygen --output ./ci-evidence-audit.key   # never your ~/.config/maos/audit-signing.key
+# Generate OUTSIDE the checkout, in a private directory. `mktemp -d` alone honours TMPDIR (which may point into
+# the checkout), so create it under a fixed base and refuse if it resolved inside the repository.
+key_dir=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/maos-key.XXXXXX") && chmod 700 "$key_dir"
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+case "$(realpath "$key_dir")/" in "$repo_root"/*) echo "refusing: $key_dir is inside the checkout" >&2; rm -r "$key_dir"; false;; esac \
+  && maosctl audit keygen --output "$key_dir/ci-evidence-audit.key"   # never your ~/.config/maos/audit-signing.key
 ```
 
 Set the repository Actions secret `CI_EVIDENCE_AUDIT_KEY` to the file's
-contents, then delete the local copy — CI is its only holder. Tested with a
+contents, then delete the local copy (`rm -r "$key_dir"`) — CI is its only holder. The key is
+never committed: the repository holds no copy and `.gitignore` refuses `ci-evidence-audit.key`
+(a copy was committed by mistake on 2026-09-24 in `3e332302` and rotated on 2026-11-26, see
+`_bmad-output/implementation-artifacts/ci-evidence-audit-key-rotation-2026-11-26.md`). Tested with a
 throwaway key under CI's own binding (`GITHUB_ACTIONS=true`, `GITHUB_SHA`,
 `GITHUB_RUN_ID`, `GITHUB_RUN_ATTEMPT`) and the three-team substrate.
 

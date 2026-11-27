@@ -177,7 +177,11 @@ bin_size=$(stat -c%s target/release/maos)
 # The binary grew +119,808 B past 33,554,432 since 89b64566 (unattributed by `nm`/`size` here;
 # attribution stays an open deferred row), so the 2026-09-20 "attribute before re-basing" rule is
 # recorded as waived by the operator for this one raise, not met.
-max_size=$(tr -d '[:space:]' < "$REPO_ROOT/tests/integration/release-size-limit")  # 34 MiB — operator ruling `size`, 2026-11-12
+# 2026-11-21 (D-21-9-04 A): limit 39,069,022 B for the wasm-host default-on build (+5 %).
+# 2026-11-26: operator ruling raises the limit ONCE to 40 MiB = 41,943,040 B, with the "nm/size
+# attribution first" rule waived one time (precedent 2026-11-12). Per-story attribution table and
+# follow-up key `later-binary-size-attribution`: docs/release/binary-size-attribution.md.
+max_size=$(tr -d '[:space:]' < "$REPO_ROOT/tests/integration/release-size-limit")  # 40 MiB — operator ruling, 2026-11-26
 echo "maos-bin stripped size: ${bin_size} bytes (limit: ${max_size})"
 if [ "$bin_size" -gt "$max_size" ]; then
     echo "ERROR: AC4 binary size violation: ${bin_size} bytes > ${max_size} bytes limit"

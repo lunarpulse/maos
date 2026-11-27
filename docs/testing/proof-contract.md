@@ -265,7 +265,7 @@ run remains authoritative, and a local pass does not prove substrate-dependent m
   secondary spans are excluded. Lower the pins when debt is intentionally reduced; do not increase them
   to hide newly introduced warnings. A failed/malformed/truncated clippy run cannot count as zero debt.
 - Determine changes from `git merge-base origin/main HEAD` through HEAD, plus the working tree and untracked files;
-  never fetch, and print the base SHA and its age. Run the release build, strip and 33,554,432-byte size check when
+  never fetch, and print the base SHA and its age. Run the release build, strip and size check (the one limit in `tests/integration/release-size-limit`) when
   `Cargo.toml`, `Cargo.lock`, `crates/maos-bin/**`, or a maos-bin dependency changes; run a fresh Docusaurus build
   and `gate-routes.js` when `docs-site/**`, `docs/errors/**`, or `xtask/error-catalog.toml` changes; run
   `cargo deny check` when `Cargo.lock` or `deny.toml` changes. Each untriggered conditional leg prints a named skip

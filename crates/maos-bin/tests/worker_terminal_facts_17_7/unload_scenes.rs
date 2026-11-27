@@ -1,5 +1,6 @@
 //! S5: planned unload remains owned when the Worker on_unload hook fails.
 
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -9,6 +10,8 @@ use maos_kernel_core::iac::transparency_log::{FrameFilter, TransparencyLogAdapte
 use maos_kernel_core::iac::FrameKind;
 use maos_kernel_core::scheduler::scheduler_loop::SpiritSchedulerAdapter;
 use maos_kernel_core::telemetry::iac_rt::IacRtMetrics;
+
+use super::{capture_file, capture_text, diagnostic_tags, SceneChild};
 
 const BOOT_NONCE: u64 = 0x17_07_51;
 type Row = (u32, String, serde_json::Value, FrameKind);
@@ -170,17 +173,14 @@ impl World {
     }
 }
 
-fn scratch() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!(
-        "maos-terminal-s5-{}-{}",
-        std::process::id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
-    std::fs::create_dir(&dir).expect("create unique S5 scratch dir");
-    dir
+fn trace(dir: &Path, record: std::fmt::Arguments<'_>) {
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("scene.trace"))
+        .expect("open S5 phase trace");
+    file.write_all(format!("{record}\n").as_bytes())
+        .expect("write S5 phase trace");
 }
 
 fn t3_manifest(dir: &Path) -> toml::Value {
@@ -191,41 +191,56 @@ fn t3_manifest(dir: &Path) -> toml::Value {
 }
 
 async fn exercise_unload(
+    dir: &Path,
     fault: OnUnloadFault,
     cap: Option<u32>,
     expected_budget_row: bool,
-    scene_name: &str,
 ) {
-    if !super::scene(scene_name) {
-        return;
-    }
-    let dir = scratch();
-    let runtime_home = dir.join("runtime-home");
-    std::fs::create_dir_all(&runtime_home).expect("create isolated runtime home");
-    let runtime_home = super::t3_substrate::isolated_runtime_home(&runtime_home).to_path_buf();
-    let home = std::env::var_os("HOME");
-    let maos_home = std::env::var_os("MAOS_HOME");
-    let xdg_home = std::env::var_os("XDG_DATA_HOME");
-    std::env::set_var("HOME", &runtime_home);
-    std::env::set_var("MAOS_HOME", &runtime_home);
-    std::env::set_var("XDG_DATA_HOME", &runtime_home);
-    let world = World::new(&dir);
+    let expected_home = dir.join("runtime-home");
+    let home = |name| {
+        if std::env::var_os(name).as_deref() == Some(expected_home.as_os_str()) {
+            "private"
+        } else {
+            "unexpected"
+        }
+    };
+    let workspace = match maos_bin::worker_workspace::resolve_workspaces_root() {
+        Ok(path) if path == expected_home.join("workspaces") => "private",
+        Ok(_) => "unexpected",
+        Err(_) => "unresolved",
+    };
+    let fixture = match maos_bin::worker_spawn::resolve_cli_binary("worker-cli-fixture") {
+        Ok(path) if Path::new(&path) == super::layout::profile_dir().join("worker-cli-fixture") => {
+            "profile/worker-cli-fixture"
+        }
+        Ok(_) => "elsewhere",
+        Err(_) => "unresolved",
+    };
+    trace(
+        dir,
+        format_args!(
+        "phase=setup HOME={} MAOS_HOME={} XDG_DATA_HOME={} workspace={workspace} fixture={fixture}",
+        home("HOME"), home("MAOS_HOME"), home("XDG_DATA_HOME")
+    ),
+    );
+    let world = World::new(dir);
+    let mint_dir = dir.to_owned();
+    let watch_dir = dir.to_owned();
     let supervisor = world.supervisor(SupervisorSeams {
         on_unload_fault: Some(fault),
         hook_cap_override: cap,
+        after_mint: Some(Arc::new(move || {
+            trace(&mint_dir, format_args!("phase=after-mint"))
+        })),
+        after_watch: Some(Arc::new(move |pid| {
+            trace(
+                &watch_dir,
+                format_args!("phase=runtime-client-observed pid={pid}"),
+            );
+        })),
         ..Default::default()
     });
-    let manifest = t3_manifest(&dir);
-    let target = PathBuf::from(env!("CARGO_BIN_EXE_maos"))
-        .parent()
-        .expect("test binary parent")
-        .to_path_buf();
-    let old_path = std::env::var_os("PATH");
-    let mut paths = vec![target];
-    if let Some(path) = old_path.as_ref() {
-        paths.extend(std::env::split_paths(path));
-    }
-    std::env::set_var("PATH", std::env::join_paths(paths).expect("join test PATH"));
+    let manifest = t3_manifest(dir);
     let run = maos_bin::worker_spawn::RunArgs {
         manifest_path: dir.join("worker.toml").display().to_string(),
         live: false,
@@ -237,8 +252,11 @@ async fn exercise_unload(
     let capability = Arc::clone(&world.capability);
     let policy = Arc::clone(&world.policy);
     let run_supervisor = Arc::clone(&supervisor);
+    let launched = Instant::now();
+    let trace_dir = dir.to_owned();
+    trace(dir, format_args!("phase=launch"));
     let run_task = tokio::task::spawn_blocking(move || {
-        maos_bin::worker_spawn::run_cli_wrapper_manifest(
+        let result = maos_bin::worker_spawn::run_cli_wrapper_manifest(
             &manifest,
             &run,
             tl,
@@ -254,16 +272,56 @@ async fn exercise_unload(
             &maos_kernel_core::security::crypto::RingCryptoProvider,
             None,
         )
-        .map_err(|error| error.to_string())
+        .map_err(|error| diagnostic_tags(&error.to_string()));
+        let elapsed = launched.elapsed();
+        let receipt = cid_from_lifecycle(&trace_dir.join("lifecycle.ndjson")).is_some();
+        match &result {
+            Ok(_) => trace(
+                &trace_dir,
+                format_args!(
+                    "phase=run-return outcome=ok elapsed={elapsed:?} cid-receipt={receipt}"
+                ),
+            ),
+            Err(tags) => trace(
+                &trace_dir,
+                format_args!(
+                "phase=run-return outcome=error elapsed={elapsed:?} cid-receipt={receipt}; {tags}"
+            ),
+            ),
+        }
+        result
     });
-    let bound = wait_for(Duration::from_secs(60), || {
-        supervisor
-            .bindings()
-            .first()
-            .is_some_and(|b| b.child_pid.is_some())
-    })
-    .await;
-    assert!(bound, "real T3 Worker must bind before the planned unload");
+    let bind_by = launched + Duration::from_secs(60);
+    loop {
+        if run_task.is_finished() {
+            let outcome = match run_task.await {
+                Ok(Ok(_)) => "unexpected-ok",
+                Ok(Err(_)) => "error",
+                Err(error) if error.is_panic() => "panic",
+                Err(_) => "cancelled",
+            };
+            trace(
+                dir,
+                format_args!("phase=before-bind early-return={outcome}"),
+            );
+            panic!("real T3 Worker returned before the planned unload");
+        }
+        if supervisor.bindings().iter().any(|b| b.child_pid.is_some()) {
+            break;
+        }
+        if Instant::now() >= bind_by {
+            let receipt = cid_from_lifecycle(&dir.join("lifecycle.ndjson")).is_some();
+            trace(
+                dir,
+                format_args!(
+                    "phase=await-bind timeout elapsed={:?} cid-receipt={receipt}",
+                    launched.elapsed()
+                ),
+            );
+            panic!("real T3 Worker must bind before the planned unload");
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
     let binding = supervisor
         .bindings()
         .into_iter()
@@ -271,6 +329,14 @@ async fn exercise_unload(
         .expect("bound Worker");
     let pid = binding.spirit_pid;
     let cid = cid_from_lifecycle(&dir.join("lifecycle.ndjson"));
+    trace(
+        dir,
+        format_args!(
+            "phase=bound elapsed={:?} cid-receipt={}",
+            launched.elapsed(),
+            cid.is_some()
+        ),
+    );
     assert!(
         cid.is_some(),
         "SandboxApplied lifecycle journal must identify the owned CID"
@@ -279,6 +345,7 @@ async fn exercise_unload(
     // The production root wrapper: unload, then the same post-unload registry
     // stop `main` installs, whatever the failing hook did (AC4.6).
     let unload_started = Instant::now();
+    trace(dir, format_args!("phase=planned-unload"));
     let stop_after_unload = |unloaded| supervisor.stop_binding(unloaded);
     let report = maos_bin::supervision::unload_all_loaded(
         &world.scheduler,
@@ -287,6 +354,10 @@ async fn exercise_unload(
     )
     .await;
     let unload_returned = Instant::now();
+    trace(
+        dir,
+        format_args!("phase=unload-return elapsed={:?}", unload_started.elapsed()),
+    );
     let teardown_budget = Duration::from_secs(25)
         + if expected_budget_row {
             Duration::from_secs(1)
@@ -320,7 +391,14 @@ async fn exercise_unload(
         Duration::from_secs(5),
         tokio::task::spawn_blocking(move || {
             std::process::Command::new("timeout")
-                .args(["5s", &exists_runtime, "container", "exists", &exists_cid])
+                .args([
+                    "--kill-after=1s",
+                    "5s",
+                    &exists_runtime,
+                    "container",
+                    "exists",
+                    &exists_cid,
+                ])
                 .status()
                 .expect("check owned CID existence")
         }),
@@ -335,8 +413,10 @@ async fn exercise_unload(
             let running = tokio::time::timeout(
                 Duration::from_secs(5),
                 tokio::task::spawn_blocking(move || {
-                    std::process::Command::new("timeout")
+                    let (capture, stdout) = capture_file();
+                    let status = std::process::Command::new("timeout")
                         .args([
+                            "--kill-after=1s",
                             "5s",
                             &running_runtime,
                             "inspect",
@@ -344,19 +424,21 @@ async fn exercise_unload(
                             "{{.State.Running}}",
                             &running_cid,
                         ])
-                        .output()
-                        .expect("inspect owned CID")
+                        .stdout(stdout)
+                        .status()
+                        .expect("inspect owned CID");
+                    (status, capture_text(&capture))
                 }),
             )
             .await
             .expect("CID running-state query bounded")
             .expect("inspect task");
             assert!(
-                running.status.success(),
+                running.0.success(),
                 "existing owned CID must be inspectable"
             );
             assert_eq!(
-                String::from_utf8_lossy(&running.stdout).trim(),
+                running.1.trim(),
                 "false",
                 "CID must stop within five seconds of unload returning"
             );
@@ -375,36 +457,21 @@ async fn exercise_unload(
     // wait_and_finalize persists the real T3 terminal row after the planned stop.
     let run_result = match tokio::time::timeout(Duration::from_secs(30), run_task).await {
         Ok(joined) => joined.expect("worker blocking task joined"),
-        Err(_) => panic!(
-            "the failed on_unload hook must not block runtime teardown: \
-             run_cli_wrapper_manifest did not return within 30s of unload returning\n{}",
-            stall_diagnostics(&runtime, &cid, binding.child_pid)
-        ),
+        Err(_) => {
+            let client_state = binding.child_pid.and_then(super::proc_state);
+            trace(
+                dir,
+                format_args!(
+                    "phase=await-run-return timeout cid-receipt=true client-state={client_state:?}"
+                ),
+            );
+            panic!("run_cli_wrapper_manifest did not return within 30s of planned unload");
+        }
     };
     assert!(
         run_result.is_ok(),
-        "real run_cli_wrapper_manifest should finalize: {run_result:?}"
+        "real run_cli_wrapper_manifest should finalize"
     );
-    if let Some(path) = old_path {
-        std::env::set_var("PATH", path);
-    } else {
-        std::env::remove_var("PATH");
-    }
-    if let Some(value) = home {
-        std::env::set_var("HOME", value);
-    } else {
-        std::env::remove_var("HOME");
-    }
-    if let Some(value) = maos_home {
-        std::env::set_var("MAOS_HOME", value);
-    } else {
-        std::env::remove_var("MAOS_HOME");
-    }
-    if let Some(value) = xdg_home {
-        std::env::set_var("XDG_DATA_HOME", value);
-    } else {
-        std::env::remove_var("XDG_DATA_HOME");
-    }
 
     let rows = world.rows();
     let at_pid: Vec<_> = rows
@@ -491,7 +558,14 @@ async fn exercise_unload(
         let exists_cid = cid.clone();
         let exists = tokio::task::spawn_blocking(move || {
             std::process::Command::new("timeout")
-                .args(["8s", &runtime, "container", "exists", &exists_cid])
+                .args([
+                    "--kill-after=1s",
+                    "8s",
+                    &runtime,
+                    "container",
+                    "exists",
+                    &exists_cid,
+                ])
                 .status()
                 .expect("check owned CID removal")
         })
@@ -505,164 +579,35 @@ async fn exercise_unload(
     } else {
         supervisor.report_unresolved_containers();
     }
-    let _ = std::fs::remove_dir_all(dir);
 }
 
 fn cid_from_lifecycle(path: &Path) -> Option<String> {
-    for line in std::fs::read_to_string(path).ok()?.lines() {
-        let entry: serde_json::Value = serde_json::from_str(line).ok()?;
+    let file = std::fs::File::open(path).ok()?;
+    let text = capture_text(&file);
+    for line in text.lines() {
+        let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
         if entry["lifecycle_event"] == "SandboxApplied" {
             let bytes = entry["payload"].as_array()?;
             let payload = bytes
                 .iter()
                 .map(|byte| byte.as_u64().and_then(|n| u8::try_from(n).ok()))
                 .collect::<Option<Vec<_>>>()?;
-            return serde_json::from_slice::<serde_json::Value>(&payload).ok()?["container_id"]
+            let receipt: serde_json::Value = serde_json::from_slice(&payload).ok()?;
+            return receipt["container_id"]
                 .as_str()
+                .filter(|cid| super::valid_cid(cid))
                 .map(str::to_owned);
         }
     }
     None
 }
 
-/// What a stalled `run_cli_wrapper_manifest` is waiting on, captured at the
-/// moment the join bound expires: this test process's threads (kernel wait
-/// channel), every other process that holds one of this process's pipes (the
-/// bridge reader threads block until the last holder of a child pipe closes
-/// it), the runtime client's `/proc` state, the process tree and the CID's
-/// runtime state. Best effort and bounded; every probe failure is reported,
-/// never hidden.
-fn stall_diagnostics(runtime: &str, cid: &str, child_pid: Option<u32>) -> String {
-    use std::fmt::Write as _;
-    let mut report = String::new();
-    let own = std::process::id();
-    let _ = writeln!(report, "-- test process {own} threads (comm: wchan) --");
-    match std::fs::read_dir("/proc/self/task") {
-        Ok(tasks) => {
-            for task in tasks.flatten() {
-                let path = task.path();
-                let read = |name: &str| {
-                    std::fs::read_to_string(path.join(name))
-                        .map(|text| text.trim().to_owned())
-                        .unwrap_or_else(|error| format!("<{error}>"))
-                };
-                let _ = writeln!(
-                    report,
-                    "{}: {} : {}",
-                    task.file_name().to_string_lossy(),
-                    read("comm"),
-                    read("wchan")
-                );
-            }
-        }
-        Err(error) => {
-            let _ = writeln!(report, "<cannot list threads: {error}>");
-        }
-    }
-    let pipe_ends: std::collections::BTreeSet<String> = std::fs::read_dir("/proc/self/fd")
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|fd| std::fs::read_link(fd.path()).ok())
-        .map(|target| target.to_string_lossy().into_owned())
-        .filter(|target| target.starts_with("pipe:["))
-        .collect();
-    let _ = writeln!(
-        report,
-        "-- other processes sharing this process's {} pipe(s) --",
-        pipe_ends.len()
-    );
-    for process in std::fs::read_dir("/proc").into_iter().flatten().flatten() {
-        let Some(pid) = process
-            .file_name()
-            .to_str()
-            .and_then(|name| name.parse::<u32>().ok())
-            .filter(|pid| *pid != own)
-        else {
-            continue;
-        };
-        let Ok(fds) = std::fs::read_dir(process.path().join("fd")) else {
-            continue;
-        };
-        let held: Vec<String> = fds
-            .flatten()
-            .filter_map(|fd| {
-                let target = std::fs::read_link(fd.path())
-                    .ok()?
-                    .to_string_lossy()
-                    .into_owned();
-                pipe_ends
-                    .contains(&target)
-                    .then(|| format!("fd{}={target}", fd.file_name().to_string_lossy()))
-            })
-            .collect();
-        if !held.is_empty() {
-            let cmdline = std::fs::read(process.path().join("cmdline"))
-                .map(|bytes| String::from_utf8_lossy(&bytes).replace('\0', " "))
-                .unwrap_or_default();
-            let _ = writeln!(
-                report,
-                "pid {pid} [{}] holds {}",
-                cmdline.chars().take(240).collect::<String>(),
-                held.join(", ")
-            );
-        }
-    }
-    if let Some(pid) = child_pid {
-        let _ = writeln!(
-            report,
-            "-- runtime client pid {pid} /proc stat --\n{}",
-            std::fs::read_to_string(format!("/proc/{pid}/stat"))
-                .unwrap_or_else(|error| format!("<{error}>"))
-        );
-    }
-    let probe = |program: &str, args: &[&str]| {
-        let output = std::process::Command::new("timeout")
-            .arg("5s")
-            .arg(program)
-            .args(args)
-            .output();
-        match output {
-            Ok(output) => format!(
-                "{:?}\n{}{}",
-                output.status.code(),
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            ),
-            Err(error) => format!("<cannot run {program}: {error}>"),
-        }
-    };
-    let _ = writeln!(
-        report,
-        "-- process tree --\n{}",
-        probe("ps", &["-eo", "pid,ppid,stat,etime,args", "--forest"])
-            .chars()
-            .take(12_000)
-            .collect::<String>()
-    );
-    let _ = writeln!(
-        report,
-        "-- CID state ({cid}) --\n{}",
-        probe(runtime, &["inspect", "--format", "{{json .State}}", cid])
-    );
-    report
-}
-
-async fn wait_for(budget: Duration, mut predicate: impl FnMut() -> bool) -> bool {
-    let deadline = Instant::now() + budget;
-    while Instant::now() < deadline {
-        if predicate() {
-            return true;
-        }
-        tokio::time::sleep(Duration::from_millis(25)).await;
-    }
-    predicate()
-}
-
-/// Hang guard for one whole scene (setup, the 60 s bind wait, teardown, the
-/// 30 s run join and the CID probes sum to well under half of this). It
-/// bounds a scene that blocks, it is not an expectation about a healthy one.
+/// Parent-side hard bound for the entire child, including a synchronous stall
+/// that prevents an in-runtime timer from being polled.
 const SCENE_HARD_BOUND: Duration = Duration::from_secs(240);
+const SCENE_CHILD: &str = "MAOS_17_7_UNLOAD_SCENE_CHILD";
 
 /// How long a failed scene waits for its blocking threads before abandoning
 /// them. A `#[tokio::test]` runtime's `Drop` waits for every `spawn_blocking`
@@ -672,21 +617,15 @@ const SCENE_HARD_BOUND: Duration = Duration::from_secs(240);
 /// "running" 1000+ s later). Owning the runtime lets a failure return promptly.
 const FAILED_SCENE_RUNTIME_REAP: Duration = Duration::from_secs(5);
 
-fn run_scene(fault: OnUnloadFault, cap: Option<u32>, expected_budget_row: bool, scene_name: &str) {
+fn run_scene_child(dir: &Path, fault: OnUnloadFault, cap: Option<u32>, budget_row: bool) {
+    trace(dir, format_args!("phase=child-start"));
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(4)
         .enable_all()
         .build()
         .expect("build the S5 scene runtime");
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        runtime.block_on(async {
-            tokio::time::timeout(
-                SCENE_HARD_BOUND,
-                exercise_unload(fault, cap, expected_budget_row, scene_name),
-            )
-            .await
-            .expect("S5 scene exceeded its hard bound");
-        })
+        runtime.block_on(exercise_unload(dir, fault, cap, budget_row))
     }));
     runtime.shutdown_timeout(FAILED_SCENE_RUNTIME_REAP);
     if let Err(panic) = outcome {
@@ -694,14 +633,107 @@ fn run_scene(fault: OnUnloadFault, cap: Option<u32>, expected_budget_row: bool, 
     }
 }
 
+fn run_scene(
+    name: &str,
+    fault: OnUnloadFault,
+    cap: Option<u32>,
+    expected_budget_row: bool,
+    scene_name: &str,
+) {
+    if let Some(selected) = std::env::var_os(SCENE_CHILD) {
+        assert_eq!(
+            selected, name,
+            "isolated S5 child must execute the selected case"
+        );
+        let home = PathBuf::from(std::env::var_os("MAOS_HOME").expect("isolated S5 home"));
+        let dir = home.parent().expect("S5 parent scratch");
+        run_scene_child(dir, fault, cap, expected_budget_row);
+        trace(dir, format_args!("phase=complete"));
+        return;
+    }
+    if !super::scene(scene_name) {
+        return;
+    }
+
+    // Re-exec only this existing test key. The private completion record
+    // rejects a zero-test child; its libtest results never enter the CI log.
+    let scratch = tempfile::tempdir().expect("isolated S5 scratch");
+    let dir = scratch.path();
+    let home = dir.join("runtime-home");
+    std::fs::create_dir(&home).expect("create isolated runtime home");
+    let (stderr, err) = capture_file();
+    let (stdout, out) = capture_file();
+    let started = Instant::now();
+    let mut child = SceneChild::spawn_worker(
+        SceneChild::worker_command(std::env::current_exe().expect("S5 test executable"))
+            .args(["--exact", name, "--nocapture", "--test-threads=1"])
+            .env(SCENE_CHILD, name)
+            .env("HOME", super::t3_substrate::isolated_runtime_home(&home))
+            .env("MAOS_HOME", &home)
+            .env("XDG_DATA_HOME", &home)
+            .env_remove(maos_bin::worker_workspace::WORKSPACES_ROOT_ENV)
+            .env("PATH", super::layout::path_with_profile())
+            .stdout(out)
+            .stderr(err),
+    )
+    .unwrap_or_else(|error| panic!("{scene_name} phase=spawn failed ({:?})", error.kind()));
+    let status = child
+        .wait_until(started + SCENE_HARD_BOUND)
+        .expect("poll S5 child");
+    let phases = std::fs::File::open(dir.join("scene.trace"))
+        .map(|file| capture_text(&file))
+        .unwrap_or_default();
+    if status.is_some_and(|status| status.success())
+        && phases.lines().any(|line| line == "phase=complete")
+    {
+        child.reap().expect("reap isolated S5 child");
+        return;
+    }
+    let outcome = match status {
+        None => "hard-timeout",
+        Some(status) if status.success() => "missing-completion",
+        Some(_) => "failed",
+    };
+    let elapsed = started.elapsed();
+    child.cid = cid_from_lifecycle(&dir.join("lifecycle.ndjson")).or_else(|| {
+        capture_text(&stdout)
+            .lines()
+            .find_map(super::cid_receipt)
+            .map(|receipt| receipt.cid)
+    });
+    let cid_received = child.cid.is_some();
+    let cleanup = child.cleanup_failure();
+    let stderr = capture_text(&stderr);
+    let assertion_site = stderr.lines().find_map(|line| {
+        let (_, site) = line.split_once("panicked at ")?;
+        let (_, location) = site.split_once("worker_terminal_facts_17_7/unload_scenes.rs:")?;
+        let (line, column) = location.trim_end_matches(':').split_once(':')?;
+        Some((line.parse::<u32>().ok()?, column.parse::<u32>().ok()?))
+    });
+    panic!(
+        "{scene_name} phase=child-result outcome={outcome} status={status:?}; \
+         elapsed={elapsed:?}; cid-receipt={cid_received}; \
+         cleanup={cleanup:?}; S5 assertion site={assertion_site:?}\n\
+         {phases}stderr: {}",
+        diagnostic_tags(&stderr)
+    );
+}
+
 #[test]
 fn s5_on_unload_panic_before_stop_keeps_planned_container_ownership() {
-    run_scene(OnUnloadFault::Panic, None, false, "S5 on_unload panic");
+    run_scene(
+        "unload_scenes::s5_on_unload_panic_before_stop_keeps_planned_container_ownership",
+        OnUnloadFault::Panic,
+        None,
+        false,
+        "S5 on_unload panic",
+    );
 }
 
 #[test]
 fn s5_on_unload_over_budget_keeps_planned_container_ownership() {
     run_scene(
+        "unload_scenes::s5_on_unload_over_budget_keeps_planned_container_ownership",
         OnUnloadFault::Sleep(Duration::from_secs(3)),
         Some(1),
         true,

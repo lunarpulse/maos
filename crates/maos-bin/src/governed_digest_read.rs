@@ -28,7 +28,7 @@
 //! before `issue_with_mediation`, so a key set that expired or a `kid` retired between the
 //! signature check and the mint is refused with the same generic denial.
 //!
-//! Residual (item I, operator acceptance NEEDED; RELEASE-HOLDS 23-2.e/23-2.f): the token is published inside the
+//! Residual (item I, accepted by the operator 2026-11-26 as a documented limit; RELEASE-HOLDS 23-2.e/23-2.f): the token is published inside the
 //! kernel capability registry (policy, context, quota shard, token store), which this crate
 //! cannot change. A key retired by a publication after the recheck and before the token is
 //! inserted is not detected. That window is the duration of `issue_with_mediation`: it can

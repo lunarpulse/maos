@@ -42,3 +42,7 @@ tests/reports/evidence-ledger-*.json
 
 # Generated deterministic migration corpus (2.8 GB; regenerate per docs/testing/proof-contract.md or set MAOS_MIGRATION_CORPUS)
 /tests/corpora/migration-corpus-1e6.sqlite
+
+# CI evidence audit key: lives only in the CI_EVIDENCE_AUDIT_KEY secret, never in the tree
+# (docs/runbooks/provisioning-checklist.md).
+/ci-evidence-audit.key

@@ -264,7 +264,7 @@ on the next successful publication, normally the half-TTL idle refresh (about ha
 a completion bound). A token's key is rechecked just before it is minted; a key withdrawn
 by a publication after that check and before the token is stored (the duration of the
 mint, with no fixed bound) is not detected, which is small against the TTL-long
-revocation window above; this residual needs operator acceptance (item I, not yet ruled). A `MAOS_SSO_*`
+revocation window above; this residual is accepted by the operator (2026-11-26) as a documented limit (item I). A `MAOS_SSO_*`
 variable that is not valid UTF-8 leaves SSO configured-down
 (`sso_env_not_unicode: <NAME>`). The principal is asserted, not authenticated, at the
 door. See the [enterprise daemon runbook](../runbooks/ent-1-enterprise-daemon-posture.md)

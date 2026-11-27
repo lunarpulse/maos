@@ -2,10 +2,15 @@
 //! touching another home's Worker or a label-less impostor. Real runtime,
 //! hosted `epic-17-exit` only.
 
-use std::io::BufRead as _;
+use std::fs::File;
+use std::io::{self, BufRead as _, BufReader, Seek as _};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
+
+use super::{
+    capture_file, capture_text, cid_channel, diagnostic_tags, run_captured, Captured, SceneChild,
+};
 
 const MANIFEST: &str = "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
     argv_prefix = [\"--maos-worker\", \"--maos-fixture-mode=hang\"]\n\
@@ -14,11 +19,10 @@ const MANIFEST: &str = "[cli_wrapper]\ncommand = \"worker-cli-fixture\"\n\
     stdio_shape = \"ndjson_over_stdio\"\ncontrol_channel = \"signals\"\n\
     shutdown_signal = \"SIGTERM\"\n\n[sandbox]\ntier = \"T3\"\n\n[author]\nname = \"MAOS Project\"\n";
 
-fn maos(home: &Path, args: &[&str]) -> Command {
+fn maos(mut command: Command, home: &Path, args: &[&str]) -> Command {
     let user_home = home.parent().expect("scratch user HOME contains MAOS_HOME");
     let root = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     let paths = super::layout::path_with_profile();
-    let mut command = Command::new(env!("CARGO_BIN_EXE_maos"));
     command
         .args(args)
         .current_dir(&root)
@@ -37,56 +41,135 @@ fn maos(home: &Path, args: &[&str]) -> Command {
     command
 }
 
-/// Start a hanging Worker root and return it with the CID it published.
-fn start_root(home: &Path, manifest: &Path) -> (Child, String) {
-    let mut child = maos(home, &["run", manifest.to_str().expect("utf8"), "--once"])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
-        .expect("spawn Worker root");
-    let (tx, rx) = std::sync::mpsc::channel();
-    let stdout = child.stdout.take().expect("root stdout");
-    std::thread::spawn(move || {
-        for line in std::io::BufReader::new(stdout)
-            .lines()
-            .map_while(Result::ok)
-        {
-            let Ok(event) = serde_json::from_str::<serde_json::Value>(&line) else {
-                continue;
-            };
-            if event["event"] == "cli_wrapper_loaded" {
-                let _ = tx.send(
-                    event["container_id"]
-                        .as_str()
-                        .unwrap_or_default()
-                        .to_owned(),
-                );
-            }
-        }
-    });
-    let cid = rx
-        .recv_timeout(Duration::from_secs(60))
-        .expect("root published cli_wrapper_loaded with its CID");
-    assert_eq!(cid.len(), 64, "published CID is the owned 64-hex id");
-    (child, cid)
+struct LiveRoot {
+    process: SceneChild,
+    stderr: std::fs::File,
 }
 
-fn runtime(args: &[&str]) -> Option<String> {
-    let runtime = std::env::var("MAOS_T3_RUNTIME").expect("provisioned runtime");
-    let output = Command::new("timeout")
-        .arg("8s")
-        .arg(runtime)
-        .args(args)
-        .output()
-        .ok()?;
+/// Start a hanging Worker root and return it with the CID it published.
+fn start_root(label: &str, home: &Path, manifest: &Path) -> (LiveRoot, String) {
+    let (stderr, err) = capture_file();
+    let started = Instant::now();
+    let mut child = SceneChild::spawn_worker(
+        maos(
+            SceneChild::worker_command(env!("CARGO_BIN_EXE_maos")),
+            home,
+            &["run", manifest.to_str().expect("utf8"), "--once"],
+        )
+        .stdout(Stdio::piped())
+        .stderr(err),
+    )
+    .unwrap_or_else(|error| panic!("root-crash {label}: spawn failed ({:?})", error.kind()));
+    let (rx, _) = cid_channel(child.child().stdout.take().expect("root stdout"));
+    let deadline = started + Duration::from_secs(60);
+    loop {
+        let left = deadline.saturating_duration_since(Instant::now());
+        let phase = match rx.recv_timeout(left.min(Duration::from_millis(25))) {
+            Ok(receipt) => {
+                return (
+                    LiveRoot {
+                        process: child,
+                        stderr,
+                    },
+                    receipt.cid,
+                );
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => "cid-disconnect",
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) if left.is_zero() => "cid-timeout",
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => "await-cid",
+        };
+        // At EOF the child may still be in its final instructions. Give the
+        // disconnect a small bounded window to retain its real exit status.
+        let status = if phase == "cid-disconnect" {
+            child.wait_until((Instant::now() + Duration::from_millis(100)).min(deadline))
+        } else {
+            child.poll()
+        }
+        .expect("poll Worker root");
+        if status.is_some() || phase != "await-cid" {
+            let stderr = diagnostic_tags(&capture_text(&stderr));
+            let cleanup = child.cleanup_failure();
+            panic!(
+                "root-crash {label}: phase={phase}; cid receipt=false; elapsed={:?}; \
+                 root status={status:?}; cleanup={cleanup:?}; \
+                 stderr: {stderr}",
+                started.elapsed()
+            );
+        }
+    }
+}
+
+fn crash_root(label: &str, root: &mut LiveRoot) {
+    use std::os::unix::process::ExitStatusExt as _;
+
+    // Kill only the root: the runtime/container must survive for the actual
+    // crash-recovery and purge assertions below.
+    root.process.child().kill().unwrap_or_else(|error| {
+        panic!(
+            "root-crash {label}: SIGKILL failed ({:?}); stderr: {}",
+            error.kind(),
+            diagnostic_tags(&capture_text(&root.stderr))
+        );
+    });
+    let status = root
+        .process
+        .wait_until(Instant::now() + Duration::from_secs(5))
+        .expect("poll SIGKILLed root");
+    assert_eq!(
+        status.and_then(|status| status.signal()),
+        Some(9),
+        "root-crash {label}: expected reaped SIGKILL; root status={status:?}; stderr: {}",
+        diagnostic_tags(&capture_text(&root.stderr))
+    );
+    root.process.reap().expect("reap crashed root");
+}
+
+fn runtime(args: &[&str]) -> io::Result<Captured> {
+    let runtime = std::env::var_os("MAOS_T3_RUNTIME").expect("provisioned runtime");
+    run_captured(Command::new(runtime).args(args), Duration::from_secs(8))
+}
+
+fn runtime_text(args: &[&str]) -> Option<String> {
+    let output = runtime(args).ok()?;
     output
-        .status
+        .status?
         .success()
-        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_owned())
+        .then(|| output.stdout_text().trim().to_owned())
+}
+
+fn report_contains(mut file: &File, marker: &str) -> bool {
+    file.rewind().expect("rewind purge report");
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    while reader.read_line(&mut line).expect("read purge report") != 0 {
+        if line.contains(marker) {
+            return true;
+        }
+        line.clear();
+    }
+    false
+}
+
+fn purge(home: &Path, args: &[&str], phase: &str) -> (ExitStatus, File, String) {
+    let output = run_captured(
+        &mut maos(Command::new(env!("CARGO_BIN_EXE_maos")), home, args),
+        Duration::from_secs(120),
+    )
+    .unwrap_or_else(|error| {
+        panic!(
+            "root-crash phase={phase}: could not run purge ({:?})",
+            error.kind()
+        )
+    });
+    let stderr = diagnostic_tags(&output.stderr);
+    let status = output
+        .status
+        .unwrap_or_else(|| panic!("root-crash phase={phase}: purge timed out; stderr: {stderr}"));
+    (status, output.stdout, stderr)
 }
 
 fn state(cid: &str) -> (String, String) {
-    let text = runtime(&[
+    let text = runtime_text(&[
         "inspect",
         "--format",
         "{{.State.Status}} {{.State.StartedAt}}",
@@ -101,46 +184,31 @@ struct Containers(Vec<String>);
 impl Drop for Containers {
     fn drop(&mut self) {
         for cid in &self.0 {
-            let _ = runtime(&["rm", "--force", "--volumes", "--time=0", cid]);
+            super::remove_scene_cid(cid);
         }
-    }
-}
-struct LiveRoot(Child);
-impl Drop for LiveRoot {
-    fn drop(&mut self) {
-        let _ = self.0.kill();
-        let _ = self.0.wait();
     }
 }
 fn exists_code(cid: &str) -> Option<i32> {
     Command::new("timeout")
+        .arg("--kill-after=1s")
         .arg("8s")
         .arg(std::env::var("MAOS_T3_RUNTIME").expect("runtime"))
         .args(["container", "exists", cid])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .expect("exists")
         .code()
 }
 fn custody_dirs(cid: &str) -> Vec<PathBuf> {
-    let mut roots = vec![std::env::temp_dir().join(format!(
-        "maos-worker-state-{}",
-        rustix::process::geteuid().as_raw()
-    ))];
-    if let Some(runtime) = std::env::var_os("XDG_RUNTIME_DIR") {
-        roots.push(PathBuf::from(runtime).join("maos-worker-state"));
-    }
     let mut found = Vec::new();
-    for root in roots {
-        if let Ok(processes) = std::fs::read_dir(root) {
-            for process in processes.flatten() {
-                if let Ok(spawns) = std::fs::read_dir(process.path()) {
-                    for spawn in spawns.flatten() {
-                        if std::fs::read_to_string(spawn.path().join("cid"))
-                            .is_ok_and(|text| text.trim() == cid)
-                        {
-                            found.push(spawn.path());
-                        }
-                    }
+    for process in super::custody_process_dirs() {
+        if let Ok(spawns) = std::fs::read_dir(process) {
+            for spawn in spawns.flatten() {
+                if std::fs::read_to_string(spawn.path().join("cid"))
+                    .is_ok_and(|text| text.trim() == cid)
+                {
+                    found.push(spawn.path());
                 }
             }
         }
@@ -178,10 +246,9 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
     std::fs::write(&manifest, MANIFEST).expect("manifest");
 
     let mut cleanup = Containers(Vec::new());
-    let (mut first, old) = start_root(&home, &manifest);
+    let (mut first, old) = start_root("first-root", &home, &manifest);
     cleanup.0.push(old.clone());
-    first.kill().expect("SIGKILL the root mid-Worker");
-    first.wait().expect("reap killed root");
+    crash_root("first-root", &mut first);
     // Stop the test-owned CID externally; `stop` can return before the
     // runtime publishes the exit, so poll, re-issuing it while still running.
     let stopped_by = Instant::now() + Duration::from_secs(30);
@@ -192,30 +259,31 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
             break observed;
         }
         if stops.len() < 5 {
-            stops.push(runtime(&["stop", "--time=0", &old]));
+            stops.push(
+                runtime(&["stop", "--time=0", &old])
+                    .map(|output| output.status)
+                    .map_err(|error| error.kind()),
+            );
         }
         std::thread::sleep(Duration::from_millis(500));
     };
     assert!(
         matches!(status.as_str(), "exited" | "stopped"),
-        "retained but stopped: {status}; stop results {stops:?}; state {:?}",
-        runtime(&["inspect", "--format", "{{json .State}}", &old])
+        "retained but stopped: last state={status:?}; stop replies (None means timeout)={stops:?}"
     );
 
-    let (mut second, new) = start_root(&home, &manifest);
+    let (mut second, new) = start_root("second-root", &home, &manifest);
     cleanup.0.push(new.clone());
     assert_ne!(old, new, "the second root creates its own CID");
     let observe_by = Instant::now() + Duration::from_secs(3);
     while Instant::now() < observe_by {
-        assert_eq!(
-            state(&old),
-            (status.clone(), started_at.clone()),
+        assert!(
+            state(&old) == (status.clone(), started_at.clone()),
             "old CID never restarts"
         );
         std::thread::sleep(Duration::from_millis(200));
     }
-    second.kill().expect("stop second root");
-    second.wait().expect("reap second root");
+    crash_root("second-root", &mut second);
 
     let old_custody = custody_dirs(&old);
     let new_custody = custody_dirs(&new);
@@ -224,11 +292,10 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
         "crashed roots retained CID custody"
     );
     std::fs::create_dir_all(&foreign_home).expect("foreign home");
-    let (foreign, foreign_cid) = start_root(&foreign_home, &manifest);
-    let _foreign = LiveRoot(foreign);
+    let (_foreign, foreign_cid) = start_root("foreign-root", &foreign_home, &manifest);
     cleanup.0.push(foreign_cid.clone());
-    let image = runtime(&["inspect", "--format", "{{.Image}}", &old]).expect("fixture image");
-    let impostor = runtime(&[
+    let image = runtime_text(&["inspect", "--format", "{{.Image}}", &old]).expect("fixture image");
+    let impostor = runtime_text(&[
         "create",
         "--name",
         &format!("maos-impostor-{}", std::process::id()),
@@ -236,17 +303,14 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
     ])
     .expect("label-less container");
     cleanup.0.push(impostor.clone());
-    let purge = maos(&home, &["purge", "--dry-run"])
-        .output()
-        .expect("dry purge");
+    let (status, _, stderr) = purge(&home, &["purge", "--dry-run"], "dry-purge");
     assert!(
-        purge.status.success(),
-        "dry purge failed: {}",
-        String::from_utf8_lossy(&purge.stderr)
+        status.success(),
+        "dry purge failed: status={status}; stderr: {stderr}"
     );
     assert_eq!(exists_code(&old), Some(0), "dry run removed a container");
     let receipt = dir.path().join("receipt.json");
-    let purge = maos(
+    let (status, stdout, stderr) = purge(
         &home,
         &[
             "purge",
@@ -254,16 +318,12 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
             "--receipt",
             receipt.to_str().expect("receipt path"),
         ],
-    )
-    .output()
-    .expect("confirmed purge");
+        "confirmed-purge",
+    );
     assert!(
-        purge.status.success()
-            || (purge.status.code() == Some(1)
-                && String::from_utf8_lossy(&purge.stdout).contains("complete with residue:")),
-        "purge failed: stdout={} stderr={}",
-        String::from_utf8_lossy(&purge.stdout),
-        String::from_utf8_lossy(&purge.stderr)
+        status.success()
+            || (status.code() == Some(1) && report_contains(&stdout, "complete with residue:")),
+        "purge failed: status={status}; stderr: {stderr}"
     );
     for cid in [&old, &new] {
         assert_eq!(exists_code(cid), Some(1), "owned CID {cid} survived purge");
@@ -274,14 +334,8 @@ fn root_crash_retains_stopped_container_and_purge_reports_it() {
     for path in old_custody.iter().chain(&new_custody) {
         assert!(
             !path.exists(),
-            "CID custody survived: {}; stdout={} stderr={} receipt={:?} custody={:?}",
-            path.display(),
-            String::from_utf8_lossy(&purge.stdout),
-            String::from_utf8_lossy(&purge.stderr),
-            std::fs::read_to_string(&receipt),
-            std::fs::read_dir(path).map(|entries| entries
-                .map(|entry| entry.map(|e| e.path()))
-                .collect::<Vec<_>>())
+            "CID custody survived confirmed purge: status={status}; stderr: {stderr}; receipt={}",
+            receipt.is_file()
         );
     }
 }
@@ -292,13 +346,10 @@ fn purge_cgroup_native_binding_and_dead_creator_twins() {
     let dir = tempfile::tempdir().expect("purge home");
     let home = dir.path().join("home");
     std::fs::create_dir(&home).expect("home");
-    let preflight = maos(&home, &["purge", "--dry-run"])
-        .output()
-        .expect("dry purge preflight");
+    let (status, _, stderr) = purge(&home, &["purge", "--dry-run"], "cgroup-dry-purge");
     assert!(
-        preflight.status.success(),
-        "fixture HOME must not be a purge root: {}",
-        String::from_utf8_lossy(&preflight.stderr)
+        status.success(),
+        "fixture HOME must not be a purge root: status={status}; stderr: {stderr}"
     );
     if !super::scene("purge-cgroups") {
         return;
@@ -332,16 +383,11 @@ fn purge_cgroup_native_binding_and_dead_creator_twins() {
         }
     }
     let _leaves = Leaves(vec![empty.clone(), populated.clone()]);
-    let member = LiveRoot(
-        Command::new("/bin/sleep")
-            .arg("60")
-            .spawn()
-            .expect("test member"),
-    );
-    std::fs::write(populated.join("cgroup.procs"), member.0.id().to_string())
+    let member = SceneChild::spawn(Command::new("/bin/sleep").arg("60")).expect("test member");
+    std::fs::write(populated.join("cgroup.procs"), member.pid().to_string())
         .expect("populate twin");
     let receipt = dir.path().join("receipt.json");
-    let purge = maos(
+    let (status, report, stderr) = purge(
         &home,
         &[
             "purge",
@@ -349,21 +395,20 @@ fn purge_cgroup_native_binding_and_dead_creator_twins() {
             "--receipt",
             receipt.to_str().expect("receipt"),
         ],
-    )
-    .output()
-    .expect("purge");
-    assert!(
-        purge.status.success()
-            || (purge.status.code() == Some(1)
-                && String::from_utf8_lossy(&purge.stdout).contains("complete with residue:")),
-        "{}",
-        String::from_utf8_lossy(&purge.stderr)
+        "cgroup-purge",
     );
-    let report = String::from_utf8_lossy(&purge.stdout);
+    assert!(
+        status.success()
+            || (status.code() == Some(1) && report_contains(&report, "complete with residue:")),
+        "purge failed: status={status}; stderr: {stderr}"
+    );
     assert!(!empty.exists(), "dead-creator empty leaf survived");
     assert!(
-        report.contains(&format!("retained cgroup {}", native_leaf.display())),
-        "kernel naming must bind to purge's actual matcher: {report}"
+        report_contains(
+            &report,
+            &format!("retained cgroup {}", native_leaf.display())
+        ),
+        "kernel naming must bind to purge's actual matcher"
     );
     assert!(native_leaf.exists(), "live creator leaf removed");
     assert!(populated.exists(), "populated leaf removed");

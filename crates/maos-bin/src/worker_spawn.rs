@@ -525,7 +525,7 @@ fn issue_governed_capability(
     // unexpired AT the authorization point, after PDP and immediately before the mint. Never
     // waits for discovery and holds no discovery lock across PDP, sealing or audit; both the
     // bounded-wait callers and the no-wait caller (the digest admission guard) pass through here.
-    // Residual (item I, operator acceptance NEEDED): the token is inserted inside the kernel capability registry,
+    // Residual (item I, accepted by the operator 2026-11-26 as a documented limit): the token is inserted inside the kernel capability registry,
     // so a key retired after this check and before the insert is not detected. That window is
     // the duration of `issue_with_mediation` (policy, context, quota-shard wait, store), not a
     // fixed small time; it is small against the revocation semantics (a withdrawn key verifies

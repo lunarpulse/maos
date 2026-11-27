@@ -148,6 +148,16 @@ cargo run -q -p xtask -- check-loom-substrate-drift   # structural, needs no Pos
 declarations, so it reds on a substrate defect *before* anyone pays for a
 Postgres.
 
+### Separate Worker failures from Postgres failures
+
+If `check-multi-tenant-loom` fails in `worker_terminal_facts_17_7`, retain the
+first failed test names and subprocess phase diagnostics. Run the same
+`maos-bin` target with `--features network` and parallel libtest execution
+after provisioning the signed T3 substrate. A local `SKIP: T3` message is
+not a pass for that scene, even if libtest reports it as `ok`. The dedicated
+Epic 17 hosted job checks the exact roster and rejects skips; its isolated
+test execution does not substitute for the whole-package parallel gate.
+
 ## The operator lane (`PROVEN_LIVE_SIGNED`)
 
 A live leg is `PROVEN_LIVE_SIGNED` only when the harness signed its own
