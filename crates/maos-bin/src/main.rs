@@ -17716,11 +17716,6 @@ mod story_13_5a_enterprise_daemon_seam {
         RequiredUnwired,
     }
 
-    fn reserve_loopback_addr() -> std::net::SocketAddr {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve client address");
-        listener.local_addr().expect("reserved client address")
-    }
-
     fn peer_config(
         peer_id: &str,
         endpoint: std::net::SocketAddr,
@@ -17801,7 +17796,9 @@ mod story_13_5a_enterprise_daemon_seam {
             Arc::clone(&transparency_log),
         )
         .expect("cohort daemon bootstrap");
-        let client_addr = reserve_loopback_addr();
+        // Let the transport bind :0 itself; a probe socket would release
+        // the port before the real bind and race other workspace tests.
+        let client_bind_addr = std::net::SocketAddr::from(([127, 0, 0, 1], 0));
         bootstrap
             .tcp
             .peer_pins
@@ -17812,7 +17809,7 @@ mod story_13_5a_enterprise_daemon_seam {
             });
         bootstrap.peers.push(peer_config(
             REQUESTER,
-            client_addr,
+            client_bind_addr,
             &fixture.client_fingerprint,
         ));
 
@@ -17890,7 +17887,7 @@ mod story_13_5a_enterprise_daemon_seam {
 
         let state = client_state(fixture);
         let client_tcp = maos_a2a_tcp::TcpA2AConfig {
-            listen_addr: client_addr,
+            listen_addr: client_bind_addr,
             own_cert_chain: fixture.client_cert_path.clone(),
             own_private_key: fixture.client_key_path.clone(),
             peer_pins: vec![maos_a2a_tcp::PinnedFingerprint {
@@ -17924,6 +17921,13 @@ mod story_13_5a_enterprise_daemon_seam {
             )
             .await
             .map_err(|error| format!("client transport bind failed: {error}"))?,
+        );
+        let client_addr = client_transport
+            .local_addr()
+            .ok_or_else(|| "client listener address absent".to_string())?;
+        daemon.transport.set_peer_endpoint(
+            &HostId(REQUESTER.to_string()),
+            format!("tls://{client_addr}"),
         );
         let router: Arc<dyn maos_a2a_core::router::A2APeerRouter> = client_transport.clone();
         let distributor = CohortDigestDistributor::new(
