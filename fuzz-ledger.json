@@ -1830,6 +1830,66 @@
       "tier": "T2",
       "timestamp": "2026-11-27T15:56:13Z",
       "workers": 4
+    },
+    {
+      "commit": "41e9cd612217f012ecd406ccecadfa1c3dbe57c4",
+      "corpus_size": 5,
+      "cpu_seconds": 57604,
+      "run_id": "46140115080-nightly",
+      "target": "cap_token_verify",
+      "tier": "T2",
+      "timestamp": "2026-11-28T15:34:26Z",
+      "workers": 4
+    },
+    {
+      "commit": "41e9cd612217f012ecd406ccecadfa1c3dbe57c4",
+      "corpus_size": 563517,
+      "cpu_seconds": 57604,
+      "run_id": "46140115080-nightly",
+      "target": "frame_deser",
+      "tier": "T2",
+      "timestamp": "2026-11-28T15:31:27Z",
+      "workers": 4
+    },
+    {
+      "commit": "41e9cd612217f012ecd406ccecadfa1c3dbe57c4",
+      "corpus_size": 8103,
+      "cpu_seconds": 57604,
+      "run_id": "46140115080-nightly",
+      "target": "fuzz_exec_deps_parse_elf",
+      "tier": "T2",
+      "timestamp": "2026-11-28T15:30:33Z",
+      "workers": 4
+    },
+    {
+      "commit": "41e9cd612217f012ecd406ccecadfa1c3dbe57c4",
+      "corpus_size": 149,
+      "cpu_seconds": 57604,
+      "run_id": "46140115080-nightly",
+      "target": "i11_digest_chain",
+      "tier": "T2",
+      "timestamp": "2026-11-28T15:34:25Z",
+      "workers": 4
+    },
+    {
+      "commit": "41e9cd612217f012ecd406ccecadfa1c3dbe57c4",
+      "corpus_size": 418,
+      "cpu_seconds": 57604,
+      "run_id": "46140115080-nightly",
+      "target": "i8_consent_intent",
+      "tier": "T2",
+      "timestamp": "2026-11-28T15:31:17Z",
+      "workers": 4
+    },
+    {
+      "commit": "41e9cd612217f012ecd406ccecadfa1c3dbe57c4",
+      "corpus_size": 46827,
+      "cpu_seconds": 57604,
+      "run_id": "46140115080-nightly",
+      "target": "manifest_parser",
+      "tier": "T2",
+      "timestamp": "2026-11-28T15:31:08Z",
+      "workers": 4
     }
   ]
 }
